@@ -1,0 +1,21 @@
+models:
+  claude-sonnet-4-6:
+    provider: claude
+    base_url_env: CLAUDE_BASE_URL
+    api_key_env: CLAUDE_API_KEY
+    endpoint: chat_completions
+  claude-opus-4-6:
+    provider: claude
+    base_url_env: CLAUDE_BASE_URL
+    api_key_env: CLAUDE_API_KEY
+    endpoint: chat_completions
+  gpt-5.4:
+    provider: gpt
+    base_url_env: GPT_BASE_URL
+    api_key_env: GPT_API_KEY
+    endpoint: responses
+
+aliases:
+  proposer_default: claude-sonnet-4-6
+  skeptic_default: gpt-5.4
+  moderator_default: gpt-5.4

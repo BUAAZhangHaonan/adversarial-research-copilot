@@ -1,0 +1,13 @@
+debate:
+  max_rounds: 6
+  min_rounds_before_stop: 2
+  score_threshold: 4.0
+  required_stable_rounds: 2
+
+rubric:
+  dimensions:
+    - novelty
+    - feasibility
+    - falsifiability
+    - evaluation_clarity
+    - resource_fit
