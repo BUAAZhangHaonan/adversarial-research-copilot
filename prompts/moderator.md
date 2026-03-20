@@ -13,6 +13,22 @@
 - required revisions 需要给出下一轮必须完成的修改指令。
 - continue_or_stop 只能写 CONTINUE 或 STOP，并给出一句理由。
 
+输出格式要求：
+- 在文本末尾必须追加一个 ```yaml 代码块，字段严格如下：
+	scorecard:
+		novelty: <1-5>
+		feasibility: <1-5>
+		falsifiability: <1-5>
+		evaluation_clarity: <1-5>
+		resource_fit: <1-5>
+	unresolved_blockers:
+		- <string>
+	required_revisions:
+		- <string>
+	continue_or_stop: CONTINUE|STOP
+	reason: <string>
+- 如果没有 unresolved_blockers，必须输出空数组 []。
+
 原则：
 - 只基于证据与结构判断，不做和稀泥总结。
 - 如果 blocker 未消解，不得 STOP。

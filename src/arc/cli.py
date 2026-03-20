@@ -27,6 +27,7 @@ def run(
         help="Model for Moderator",
     ),
     output_dir: str = typer.Option("reports", help="Output directory"),
+    resume: bool = typer.Option(False, help="Resume from reports/latest/run_state.json if available"),
 ) -> None:
     report_file, state_file = run_debate(
         idea_file=idea_file,
@@ -34,6 +35,7 @@ def run(
         skeptic_model=skeptic,
         moderator_model=moderator,
         output_dir=output_dir,
+        resume=resume,
     )
     console.print(f"[bold green]Report:[/bold green] {report_file}")
     console.print(f"[bold green]State:[/bold green] {state_file}")

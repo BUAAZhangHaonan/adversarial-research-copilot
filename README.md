@@ -11,6 +11,18 @@ ARC 不是“自动做科研”的黑箱流水线，而是一个受控对抗式�
 
 单模型自审容易陷入盲点。ARC 强制跨角色、跨模型对抗评审，让输出从“聊天记录”变成可落地的 Research Decision Memo。
 
+## What We Borrowed (And Why)
+
+基于对 ARIS 与 EvoScientist 的实仓审阅，ARC 在 v0.1.1 引入三项升级：
+- 跨模型对抗约束：默认要求 Proposer 与 Skeptic 使用不同模型，避免同模自审盲点。
+- 可恢复循环：每轮写入 `run_state.json`，支持 `--resume` 从中断点继续。
+- 结构化裁决协议：Moderator 追加 machine-readable YAML，提升解析稳定性。
+
+取舍：
+- 借鉴 ARIS 的“轻量、可恢复、流程严控”。
+- 吸收 EvoScientist 的“记忆与多阶段理念”。
+- 暂不引入重框架编排，先把对抗收敛引擎打磨到可复用。
+
 ## Architecture
 
 ```text
@@ -147,11 +159,20 @@ arc run examples/multimodal_research_idea.md \
   --skeptic gpt-5.4 \
   --moderator gpt-5.4 \
   --output-dir reports
+
+# 若上次运行中断，可恢复
+arc run examples/multimodal_research_idea.md \
+       --proposer claude-sonnet-4-6 \
+       --skeptic gpt-5.4 \
+       --moderator gpt-5.4 \
+       --output-dir reports \
+       --resume
 ```
 
 输出：
 - `reports/latest/debate_log.jsonl`
 - `reports/latest/final_state.json`
+- `reports/latest/run_state.json`
 - `reports/latest/research_decision_memo.md`
 
 ### 4) Test

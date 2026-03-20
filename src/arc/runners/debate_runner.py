@@ -11,6 +11,7 @@ def run_debate(
     skeptic_model: str,
     moderator_model: str,
     output_dir: str = "reports",
+    resume: bool = False,
 ) -> tuple[Path, Path]:
     orchestrator = ARCOrchestrator()
     return orchestrator.run(
@@ -19,4 +20,5 @@ def run_debate(
         skeptic_model=skeptic_model,
         moderator_model=moderator_model,
         output_dir=output_dir,
+        resume=resume,
     )

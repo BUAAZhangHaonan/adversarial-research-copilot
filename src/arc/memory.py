@@ -19,3 +19,9 @@ class DebateMemory:
         out_file = self.run_dir / name
         out_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return out_file
+
+    def load_json(self, name: str) -> dict[str, Any] | None:
+        in_file = self.run_dir / name
+        if not in_file.exists():
+            return None
+        return json.loads(in_file.read_text(encoding="utf-8"))

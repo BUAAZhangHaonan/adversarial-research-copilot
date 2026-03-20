@@ -41,6 +41,10 @@ class DebateConfig(BaseModel):
     min_rounds_before_stop: int = 2
     score_threshold: float = 4.0
     required_stable_rounds: int = 2
+    human_checkpoint: bool = False
+    require_cross_model_adversary: bool = True
+    persist_run_state: bool = True
+    stale_resume_hours: int = 24
 
 
 class ResearchState(BaseModel):
