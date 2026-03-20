@@ -11,3 +11,4 @@ htmlcov/
 *.log
 reports/
 *.db
+*.egg-info/
