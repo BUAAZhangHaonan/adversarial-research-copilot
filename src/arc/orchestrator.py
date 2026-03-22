@@ -41,6 +41,9 @@ class ARCOrchestrator:
 
         idea = load_idea_text(idea_file)
         state, start_round, previous_blockers = self._prepare_state(memory, idea, resume)
+        previous_required_revisions: list[str] = []
+        if state.rounds:
+            previous_required_revisions = state.rounds[-1].required_revisions
 
         proposer = ProposerAgent(self.client, proposer_model)
         skeptic = SkepticAgent(self.client, skeptic_model)
@@ -48,9 +51,21 @@ class ARCOrchestrator:
 
         for round_id in range(start_round, self.config.max_rounds + 1):
             self.console.rule(f"Round {round_id}")
-            proposer_output = proposer.run(state.framed_problem, previous_blockers, round_id)
-            skeptic_output = skeptic.run(state.framed_problem, proposer_output, round_id)
-            moderator_output = moderator.run(state.framed_problem, proposer_output, skeptic_output, round_id)
+            proposer_output = proposer.run(
+                state.framed_problem,
+                previous_blockers,
+                previous_required_revisions,
+                round_id,
+            )
+            skeptic_output = skeptic.run(state.framed_problem, proposer_output, previous_blockers, round_id)
+            moderator_output = moderator.run(
+                state.framed_problem,
+                proposer_output,
+                skeptic_output,
+                previous_blockers,
+                previous_required_revisions,
+                round_id,
+            )
 
             scorecard = parse_scorecard(moderator_output)
             decision = parse_decision(moderator_output)
@@ -69,6 +84,7 @@ class ARCOrchestrator:
             )
             state.add_round(record)
             previous_blockers = unresolved_blockers
+            previous_required_revisions = required_revisions
 
             memory.append(record.model_dump())
             self._save_run_state(memory, round_id, scorecard.average, decision, unresolved_blockers, "in_progress")

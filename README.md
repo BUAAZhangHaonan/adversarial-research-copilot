@@ -23,6 +23,37 @@ ARC 不是“自动做科研”的黑箱流水线，而是一个受控对抗式�
 - 吸收 EvoScientist 的“记忆与多阶段理念”。
 - 暂不引入重框架编排，先把对抗收敛引擎打磨到可复用。
 
+## Local References (Visible In Repo)
+
+为便于对照学习，项目内提供本地参考仓库同步目录：
+- `references/ARIS`
+- `references/EvoScientist`
+
+同步命令：
+
+```bash
+bash references/sync_references.sh
+```
+
+说明：参考仓库仅用于本地对照审阅，默认不纳入 ARC 仓库版本历史。
+
+## Skills Library
+
+ARC 已提供一套技能化工作流（见 `skills/`）：
+- `research-lit`
+- `idea-creator`
+- `novelty-check`
+- `research-refine`
+- `experiment-bridge`
+- `debate-runner`
+- `auto-review-loop`
+- `memo-synthesis`
+- `evidence-grounding`
+- `recovery-resume`
+- `pipeline-arc`
+
+这套库借鉴 ARIS 的轻量技能组织方式，但围绕 ARC 的 Proposer/Skeptic/Moderator 对抗收敛逻辑重写。
+
 ## Architecture
 
 ```text
