@@ -1,7 +1,14 @@
 chat_mode:
-  rounds: 3
+  # At least this many rounds must be completed before judge can stop.
+  min_rounds_before_stop: 20
+  # Safety cap for long-running debates. Increase if needed.
+  max_rounds: 60
   # At least 20 references are required for each chat-mode run.
   min_references: 20
-  # Heuristic length guard so each agent output stays concise.
-  max_response_chars: 1600
+  # Approximate 1K-token guard per agent response.
+  max_response_chars: 3200
+  # Keep each message concise and readable.
+  max_paragraphs: 3
+  # One-click concise consensus export.
+  export_best_consensus: true
   persist_state: true

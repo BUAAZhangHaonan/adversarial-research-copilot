@@ -197,6 +197,19 @@ def chat_mode(
     moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
     output_dir: str = typer.Option("reports", help="Output directory"),
     resume: bool = typer.Option(False, help="Resume from latest run directory"),
+    min_rounds_before_stop: int = typer.Option(
+        20,
+        help="Minimum rounds before judge is allowed to stop when convergence is reached",
+    ),
+    max_rounds: int = typer.Option(
+        60,
+        help="Maximum rounds safety cap; set a higher value for long overnight debate",
+    ),
+    export_best_consensus: bool = typer.Option(
+        True,
+        "--export-best-consensus/--no-export-best-consensus",
+        help="Generate BEST_CONSENSUS.md automatically",
+    ),
     gpt_effort: str = typer.Option(
         "medium", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
     gpt_verbosity: str = typer.Option(
@@ -221,9 +234,15 @@ def chat_mode(
         moderator_model=moderator_model,
         output_dir=output_dir,
         resume=resume,
+        min_rounds_before_stop=min_rounds_before_stop,
+        max_rounds=max_rounds,
+        export_best_consensus=export_best_consensus,
     )
     console.print(f"[bold green]Chat transcript:[/bold green] {transcript_file}")
     console.print(f"[bold green]Chat state:[/bold green] {state_file}")
+    consensus_file = transcript_file.parent / "BEST_CONSENSUS.md"
+    if consensus_file.exists():
+        console.print(f"[bold green]Best consensus:[/bold green] {consensus_file}")
 
 
 @app.command("refine-topic")

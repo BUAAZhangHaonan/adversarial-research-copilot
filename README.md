@@ -300,19 +300,26 @@ arc chat-mode "multimodal hallucination mitigation for editing agents" \
        --proposer gpt-5.4 \
        --skeptic glm-5 \
        --moderator gpt-5.4 \
+       --min-rounds-before-stop 20 \
+       --max-rounds 60 \
+       --export-best-consensus \
        --output-dir reports
 ```
 
 特点：
+- 至少进行 20 轮后，才允许裁判根据收敛/方案充分性判定停止
 - 每轮三位 AI 都按聊天语气输出重点思路（创新 + 可行性）
-- 每位 AI 单轮输出受长度约束（默认 `configs/chat_mode.yaml`）
+- 每位 AI 单轮输出受约束：尽量不超过 1K tokens、最多 3 段、强调精简表达
 - 每次运行至少尝试检索 20 篇参考文献（含摘要）
+- 裁判输出带结构化停机标记（CONTINUE / STOP_CONVERGED / STOP_PROPOSER_SUFFICIENT）
+- 一键导出 `BEST_CONSENSUS.md`（精简最优共识方案）
 - 每轮发言单独保存，便于阅读
 
 Chat mode 主要产物（默认 `reports/<timestamp>/`）：
 - `TOPIC_CHAT.txt`
 - `REFERENCES.md`
 - `CHAT_TRANSCRIPT.md`
+- `BEST_CONSENSUS.md`
 - `chat_mode_state.json`
 - `chat_rounds/round_01_proposer.md`
 - `chat_rounds/round_01_skeptic.md`
