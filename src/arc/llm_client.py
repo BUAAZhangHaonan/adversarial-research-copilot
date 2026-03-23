@@ -25,10 +25,13 @@ class ModelSpec:
 class LLMClient:
     def __init__(self, config_path: str | Path = "configs/models.yaml") -> None:
         config = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
-        defaults = config.get("generation_defaults", {}) if isinstance(config, dict) else {}
+        defaults = config.get("generation_defaults", {}
+                              ) if isinstance(config, dict) else {}
         self._default_temperature = _as_float(defaults.get("temperature"), 0.3)
-        self._default_max_output_tokens = _as_int(defaults.get("max_output_tokens"), 16384)
-        self._default_fallback_max_output_tokens = _as_int(defaults.get("fallback_max_output_tokens"), 4096)
+        self._default_max_output_tokens = _as_int(
+            defaults.get("max_output_tokens"), 16384)
+        self._default_fallback_max_output_tokens = _as_int(
+            defaults.get("fallback_max_output_tokens"), 4096)
         self._models: dict[str, ModelSpec] = {}
         for name, spec in config.get("models", {}).items():
             self._models[name] = ModelSpec(
@@ -37,7 +40,8 @@ class LLMClient:
                 base_url_env=spec["base_url_env"],
                 api_key_env=spec["api_key_env"],
                 endpoint=spec["endpoint"],
-                max_output_tokens=_as_optional_int(spec.get("max_output_tokens")),
+                max_output_tokens=_as_optional_int(
+                    spec.get("max_output_tokens")),
                 max_tokens=_as_optional_int(spec.get("max_tokens")),
                 temperature=_as_optional_float(spec.get("temperature")),
             )
@@ -154,7 +158,8 @@ class LLMClient:
         data = _post_json_with_retry(url, headers, payload)
         text = data["choices"][0]["message"]["content"]
         if not isinstance(text, str):
-            raise RuntimeError("No text content returned by chat completions API")
+            raise RuntimeError(
+                "No text content returned by chat completions API")
         return text
 
     @staticmethod
@@ -242,7 +247,8 @@ def _post_json_with_retry(url: str, headers: dict[str, str], payload: dict[str, 
     last_exc: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=_request_timeout_seconds())
+            resp = requests.post(
+                url, headers=headers, json=payload, timeout=_request_timeout_seconds())
             resp.raise_for_status()
             return resp.json()
         except requests.exceptions.ReadTimeout as e:
@@ -256,7 +262,8 @@ def _post_json_with_retry(url: str, headers: dict[str, str], payload: dict[str, 
 
         if attempt < max_attempts:
             if isinstance(last_exc, requests.exceptions.HTTPError) and last_exc.response is not None:
-                retry_after = last_exc.response.headers.get("Retry-After", "").strip()
+                retry_after = last_exc.response.headers.get(
+                    "Retry-After", "").strip()
                 if retry_after.isdigit():
                     delay = max(delay, float(retry_after))
             time.sleep(delay)

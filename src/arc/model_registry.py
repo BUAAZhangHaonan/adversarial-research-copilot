@@ -93,7 +93,8 @@ def save_runtime_roles(cfg: RuntimeRoleConfig, path: str | Path = "configs/runti
     payload = {
         "roles": cfg.model_dump(),
     }
-    p.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    p.write_text(yaml.safe_dump(payload, allow_unicode=True,
+                 sort_keys=False), encoding="utf-8")
     return p
 
 

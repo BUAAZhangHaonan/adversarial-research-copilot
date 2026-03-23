@@ -31,7 +31,8 @@ def load_skill(path: str | Path) -> Skill:
         try:
             meta_obj = yaml.safe_load(frontmatter)
         except yaml.YAMLError as e:
-            raise SkillLoadError(f"Invalid YAML frontmatter in {p}: {e}") from e
+            raise SkillLoadError(
+                f"Invalid YAML frontmatter in {p}: {e}") from e
         if isinstance(meta_obj, dict):
             meta = meta_obj
 
@@ -43,14 +44,15 @@ def load_skill(path: str | Path) -> Skill:
     argument_hint = meta.get("argument-hint")
     if isinstance(argument_hint, list):
         parts = [str(x).strip() for x in argument_hint if str(x).strip()]
-        argument_hint = f"[{ ' '.join(parts) }]" if parts else None
+        argument_hint = f"[{' '.join(parts)}]" if parts else None
     elif argument_hint is not None:
         argument_hint = str(argument_hint).strip() or None
 
     allowed_tools_raw = meta.get("allowed-tools")
     allowed_tools: list[str] = []
     if isinstance(allowed_tools_raw, list):
-        allowed_tools = [str(x).strip() for x in allowed_tools_raw if str(x).strip()]
+        allowed_tools = [str(x).strip()
+                         for x in allowed_tools_raw if str(x).strip()]
 
     return Skill(
         name=name,
@@ -71,7 +73,8 @@ def load_skills_dir(skills_dir: str | Path) -> dict[str, Skill]:
     for skill_file in root.glob("*/SKILL.md"):
         skill = load_skill(skill_file)
         if skill.name in skills:
-            raise SkillLoadError(f"Duplicate skill name '{skill.name}' in {skill_file} and {skills[skill.name].path}")
+            raise SkillLoadError(
+                f"Duplicate skill name '{skill.name}' in {skill_file} and {skills[skill.name].path}")
         skills[skill.name] = skill
     return skills
 
@@ -87,7 +90,8 @@ def parse_stage_chain_from_pipeline_skill(pipeline_skill: Skill) -> list[str]:
             break
 
     if start_idx is None:
-        raise SkillLoadError(f"pipeline skill {pipeline_skill.path} missing '## Stage Chain' section")
+        raise SkillLoadError(
+            f"pipeline skill {pipeline_skill.path} missing '## Stage Chain' section")
 
     stages: list[str] = []
     for line in lines[start_idx:]:
@@ -111,7 +115,8 @@ def parse_stage_chain_from_pipeline_skill(pipeline_skill: Skill) -> list[str]:
             continue
 
     if not stages:
-        raise SkillLoadError(f"pipeline skill {pipeline_skill.path} has empty Stage Chain")
+        raise SkillLoadError(
+            f"pipeline skill {pipeline_skill.path} has empty Stage Chain")
     return stages
 
 
@@ -132,5 +137,5 @@ def _split_frontmatter(text: str) -> tuple[str, str]:
         return "", text
 
     front = "".join(lines[1:end_idx])
-    body = "".join(lines[end_idx + 1 :])
+    body = "".join(lines[end_idx + 1:])
     return front, body

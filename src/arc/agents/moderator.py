@@ -20,7 +20,8 @@ class ModeratorAgent:
         previous_required_revisions: list[str],
         round_id: int,
     ) -> str:
-        blocker_text = "\n".join(f"- {b}" for b in previous_blockers) if previous_blockers else "- 无"
+        blocker_text = "\n".join(
+            f"- {b}" for b in previous_blockers) if previous_blockers else "- 无"
         revision_text = (
             "\n".join(f"- {r}" for r in previous_required_revisions)
             if previous_required_revisions

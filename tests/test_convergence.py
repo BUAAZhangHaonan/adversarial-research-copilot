@@ -23,14 +23,16 @@ def _round(rid: int, avg_high: bool = True) -> RoundRecord:
 
 
 def test_convergence_with_stable_scores() -> None:
-    cfg = DebateConfig(max_rounds=6, min_rounds_before_stop=2, score_threshold=4.0, required_stable_rounds=2)
+    cfg = DebateConfig(max_rounds=6, min_rounds_before_stop=2,
+                       score_threshold=4.0, required_stable_rounds=2)
     rounds = [_round(1), _round(2)]
     status = assess_convergence(rounds, cfg)
     assert status.should_stop is True
 
 
 def test_no_convergence_when_low_score() -> None:
-    cfg = DebateConfig(max_rounds=6, min_rounds_before_stop=2, score_threshold=4.0, required_stable_rounds=2)
+    cfg = DebateConfig(max_rounds=6, min_rounds_before_stop=2,
+                       score_threshold=4.0, required_stable_rounds=2)
     rounds = [_round(1), _round(2, avg_high=False)]
     status = assess_convergence(rounds, cfg)
     assert status.should_stop is False

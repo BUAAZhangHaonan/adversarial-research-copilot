@@ -119,14 +119,14 @@ def test_pipeline_resume_skips_completed_stage(tmp_path: Path) -> None:
 
 
 def test_extract_auto_review_constants() -> None:
-        body = """
+    body = """
 ## Constants
 - MAX_ROUNDS = 5
 - POSITIVE_THRESHOLD = 8/10
 """
-        constants = _extract_auto_review_constants(body)
-        assert constants["MAX_ROUNDS"] == 5
-        assert constants["POSITIVE_THRESHOLD"] == 8
+    constants = _extract_auto_review_constants(body)
+    assert constants["MAX_ROUNDS"] == 5
+    assert constants["POSITIVE_THRESHOLD"] == 8
 
 
 def test_parse_auto_review_payload_yaml_and_revised_memo() -> None:

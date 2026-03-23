@@ -18,7 +18,8 @@ class SkepticAgent:
         previous_blockers: list[str],
         round_id: int,
     ) -> str:
-        blocker_text = "\n".join(f"- {b}" for b in previous_blockers) if previous_blockers else "- 无"
+        blocker_text = "\n".join(
+            f"- {b}" for b in previous_blockers) if previous_blockers else "- 无"
         user_prompt = (
             f"第 {round_id} 轮。\n"
             f"问题框架：\n{framed_problem}\n\n"

@@ -52,7 +52,8 @@ def run_pipeline(
 
     skills: dict[str, Skill] = load_skills_dir(skills_dir)
     if "pipeline-arc" not in skills:
-        raise SkillLoadError("Missing skills/pipeline-arc/SKILL.md (skill name must be 'pipeline-arc')")
+        raise SkillLoadError(
+            "Missing skills/pipeline-arc/SKILL.md (skill name must be 'pipeline-arc')")
 
     stage_chain = parse_stage_chain_from_pipeline_skill(skills["pipeline-arc"])
     if strict_gates:
@@ -112,7 +113,8 @@ def run_pipeline(
         if human_checkpoint and not _checkpoint_stage(stage_name):
             pipeline_state.status = "in_progress"
             _save_pipeline_state(memory, pipeline_state)
-            raise KeyboardInterrupt(f"Stopped by human checkpoint at stage: {stage_name}")
+            raise KeyboardInterrupt(
+                f"Stopped by human checkpoint at stage: {stage_name}")
 
     pipeline_state.status = "completed"
     pipeline_state.completed_at = datetime.now(UTC)
@@ -301,7 +303,8 @@ def _run_stage(
         src_memo = run_dir / "research_decision_memo.md"
         dst_memo = run_dir / "RESEARCH_DECISION_MEMO.md"
         if src_memo.exists():
-            dst_memo.write_text(src_memo.read_text(encoding="utf-8"), encoding="utf-8")
+            dst_memo.write_text(src_memo.read_text(
+                encoding="utf-8"), encoding="utf-8")
         pipeline_state.stage(stage_name).inputs = ["FINAL_PROPOSAL.md"]
         pipeline_state.stage(stage_name).outputs = [dst_memo.name]
         return
@@ -311,7 +314,8 @@ def _run_stage(
         _read_required(memo_path)
         log_path = run_dir / "AUTO_REVIEW.md"
 
-        constants = _extract_auto_review_constants(_skill_body(skills, stage_name))
+        constants = _extract_auto_review_constants(
+            _skill_body(skills, stage_name))
         max_rounds = constants["MAX_ROUNDS"]
         threshold = constants["POSITIVE_THRESHOLD"]
         stage_state_file = run_dir / "auto_review_state.json"
@@ -363,7 +367,8 @@ def _run_stage(
             if revised_memo:
                 memo_path.write_text(revised_memo + "\n", encoding="utf-8")
 
-            prev = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+            prev = log_path.read_text(
+                encoding="utf-8") if log_path.exists() else ""
             log_path.write_text(
                 prev
                 + (
@@ -416,7 +421,8 @@ def _run_stage(
             )
 
         pipeline_state.stage(stage_name).inputs = [memo_path.name]
-        pipeline_state.stage(stage_name).outputs = [memo_path.name, log_path.name, stage_state_file.name]
+        pipeline_state.stage(stage_name).outputs = [
+            memo_path.name, log_path.name, stage_state_file.name]
         return
 
     if stage_name == "memo-synthesis":
@@ -425,9 +431,11 @@ def _run_stage(
         if not memo_path.exists():
             src = run_dir / "research_decision_memo.md"
             if src.exists():
-                memo_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+                memo_path.write_text(src.read_text(
+                    encoding="utf-8"), encoding="utf-8")
         pipeline_state.stage(stage_name).inputs = ["RESEARCH_DECISION_MEMO.md"]
-        pipeline_state.stage(stage_name).outputs = ["RESEARCH_DECISION_MEMO.md"]
+        pipeline_state.stage(stage_name).outputs = [
+            "RESEARCH_DECISION_MEMO.md"]
         return
 
     raise PipelineError(f"Unknown pipeline stage: {stage_name}")
@@ -445,7 +453,8 @@ def _fetch_arxiv_references(topic: str) -> list[dict[str, str]]:
     except Exception:
         max_results = 8
 
-    query = "+AND+".join([f"all:{w}" for w in re.findall(r"[A-Za-z0-9\u4e00-\u9fff]+", topic)[:8]])
+    query = "+AND+".join([f"all:{w}" for w in re.findall(
+        r"[A-Za-z0-9\u4e00-\u9fff]+", topic)[:8]])
     if not query:
         query = "all:multimodal+AND+all:hallucination"
 
@@ -454,7 +463,8 @@ def _fetch_arxiv_references(topic: str) -> list[dict[str, str]]:
         f"search_query={query}&start=0&max_results={max_results}&sortBy=relevance&sortOrder=descending"
     )
     try:
-        resp = requests.get(url, timeout=12, headers={"User-Agent": "ARC/0.1 (research-pipeline)"})
+        resp = requests.get(url, timeout=12, headers={
+                            "User-Agent": "ARC/0.1 (research-pipeline)"})
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
     except Exception:
@@ -477,7 +487,8 @@ def _fetch_arxiv_references(topic: str) -> list[dict[str, str]]:
 
 
 def _format_arxiv_refs(refs: list[dict[str, str]]) -> str:
-    lines = ["# ARXIV_REFERENCES", "", "| arxiv_id | title | url |", "|---|---|---|"]
+    lines = ["# ARXIV_REFERENCES", "",
+             "| arxiv_id | title | url |", "|---|---|---|"]
     for r in refs:
         title = r["title"].replace("|", "\\|")
         lines.append(f"| {r['arxiv_id']} | {title} | {r['url']} |")
@@ -552,7 +563,8 @@ def _validate_stage_chain(stage_chain: list[str]) -> None:
 
 
 def _checkpoint_stage(stage_name: str) -> bool:
-    answer = input(f"[pipeline checkpoint] stage '{stage_name}' completed. Continue? [Y/n]: ").strip().lower()
+    answer = input(
+        f"[pipeline checkpoint] stage '{stage_name}' completed. Continue? [Y/n]: ").strip().lower()
     return answer in {"", "y", "yes"}
 
 
@@ -595,7 +607,8 @@ def _parse_auto_review_payload(text: str) -> dict[str, Any]:
             if isinstance(obj, dict):
                 parsed["score_10"] = int(obj.get("score_10", 0) or 0)
                 parsed["top_blockers"] = _to_str_list(obj.get("top_blockers"))
-                parsed["required_changes"] = _to_str_list(obj.get("required_changes"))
+                parsed["required_changes"] = _to_str_list(
+                    obj.get("required_changes"))
                 decision = str(obj.get("decision", "CONTINUE")).upper()
                 parsed["decision"] = "STOP" if decision == "STOP" else "CONTINUE"
         except Exception:
@@ -611,7 +624,8 @@ def _parse_auto_review_payload(text: str) -> dict[str, Any]:
 
 
 def _extract_fenced_yaml(text: str) -> str:
-    m = re.search(r"```(?:yaml|yml)\s*(.*?)```", text, flags=re.IGNORECASE | re.DOTALL)
+    m = re.search(r"```(?:yaml|yml)\s*(.*?)```", text,
+                  flags=re.IGNORECASE | re.DOTALL)
     if not m:
         return ""
     return m.group(1).strip()
@@ -619,9 +633,10 @@ def _extract_fenced_yaml(text: str) -> str:
 
 def _extract_revised_memo(text: str) -> str:
     # Prefer heading-based extraction.
-    m = re.search(r"^#\s*REVISED_MEMO\s*$", text, flags=re.MULTILINE | re.IGNORECASE)
+    m = re.search(r"^#\s*REVISED_MEMO\s*$", text,
+                  flags=re.MULTILINE | re.IGNORECASE)
     if m:
-        return text[m.end() :].strip()
+        return text[m.end():].strip()
     # Fallback: remove YAML block and keep the rest.
     return re.sub(r"```(?:yaml|yml)\s*.*?```", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
 

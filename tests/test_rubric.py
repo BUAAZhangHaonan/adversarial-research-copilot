@@ -22,7 +22,7 @@ def test_parse_decision() -> None:
 
 
 def test_parse_yaml_payload() -> None:
-        text = """
+    text = """
         moderator report
         ```yaml
         scorecard:
@@ -41,8 +41,8 @@ def test_parse_yaml_payload() -> None:
         reason: blockers still open
         ```
         """
-        score = parse_scorecard(text)
-        assert score.novelty == 5
-        assert parse_decision(text) == "CONTINUE"
-        assert len(parse_unresolved_blockers(text)) == 2
-        assert len(parse_required_revisions(text)) == 2
+    score = parse_scorecard(text)
+    assert score.novelty == 5
+    assert parse_decision(text) == "CONTINUE"
+    assert len(parse_unresolved_blockers(text)) == 2
+    assert len(parse_required_revisions(text)) == 2

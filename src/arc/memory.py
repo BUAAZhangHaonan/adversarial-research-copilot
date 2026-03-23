@@ -17,7 +17,8 @@ class DebateMemory:
 
     def save_json(self, name: str, payload: dict[str, Any]) -> Path:
         out_file = self.run_dir / name
-        out_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        out_file.write_text(json.dumps(
+            payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return out_file
 
     def load_json(self, name: str) -> dict[str, Any] | None:

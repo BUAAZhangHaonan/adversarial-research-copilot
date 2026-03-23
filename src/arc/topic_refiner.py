@@ -24,7 +24,8 @@ def refine_research_topic(
     history: list[TopicRefineRound] = []
 
     for rid in range(1, max(1, rounds) + 1):
-        writer_prompt = _writer_prompt(draft, previous_critique=history[-1].critique if history else None)
+        writer_prompt = _writer_prompt(
+            draft, previous_critique=history[-1].critique if history else None)
         writer_output = client.chat(
             model=writer_model,
             system_prompt=_writer_system_prompt(),
@@ -40,7 +41,8 @@ def refine_research_topic(
             temperature=0.2,
         )
 
-        history.append(TopicRefineRound(round_id=rid, draft=refined, critique=critique_output.strip()))
+        history.append(TopicRefineRound(
+            round_id=rid, draft=refined, critique=critique_output.strip()))
         draft = refined
 
     return draft, history
@@ -61,7 +63,7 @@ def extract_refined_topic(text: str) -> str:
         m = re.search(p, cleaned)
         if not m:
             continue
-        tail = cleaned[m.end() :].strip()
+        tail = cleaned[m.end():].strip()
         if not tail:
             continue
         # Stop at next heading if present.

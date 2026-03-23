@@ -24,23 +24,29 @@ console = Console()
 
 @app.command()
 def run(
-    idea_file: str = typer.Argument(..., help="Path to idea markdown/text file"),
+    idea_file: str = typer.Argument(...,
+                                    help="Path to idea markdown/text file"),
     proposer: Optional[str] = typer.Option(None, help="Model for Proposer"),
     skeptic: Optional[str] = typer.Option(None, help="Model for Skeptic"),
     moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
     output_dir: str = typer.Option("reports", help="Output directory"),
-    resume: bool = typer.Option(False, help="Resume from most recent run if run_state.json is available"),
-    gpt_effort: str = typer.Option("high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option("medium", help="GPT output verbosity: low|medium|high"),
+    resume: bool = typer.Option(
+        False, help="Resume from most recent run if run_state.json is available"),
+    gpt_effort: str = typer.Option(
+        "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
+    gpt_verbosity: str = typer.Option(
+        "medium", help="GPT output verbosity: low|medium|high"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
 
     registry = load_registry()
     runtime = load_runtime_roles(registry)
-    proposer_model = resolve_role_model("proposer", registry, runtime, proposer)
+    proposer_model = resolve_role_model(
+        "proposer", registry, runtime, proposer)
     skeptic_model = resolve_role_model("skeptic", registry, runtime, skeptic)
-    moderator_model = resolve_role_model("moderator", registry, runtime, moderator)
+    moderator_model = resolve_role_model(
+        "moderator", registry, runtime, moderator)
 
     report_file, state_file = run_debate(
         idea_file=idea_file,
@@ -70,24 +76,31 @@ def pipeline(
         help="Model for debate moderator",
     ),
     output_dir: str = typer.Option("reports", help="Output directory"),
-    resume: bool = typer.Option(False, help="Resume from most recent run if pipeline_state.json is available"),
+    resume: bool = typer.Option(
+        False, help="Resume from most recent run if pipeline_state.json is available"),
     strict_gates: bool = typer.Option(
         True,
         "--strict-gates/--no-strict-gates",
         help="Enforce mandatory pipeline gates (novelty-check, debate-runner)",
     ),
-    checkpoint: bool = typer.Option(False, help="Ask for confirmation after each completed stage"),
-    gpt_effort: str = typer.Option("high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option("medium", help="GPT output verbosity: low|medium|high"),
+    checkpoint: bool = typer.Option(
+        False, help="Ask for confirmation after each completed stage"),
+    gpt_effort: str = typer.Option(
+        "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
+    gpt_verbosity: str = typer.Option(
+        "medium", help="GPT output verbosity: low|medium|high"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
 
     registry = load_registry()
     runtime = load_runtime_roles(registry)
-    writer_model = resolve_role_model("pipeline_writer", registry, runtime, proposer)
-    reviewer_model = resolve_role_model("pipeline_reviewer", registry, runtime, skeptic)
-    pipeline_moderator_model = resolve_role_model("pipeline_moderator", registry, runtime, moderator)
+    writer_model = resolve_role_model(
+        "pipeline_writer", registry, runtime, proposer)
+    reviewer_model = resolve_role_model(
+        "pipeline_reviewer", registry, runtime, skeptic)
+    pipeline_moderator_model = resolve_role_model(
+        "pipeline_moderator", registry, runtime, moderator)
 
     state_file, memo_file = run_pipeline(
         topic=topic,
@@ -106,24 +119,33 @@ def pipeline(
 @app.command("refine-topic")
 def refine_topic_cmd(
     topic: str = typer.Argument(..., help="Raw research problem statement"),
-    proposer: Optional[str] = typer.Option(None, help="Writer model (default: pipeline_writer role)"),
-    skeptic: Optional[str] = typer.Option(None, help="Reviewer model (default: pipeline_reviewer role)"),
+    proposer: Optional[str] = typer.Option(
+        None, help="Writer model (default: pipeline_writer role)"),
+    skeptic: Optional[str] = typer.Option(
+        None, help="Reviewer model (default: pipeline_reviewer role)"),
     output_dir: str = typer.Option("reports", help="Output directory"),
     rounds: int = typer.Option(2, help="Refinement rounds"),
-    run_pipeline_after: bool = typer.Option(False, help="Start pipeline with refined topic after refinement"),
-    gpt_effort: str = typer.Option("high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option("medium", help="GPT output verbosity: low|medium|high"),
+    run_pipeline_after: bool = typer.Option(
+        False, help="Start pipeline with refined topic after refinement"),
+    gpt_effort: str = typer.Option(
+        "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
+    gpt_verbosity: str = typer.Option(
+        "medium", help="GPT output verbosity: low|medium|high"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
 
     registry = load_registry()
     runtime = load_runtime_roles(registry)
-    writer_model = resolve_role_model("pipeline_writer", registry, runtime, proposer)
-    reviewer_model = resolve_role_model("pipeline_reviewer", registry, runtime, skeptic)
-    moderator_model = resolve_role_model("pipeline_moderator", registry, runtime, None)
+    writer_model = resolve_role_model(
+        "pipeline_writer", registry, runtime, proposer)
+    reviewer_model = resolve_role_model(
+        "pipeline_reviewer", registry, runtime, skeptic)
+    moderator_model = resolve_role_model(
+        "pipeline_moderator", registry, runtime, None)
 
-    run_dir = resolve_run_dir(output_dir, resume=False, state_file_name="topic_refine_state.json")
+    run_dir = resolve_run_dir(output_dir, resume=False,
+                              state_file_name="topic_refine_state.json")
     client = LLMClient()
     refined, history = refine_research_topic(
         client=client,
@@ -140,7 +162,8 @@ def refine_topic_cmd(
 
     original_file.write_text(topic.strip() + "\n", encoding="utf-8")
     refined_file.write_text(refined.strip() + "\n", encoding="utf-8")
-    report_file.write_text(build_topic_refine_report(topic, refined, history), encoding="utf-8")
+    report_file.write_text(build_topic_refine_report(
+        topic, refined, history), encoding="utf-8")
     state_file.write_text(
         json.dumps(
             {
@@ -169,7 +192,8 @@ def refine_topic_cmd(
             strict_gates=True,
             human_checkpoint=False,
         )
-        console.print(f"[bold green]Pipeline state:[/bold green] {pipeline_state}")
+        console.print(
+            f"[bold green]Pipeline state:[/bold green] {pipeline_state}")
         console.print(f"[bold green]Final memo:[/bold green] {memo}")
 
 
@@ -185,7 +209,8 @@ def models_list() -> None:
     table.add_column("base_url_env")
     table.add_column("api_key_env")
     for name, spec in registry.models.items():
-        table.add_row(name, spec.provider, spec.endpoint, spec.base_url_env, spec.api_key_env)
+        table.add_row(name, spec.provider, spec.endpoint,
+                      spec.base_url_env, spec.api_key_env)
     console.print(table)
 
     role_table = Table(title="Current role mapping")
@@ -200,7 +225,8 @@ def models_list() -> None:
 
 @models_app.command("set")
 def models_set(
-    role: str = typer.Argument(..., help="Role: proposer|skeptic|moderator|pipeline_writer|pipeline_reviewer|pipeline_moderator"),
+    role: str = typer.Argument(
+        ..., help="Role: proposer|skeptic|moderator|pipeline_writer|pipeline_reviewer|pipeline_moderator"),
     model: str = typer.Argument(..., help="Model name from registry"),
 ) -> None:
     registry = load_registry()
@@ -221,7 +247,8 @@ def models_set(
 
 @models_app.command("doctor")
 def models_doctor(
-    online: bool = typer.Option(False, help="Run real API smoke tests for mapped role models"),
+    online: bool = typer.Option(
+        False, help="Run real API smoke tests for mapped role models"),
 ) -> None:
     registry = load_registry()
     runtime = load_runtime_roles(registry)
@@ -256,7 +283,8 @@ def models_doctor(
         elif online and not ready:
             online_result = "not-configured"
 
-        table.add_row(role, model, reason if not ready else "ready", online_result)
+        table.add_row(
+            role, model, reason if not ready else "ready", online_result)
 
     console.print(table)
 
