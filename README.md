@@ -174,37 +174,111 @@ set -a && source .env && set +a
 ```
 
 支持两类接口：
-- Claude 兼容 chat completions：`$CLAUDE_BASE_URL/chat/completions`
 - GPT 兼容 responses：`$GPT_BASE_URL/responses`
+- GLM 兼容 chat completions：`$GLM_BASE_URL/chat/completions`
+
+GLM 官方文档接口：`https://open.bigmodel.cn/api/paas/v4/chat/completions`
 
 默认模型：
-- Proposer: claude-sonnet-4-6
-- Skeptic: gpt-5.4
+- Proposer: gpt-5.4
+- Skeptic: glm-5
 - Moderator: gpt-5.4
+
+可选模型（已内置到 `configs/models.yaml`）：
+- gpt-5.4
+- glm-5
+
+## Model Switcher (Terminal)
+
+```bash
+# 查看所有可用模型 + 当前角色绑定 + 配置就绪状态
+arc models list
+
+# 设置角色模型
+arc models set proposer gpt-5.4
+arc models set skeptic glm-5
+arc models set moderator gpt-5.4
+arc models set pipeline_writer gpt-5.4
+arc models set pipeline_reviewer glm-5
+arc models set pipeline_moderator gpt-5.4
+
+# 诊断配置（离线）：检查 env 是否齐全
+arc models doctor
+
+# 在线烟雾测试：对当前角色模型逐个发起最小请求
+arc models doctor --online
+
+# 可选：提高慢模型稳定性
+export ARC_LLM_TIMEOUT_SECONDS=180
+export ARC_LLM_RETRY_ATTEMPTS=4
+
+# GPT 思考深度（Responses API）
+export ARC_GPT_REASONING_EFFORT=high
+export ARC_GPT_VERBOSITY=medium
+```
 
 ### 3) Run
 
 ```bash
 arc run examples/multimodal_research_idea.md \
-  --proposer claude-sonnet-4-6 \
-  --skeptic gpt-5.4 \
+       --proposer gpt-5.4 \
+       --skeptic glm-5 \
   --moderator gpt-5.4 \
+       --gpt-effort high \
   --output-dir reports
 
 # 若上次运行中断，可恢复
 arc run examples/multimodal_research_idea.md \
-       --proposer claude-sonnet-4-6 \
-       --skeptic gpt-5.4 \
+       --proposer gpt-5.4 \
+       --skeptic glm-5 \
        --moderator gpt-5.4 \
+       --gpt-effort high \
        --output-dir reports \
        --resume
 ```
 
 输出：
-- `reports/latest/debate_log.jsonl`
-- `reports/latest/final_state.json`
-- `reports/latest/run_state.json`
-- `reports/latest/research_decision_memo.md`
+- `reports/<timestamp>/debate_log.jsonl`
+- `reports/<timestamp>/final_state.json`
+- `reports/<timestamp>/run_state.json`
+- `reports/<timestamp>/research_decision_memo.md`
+
+说明：每次运行都会创建新的时间戳目录，并更新 `reports/LATEST_RUN` 指向最近一次运行目录；`--resume` 会优先从该目录恢复。
+
+### 3.1) Run Skill-First Pipeline (ARIS-style)
+
+```bash
+arc pipeline "multimodal agent safety benchmark" \
+       --proposer gpt-5.4 \
+       --skeptic glm-5 \
+       --moderator gpt-5.4 \
+       --gpt-effort high \
+       --output-dir reports \
+       --strict-gates
+
+# 若上次 pipeline 中断，可恢复
+arc pipeline "multimodal agent safety benchmark" \
+       --proposer gpt-5.4 \
+       --skeptic glm-5 \
+       --moderator gpt-5.4 \
+       --gpt-effort high \
+       --output-dir reports \
+       --checkpoint \
+       --resume
+```
+
+Pipeline 主要产物（默认 `reports/<timestamp>/`）：
+- `pipeline_state.json`
+- `LITERATURE_MAP.md`
+- `IDEA_REPORT.md`
+- `FINAL_PROPOSAL.md`
+- `EVIDENCE_TABLE.md`
+- `EXPERIMENT_PLAN.md`
+- `RESEARCH_DECISION_MEMO.md`
+- `AUTO_REVIEW.md`（当 stage chain 包含 `auto-review-loop` 时）
+
+说明：当前 pipeline 为安全版，不会自动执行外部实验脚本；`experiment-bridge` 仅生成计划和脚本草案。
+当启用 `--strict-gates`（默认）时，stage chain 必须包含 `novelty-check` 与 `debate-runner`。
 
 ### 4) Test
 
