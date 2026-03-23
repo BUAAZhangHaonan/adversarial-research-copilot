@@ -503,7 +503,7 @@ def _load_reference_config(config_path: str | Path = "configs/references.yaml") 
         "arxiv_max_results": 20,
         "semantic_scholar_max_results": 20,
         "glm_coding_plan_mcp_max_results": 10,
-        "final_reference_count": 12,
+        "final_reference_count": 20,
         "recency_years_preferred": 3,
         "influential_citation_threshold": 1000,
         "semantic_scholar_base_url": "https://api.semanticscholar.org/graph/v1",

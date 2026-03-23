@@ -291,6 +291,35 @@ arc explain-outputs --run-dir reports/<timestamp>
 arc explain-outputs
 ```
 
+### 3.2) Run Chat Mode (轻量头脑风暴)
+
+如果你想做更轻松的角色扮演式讨论（不走严肃证明模板），可以使用独立的 chat mode：
+
+```bash
+arc chat-mode "multimodal hallucination mitigation for editing agents" \
+       --proposer gpt-5.4 \
+       --skeptic glm-5 \
+       --moderator gpt-5.4 \
+       --output-dir reports
+```
+
+特点：
+- 每轮三位 AI 都按聊天语气输出重点思路（创新 + 可行性）
+- 每位 AI 单轮输出受长度约束（默认 `configs/chat_mode.yaml`）
+- 每次运行至少尝试检索 20 篇参考文献（含摘要）
+- 每轮发言单独保存，便于阅读
+
+Chat mode 主要产物（默认 `reports/<timestamp>/`）：
+- `TOPIC_CHAT.txt`
+- `REFERENCES.md`
+- `CHAT_TRANSCRIPT.md`
+- `chat_mode_state.json`
+- `chat_rounds/round_01_proposer.md`
+- `chat_rounds/round_01_skeptic.md`
+- `chat_rounds/round_01_moderator.md`
+- `chat_rounds/round_01.md`
+
+
 ### 4) Test
 
 ```bash

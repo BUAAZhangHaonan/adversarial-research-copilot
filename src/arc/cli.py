@@ -14,6 +14,7 @@ from arc.llm_client import LLMClient
 from arc.model_registry import load_registry, load_runtime_roles, resolve_role_model, role_api_ready, set_role_model
 from arc.run_paths import resolve_run_dir
 from arc.runners.debate_runner import run_debate
+from arc.runners.chat_mode_runner import run_chat_mode
 from arc.runners.pipeline_runner import run_pipeline
 from arc.topic_refiner import build_topic_refine_report, refine_research_topic
 
@@ -21,6 +22,25 @@ app = typer.Typer(help="ARC - Adversarial Research Copilot")
 models_app = typer.Typer(help="Model registry and role mapping")
 app.add_typer(models_app, name="models")
 console = Console()
+
+
+def _ensure_known_model(role: str, model: str, registry) -> str:
+    if model in registry.models:
+        return model
+    alias_key = f"{role}_default"
+    fallback = registry.aliases.get(alias_key)
+    if fallback and fallback in registry.models:
+        console.print(
+            f"[yellow]Warning:[/yellow] unknown model '{model}' for role '{role}', fallback to '{fallback}'."
+        )
+        return fallback
+    if registry.models:
+        first = next(iter(registry.models.keys()))
+        console.print(
+            f"[yellow]Warning:[/yellow] unknown model '{model}' for role '{role}', fallback to '{first}'."
+        )
+        return first
+    raise typer.BadParameter("No model available in registry. Please check configs/models.yaml")
 
 
 @app.command()
@@ -167,6 +187,43 @@ def explain_outputs(
     for f in files:
         table.add_row(f, purpose_map.get(f, "auxiliary artifact"))
     console.print(table)
+
+
+@app.command("chat-mode")
+def chat_mode(
+    topic: str = typer.Argument(..., help="Brainstorm topic"),
+    proposer: Optional[str] = typer.Option(None, help="Model for Proposer"),
+    skeptic: Optional[str] = typer.Option(None, help="Model for Skeptic"),
+    moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
+    output_dir: str = typer.Option("reports", help="Output directory"),
+    resume: bool = typer.Option(False, help="Resume from latest run directory"),
+    gpt_effort: str = typer.Option(
+        "medium", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
+    gpt_verbosity: str = typer.Option(
+        "high", help="GPT output verbosity: low|medium|high"),
+) -> None:
+    os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
+    os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
+
+    registry = load_registry()
+    runtime = load_runtime_roles(registry)
+    proposer_model = resolve_role_model("proposer", registry, runtime, proposer)
+    skeptic_model = resolve_role_model("skeptic", registry, runtime, skeptic)
+    moderator_model = resolve_role_model("moderator", registry, runtime, moderator)
+    proposer_model = _ensure_known_model("proposer", proposer_model, registry)
+    skeptic_model = _ensure_known_model("skeptic", skeptic_model, registry)
+    moderator_model = _ensure_known_model("moderator", moderator_model, registry)
+
+    transcript_file, state_file = run_chat_mode(
+        topic=topic,
+        proposer_model=proposer_model,
+        skeptic_model=skeptic_model,
+        moderator_model=moderator_model,
+        output_dir=output_dir,
+        resume=resume,
+    )
+    console.print(f"[bold green]Chat transcript:[/bold green] {transcript_file}")
+    console.print(f"[bold green]Chat state:[/bold green] {state_file}")
 
 
 @app.command("refine-topic")

@@ -4,7 +4,7 @@ references:
   semantic_scholar_max_results: 20
   glm_coding_plan_mcp_max_results: 10
   # Final number of references injected into pipeline prompts
-  final_reference_count: 12
+  final_reference_count: 20
 
   # Prefer papers from recent years unless citation count is very high
   recency_years_preferred: 3

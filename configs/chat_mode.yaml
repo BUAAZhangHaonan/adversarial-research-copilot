@@ -1,0 +1,7 @@
+chat_mode:
+  rounds: 3
+  # At least 20 references are required for each chat-mode run.
+  min_references: 20
+  # Heuristic length guard so each agent output stays concise.
+  max_response_chars: 1600
+  persist_state: true
