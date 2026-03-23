@@ -55,3 +55,40 @@ class ResearchState(BaseModel):
 
     def add_round(self, record: RoundRecord) -> None:
         self.rounds.append(record)
+
+
+PipelineStatus = Literal["in_progress", "completed", "failed"]
+StageStatus = Literal["not_started", "in_progress", "completed", "failed"]
+
+
+class PipelineStageRecord(BaseModel):
+    name: str
+    status: StageStatus = "not_started"
+    inputs: list[str] = Field(default_factory=list)
+    outputs: list[str] = Field(default_factory=list)
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    error: str | None = None
+
+
+class PipelineState(BaseModel):
+    run_id: str
+    topic: str
+    status: PipelineStatus = "in_progress"
+    current_stage: str | None = None
+    stages: list[PipelineStageRecord] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
+
+    @classmethod
+    def new(cls, topic: str) -> "PipelineState":
+        import uuid
+
+        return cls(run_id=uuid.uuid4().hex, topic=topic)
+
+    def stage(self, name: str) -> PipelineStageRecord:
+        for s in self.stages:
+            if s.name == name:
+                return s
+        raise KeyError(name)

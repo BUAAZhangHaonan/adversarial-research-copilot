@@ -12,6 +12,7 @@ from arc.agents.skeptic import SkepticAgent
 from arc.exporters.markdown_report import export_markdown_report
 from arc.llm_client import LLMClient
 from arc.memory import DebateMemory
+from arc.run_paths import resolve_run_dir
 from arc.schemas import DebateConfig, ResearchState, RoundRecord
 from arc.scoring.rubric import assess_convergence, parse_decision, parse_required_revisions, parse_scorecard, parse_unresolved_blockers
 from arc.state import init_state, load_idea_text
@@ -32,9 +33,10 @@ class ARCOrchestrator:
         moderator_model: str,
         output_dir: str = "reports",
         resume: bool = False,
+        run_dir: Path | None = None,
     ) -> tuple[Path, Path]:
-        run_dir = Path(output_dir) / "latest"
-        memory = DebateMemory(run_dir)
+        target_run_dir = run_dir or resolve_run_dir(output_dir, resume, "run_state.json")
+        memory = DebateMemory(target_run_dir)
 
         if self.config.require_cross_model_adversary and proposer_model == skeptic_model:
             raise ValueError("Proposer and Skeptic must use different models when require_cross_model_adversary=true")
@@ -99,7 +101,7 @@ class ARCOrchestrator:
                 self.console.print(f"[green]Converged:[/green] {convergence.reason}")
                 break
 
-        report_file = export_markdown_report(state, run_dir / "research_decision_memo.md")
+        report_file = export_markdown_report(state, target_run_dir / "research_decision_memo.md")
         state_file = memory.save_json("final_state.json", state.model_dump(mode="json"))
         self._save_run_state(
             memory,
