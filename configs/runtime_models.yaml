@@ -1,0 +1,7 @@
+roles:
+  proposer: gpt-5.4
+  skeptic: glm-5
+  moderator: gpt-5.4
+  pipeline_writer: gpt-5.4
+  pipeline_reviewer: glm-5
+  pipeline_moderator: gpt-5.4
