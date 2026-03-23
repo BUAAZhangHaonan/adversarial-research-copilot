@@ -4,7 +4,7 @@ debate:
   score_threshold: 4.0
   required_stable_rounds: 2
   human_checkpoint: false
-  require_cross_model_adversary: true
+  require_cross_model_adversary: false
   persist_run_state: true
   stale_resume_hours: 24
 

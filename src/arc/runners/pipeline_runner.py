@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import re
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
+import requests
 import yaml
 
 from arc.llm_client import LLMClient
@@ -38,6 +41,9 @@ def run_pipeline(
     """
 
     run_dir = resolve_run_dir(output_dir, resume, "pipeline_state.json")
+
+    # Persist the user input so each run directory is self-describing.
+    (run_dir / "TOPIC.txt").write_text(topic.strip() + "\n", encoding="utf-8")
 
     memory = DebateMemory(run_dir)
     debate_cfg = _load_debate_config()
@@ -141,6 +147,16 @@ def _run_stage(
     # The stage contract is file-based. Each stage must create/overwrite its target output.
     if stage_name == "research-lit":
         out = run_dir / "LITERATURE_MAP.md"
+        arxiv_file = run_dir / "ARXIV_REFERENCES.md"
+        arxiv_refs = _fetch_arxiv_references(topic)
+        arxiv_context = ""
+        if arxiv_refs:
+            arxiv_text = _format_arxiv_refs(arxiv_refs)
+            arxiv_file.write_text(arxiv_text, encoding="utf-8")
+            arxiv_context = (
+                "\n\n已检索到的 arXiv 参考（优先使用，禁止编造 arXiv ID）：\n"
+                f"{arxiv_text}\n"
+            )
         text = _llm_generate(
             client,
             model=proposer_model,
@@ -149,12 +165,16 @@ def _run_stage(
                 f"研究主题：{topic}\n\n"
                 "请在不联网的前提下输出一个可执行的文献调研地图。\n"
                 "要求：1) 列出关键子方向与关键词；2) 给出每个子方向的代表性论文类型/会议期刊；"
-                "3) 明确假设与待验证清单；4) 输出为 Markdown。\n"
+                "3) 明确假设与待验证清单；4) 优先引用下方给出的 arXiv 文献；5) 输出为 Markdown。\n"
+                f"{arxiv_context}"
                 f"目标文件：{out.name}"
             ),
         )
         out.write_text(text.strip() + "\n", encoding="utf-8")
-        pipeline_state.stage(stage_name).outputs = [out.name]
+        outputs = [out.name]
+        if arxiv_refs:
+            outputs.append(arxiv_file.name)
+        pipeline_state.stage(stage_name).outputs = outputs
         return
 
     if stage_name == "idea-creator":
@@ -178,6 +198,10 @@ def _run_stage(
 
     if stage_name == "novelty-check":
         idea = _read_required(run_dir / "IDEA_REPORT.md")
+        arxiv_refs_text = ""
+        arxiv_file = run_dir / "ARXIV_REFERENCES.md"
+        if arxiv_file.exists():
+            arxiv_refs_text = arxiv_file.read_text(encoding="utf-8")
         out = run_dir / "FINAL_PROPOSAL.md"
         text = _llm_generate(
             client,
@@ -186,6 +210,8 @@ def _run_stage(
             user_prompt=(
                 "输入：IDEA_REPORT.md\n\n"
                 f"{idea}\n\n"
+                + (f"输入：ARXIV_REFERENCES.md\n\n{arxiv_refs_text}\n\n" if arxiv_refs_text else "")
+                +
                 "请做严格 novelty 风险审查：列出最可能的先验工作、潜在重复点、需要证据的断言、以及如何区分。\n"
                 "最后输出一个可提交到辩论环节的 FINAL_PROPOSAL（含评估标准与可证伪实验）。\n"
                 f"目标文件：{out.name}"
@@ -198,6 +224,10 @@ def _run_stage(
 
     if stage_name == "evidence-grounding":
         proposal = _read_required(run_dir / "FINAL_PROPOSAL.md")
+        arxiv_refs_text = ""
+        arxiv_file = run_dir / "ARXIV_REFERENCES.md"
+        if arxiv_file.exists():
+            arxiv_refs_text = arxiv_file.read_text(encoding="utf-8")
         out = run_dir / "EVIDENCE_TABLE.md"
         text = _llm_generate(
             client,
@@ -206,6 +236,8 @@ def _run_stage(
             user_prompt=(
                 "输入：FINAL_PROPOSAL.md\n\n"
                 f"{proposal}\n\n"
+                + (f"输入：ARXIV_REFERENCES.md\n\n{arxiv_refs_text}\n\n" if arxiv_refs_text else "")
+                +
                 "请将主张拆成可验证 claim，并输出证据表。若无法联网，请显式标注 unsupported 与待检索动作。\n"
                 f"目标文件：{out.name}"
             ),
@@ -403,6 +435,54 @@ def _run_stage(
 
 def _llm_generate(client: LLMClient, model: str, system_prompt: str, user_prompt: str) -> str:
     return client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
+
+
+def _fetch_arxiv_references(topic: str) -> list[dict[str, str]]:
+    max_results = 8
+    try:
+        max_results_raw = int(str(os.getenv("ARC_ARXIV_MAX_RESULTS", "8")))
+        max_results = max(1, min(max_results_raw, 20))
+    except Exception:
+        max_results = 8
+
+    query = "+AND+".join([f"all:{w}" for w in re.findall(r"[A-Za-z0-9\u4e00-\u9fff]+", topic)[:8]])
+    if not query:
+        query = "all:multimodal+AND+all:hallucination"
+
+    url = (
+        "https://export.arxiv.org/api/query?"
+        f"search_query={query}&start=0&max_results={max_results}&sortBy=relevance&sortOrder=descending"
+    )
+    try:
+        resp = requests.get(url, timeout=12, headers={"User-Agent": "ARC/0.1 (research-pipeline)"})
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+    except Exception:
+        return []
+
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    out: list[dict[str, str]] = []
+    for entry in root.findall("a:entry", ns):
+        id_node = entry.find("a:id", ns)
+        title_node = entry.find("a:title", ns)
+        if id_node is None or title_node is None:
+            continue
+        arxiv_url = (id_node.text or "").strip()
+        title = re.sub(r"\s+", " ", (title_node.text or "").strip())
+        arxiv_id = arxiv_url.rsplit("/", 1)[-1] if arxiv_url else ""
+        if not arxiv_id or not title:
+            continue
+        out.append({"arxiv_id": arxiv_id, "title": title, "url": arxiv_url})
+    return out
+
+
+def _format_arxiv_refs(refs: list[dict[str, str]]) -> str:
+    lines = ["# ARXIV_REFERENCES", "", "| arxiv_id | title | url |", "|---|---|---|"]
+    for r in refs:
+        title = r["title"].replace("|", "\\|")
+        lines.append(f"| {r['arxiv_id']} | {title} | {r['url']} |")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _read_required(path: Path) -> str:

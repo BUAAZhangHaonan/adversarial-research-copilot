@@ -17,11 +17,18 @@ class ModelSpec:
     base_url_env: str
     api_key_env: str
     endpoint: str
+    max_output_tokens: int | None = None
+    max_tokens: int | None = None
+    temperature: float | None = None
 
 
 class LLMClient:
     def __init__(self, config_path: str | Path = "configs/models.yaml") -> None:
         config = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+        defaults = config.get("generation_defaults", {}) if isinstance(config, dict) else {}
+        self._default_temperature = _as_float(defaults.get("temperature"), 0.3)
+        self._default_max_output_tokens = _as_int(defaults.get("max_output_tokens"), 16384)
+        self._default_fallback_max_output_tokens = _as_int(defaults.get("fallback_max_output_tokens"), 4096)
         self._models: dict[str, ModelSpec] = {}
         for name, spec in config.get("models", {}).items():
             self._models[name] = ModelSpec(
@@ -30,6 +37,9 @@ class LLMClient:
                 base_url_env=spec["base_url_env"],
                 api_key_env=spec["api_key_env"],
                 endpoint=spec["endpoint"],
+                max_output_tokens=_as_optional_int(spec.get("max_output_tokens")),
+                max_tokens=_as_optional_int(spec.get("max_tokens")),
+                temperature=_as_optional_float(spec.get("temperature")),
             )
 
     def chat(self, model: str, system_prompt: str, user_prompt: str, temperature: float = 0.3) -> str:
@@ -44,12 +54,77 @@ class LLMClient:
                 f"Set {spec.base_url_env} and {spec.api_key_env}."
             )
 
-        if spec.endpoint == "chat_completions":
-            return self._call_chat_completions(base_url, api_key, model, system_prompt, user_prompt, temperature)
-        if spec.endpoint == "responses":
-            return self._call_responses(base_url, api_key, model, system_prompt, user_prompt, temperature)
+        # Some gateways may (rarely) return empty strings with 200 OK.
+        # Treat empty/whitespace as a transient failure and retry a small number of times.
+        empty_retry_attempts = min(2, _retry_attempts())
+        delay = 0.6
+        last_text: str | None = None
+        for attempt in range(1, empty_retry_attempts + 1):
+            if spec.endpoint == "chat_completions":
+                text = self._call_chat_completions(
+                    base_url,
+                    api_key,
+                    model,
+                    system_prompt,
+                    user_prompt,
+                    self._resolve_temperature(spec, temperature),
+                    self._resolve_chat_max_tokens(spec),
+                )
+            elif spec.endpoint == "responses":
+                text = self._call_responses(
+                    base_url,
+                    api_key,
+                    model,
+                    system_prompt,
+                    user_prompt,
+                    self._resolve_temperature(spec, temperature),
+                    self._resolve_max_output_tokens(spec),
+                    self._resolve_fallback_max_output_tokens(),
+                )
+            else:
+                raise ValueError(f"Unsupported endpoint: {spec.endpoint}")
 
-        raise ValueError(f"Unsupported endpoint: {spec.endpoint}")
+            last_text = text
+            if isinstance(text, str) and text.strip():
+                return text
+
+            if attempt < empty_retry_attempts:
+                time.sleep(delay)
+                delay = min(delay * 2, 3.0)
+
+        raise RuntimeError(f"Empty text returned by model '{model}'")
+
+    def _resolve_temperature(self, spec: ModelSpec, requested: float) -> float:
+        env = os.getenv("ARC_TEMPERATURE")
+        if env is not None and env.strip():
+            return _as_float(env, self._default_temperature)
+        if requested != 0.3:
+            return requested
+        if spec.temperature is not None:
+            return spec.temperature
+        return self._default_temperature
+
+    def _resolve_max_output_tokens(self, spec: ModelSpec) -> int:
+        env = os.getenv("ARC_MAX_OUTPUT_TOKENS")
+        if env is not None and env.strip():
+            return max(1, _as_int(env, self._default_max_output_tokens))
+        if spec.max_output_tokens is not None:
+            return max(1, spec.max_output_tokens)
+        return max(1, self._default_max_output_tokens)
+
+    def _resolve_chat_max_tokens(self, spec: ModelSpec) -> int:
+        env = os.getenv("ARC_CHAT_MAX_TOKENS")
+        if env is not None and env.strip():
+            return max(1, _as_int(env, self._default_max_output_tokens))
+        if spec.max_tokens is not None:
+            return max(1, spec.max_tokens)
+        return max(1, self._default_max_output_tokens)
+
+    def _resolve_fallback_max_output_tokens(self) -> int:
+        env = os.getenv("ARC_FALLBACK_MAX_OUTPUT_TOKENS")
+        if env is not None and env.strip():
+            return max(1, _as_int(env, self._default_fallback_max_output_tokens))
+        return max(1, self._default_fallback_max_output_tokens)
 
     @staticmethod
     def _call_chat_completions(
@@ -59,6 +134,7 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         temperature: float,
+        max_tokens: int,
     ) -> str:
         url = f"{base_url}/chat/completions"
         headers = {
@@ -72,11 +148,14 @@ class LLMClient:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": temperature,
-            "max_tokens": 1800,
+            "max_tokens": max_tokens,
             "stream": False,
         }
         data = _post_json_with_retry(url, headers, payload)
-        return data["choices"][0]["message"]["content"]
+        text = data["choices"][0]["message"]["content"]
+        if not isinstance(text, str):
+            raise RuntimeError("No text content returned by chat completions API")
+        return text
 
     @staticmethod
     def _call_responses(
@@ -86,6 +165,8 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         temperature: float,
+        max_output_tokens: int,
+        fallback_max_output_tokens: int,
     ) -> str:
         url = f"{base_url}/responses"
         headers = {
@@ -111,7 +192,7 @@ class LLMClient:
             "text": {
                 "verbosity": _gpt_text_verbosity(),
             },
-            "max_output_tokens": 1800,
+            "max_output_tokens": max_output_tokens,
         }
         try:
             data = _post_json_with_retry(url, headers, payload)
@@ -122,7 +203,7 @@ class LLMClient:
             fallback_payload = {
                 "model": model,
                 "input": payload["input"],
-                "max_output_tokens": 900,
+                "max_output_tokens": fallback_max_output_tokens,
             }
             # Keep temperature only if explicitly requested by caller path.
             if "temperature" in payload:
@@ -168,11 +249,16 @@ def _post_json_with_retry(url: str, headers: dict[str, str], payload: dict[str, 
             last_exc = e
         except requests.exceptions.HTTPError as e:
             status = e.response.status_code if e.response is not None else None
-            if status is not None and status < 500:
+            # Retry on rate-limit and transient gateway failures.
+            if status not in {429} and status is not None and status < 500:
                 raise
             last_exc = e
 
         if attempt < max_attempts:
+            if isinstance(last_exc, requests.exceptions.HTTPError) and last_exc.response is not None:
+                retry_after = last_exc.response.headers.get("Retry-After", "").strip()
+                if retry_after.isdigit():
+                    delay = max(delay, float(retry_after))
             time.sleep(delay)
             delay = min(delay * 2, 5.0)
 
@@ -195,7 +281,7 @@ def _is_transient_gateway_error(exc: Exception) -> bool:
         return True
     if isinstance(exc, requests.exceptions.HTTPError):
         status = exc.response.status_code if exc.response is not None else None
-        return status in {502, 503, 504, 524}
+        return status in {429, 502, 503, 504, 524}
     return False
 
 
@@ -209,3 +295,35 @@ def _gpt_text_verbosity() -> str:
     raw = os.getenv("ARC_GPT_VERBOSITY", "medium").strip().lower()
     allowed = {"low", "medium", "high"}
     return raw if raw in allowed else "medium"
+
+
+def _as_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None

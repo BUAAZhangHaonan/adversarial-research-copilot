@@ -42,6 +42,8 @@ class ARCOrchestrator:
             raise ValueError("Proposer and Skeptic must use different models when require_cross_model_adversary=true")
 
         idea = load_idea_text(idea_file)
+        # Persist the debate input so the run directory always contains the exact prompt/idea.
+        (target_run_dir / "INPUT_IDEA.txt").write_text(idea.strip() + "\n", encoding="utf-8")
         state, start_round, previous_blockers = self._prepare_state(memory, idea, resume)
         previous_required_revisions: list[str] = []
         if state.rounds:

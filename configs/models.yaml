@@ -1,14 +1,25 @@
+generation_defaults:
+  temperature: 0.3
+  # Default to larger context outputs for long-form research artifacts.
+  max_output_tokens: 16384
+  # Used when transient gateway errors require a lighter retry payload.
+  fallback_max_output_tokens: 4096
+
 models:
   gpt-5.4:
     provider: gpt
     base_url_env: GPT_BASE_URL
     api_key_env: GPT_API_KEY
     endpoint: responses
+    max_output_tokens: 16384
+    temperature: 0.3
   glm-5:
     provider: glm
     base_url_env: GLM_BASE_URL
     api_key_env: GLM_API_KEY
     endpoint: chat_completions
+    max_tokens: 16384
+    temperature: 0.3
 
 aliases:
   proposer_default: gpt-5.4
