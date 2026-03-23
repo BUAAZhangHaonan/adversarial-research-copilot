@@ -1,7 +1,7 @@
 ---
 name: research-refine
 description: Convert a vague or over-broad idea into a testable, resource-bounded proposal.
-argument-hint: [idea-or-proposal]
+argument-hint: "[idea-or-proposal]"
 allowed-tools: Read, Write, Edit, Grep, Agent
 ---
 

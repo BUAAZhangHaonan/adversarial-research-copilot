@@ -1,7 +1,7 @@
 ---
 name: experiment-bridge
 description: Turn a proposal into executable experiment tasks and runbook scripts.
-argument-hint: [proposal-file]
+argument-hint: "[proposal-file]"
 allowed-tools: Read, Write, Edit, Bash(*), Grep
 ---
 

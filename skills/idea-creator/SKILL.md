@@ -1,7 +1,7 @@
 ---
 name: idea-creator
 description: Generate and rank candidate research ideas from a constrained problem frame.
-argument-hint: [problem-frame]
+argument-hint: "[problem-frame]"
 allowed-tools: Read, Write, Grep, Agent
 ---
 

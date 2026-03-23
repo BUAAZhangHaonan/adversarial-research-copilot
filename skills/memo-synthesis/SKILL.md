@@ -1,7 +1,7 @@
 ---
 name: memo-synthesis
 description: Convert debate artifacts into a concise research decision memo with explicit go/no-go decision.
-argument-hint: [reports-dir]
+argument-hint: "[reports-dir]"
 allowed-tools: Read, Write, Grep
 ---
 

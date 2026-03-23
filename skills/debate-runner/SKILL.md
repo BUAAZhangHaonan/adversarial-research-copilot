@@ -1,7 +1,7 @@
 ---
 name: debate-runner
 description: Run ARC adversarial debate loop with proposer, skeptic, moderator and produce round-wise adjudication.
-argument-hint: [idea-file]
+argument-hint: "[idea-file]"
 allowed-tools: Read, Write, Bash(*), Agent
 ---
 

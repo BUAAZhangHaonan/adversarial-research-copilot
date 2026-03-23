@@ -1,7 +1,7 @@
 ---
 name: novelty-check
 description: Stress-test whether the proposed idea is actually new or just renamed prior work.
-argument-hint: [idea-file]
+argument-hint: "[idea-file]"
 allowed-tools: Read, Grep, WebSearch, WebFetch, Write
 ---
 

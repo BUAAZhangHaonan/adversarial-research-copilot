@@ -1,7 +1,7 @@
 ---
 name: evidence-grounding
 description: Attach concrete evidence to skeptic criticisms and proposer claims.
-argument-hint: [debate-round-or-memo]
+argument-hint: "[debate-round-or-memo]"
 allowed-tools: Read, Grep, WebSearch, WebFetch, Write
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: auto-review-loop
 description: Iterate review-fix-rerun cycles on ARC outputs and keep state for long-running sessions.
-argument-hint: [scope]
+argument-hint: "[scope]"
 allowed-tools: Read, Write, Edit, Bash(*), Agent
 ---
 

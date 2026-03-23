@@ -1,7 +1,7 @@
 ---
 name: recovery-resume
 description: Recover interrupted ARC runs from run_state and final_state snapshots.
-argument-hint: [reports-dir]
+argument-hint: "[reports-dir]"
 allowed-tools: Read, Write, Bash(*), Grep
 ---
 

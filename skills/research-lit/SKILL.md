@@ -1,7 +1,7 @@
 ---
 name: research-lit
 description: Collect and prioritize literature evidence from local PDFs, notes, and web APIs to produce a claim-oriented evidence map.
-argument-hint: [topic-or-question]
+argument-hint: "[topic-or-question]"
 allowed-tools: Read, Grep, Glob, Bash(*), WebSearch, WebFetch, Write
 ---
 
