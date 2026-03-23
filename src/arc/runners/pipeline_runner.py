@@ -6,6 +6,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote_plus
 from xml.etree import ElementTree as ET
 
 import requests
@@ -119,6 +120,7 @@ def run_pipeline(
     pipeline_state.status = "completed"
     pipeline_state.completed_at = datetime.now(UTC)
     _save_pipeline_state(memory, pipeline_state)
+    _write_output_index(run_dir, pipeline_state)
 
     memo = run_dir / "RESEARCH_DECISION_MEMO.md"
     if not memo.exists():
@@ -149,16 +151,10 @@ def _run_stage(
     # The stage contract is file-based. Each stage must create/overwrite its target output.
     if stage_name == "research-lit":
         out = run_dir / "LITERATURE_MAP.md"
-        arxiv_file = run_dir / "ARXIV_REFERENCES.md"
-        arxiv_refs = _fetch_arxiv_references(topic)
-        arxiv_context = ""
-        if arxiv_refs:
-            arxiv_text = _format_arxiv_refs(arxiv_refs)
-            arxiv_file.write_text(arxiv_text, encoding="utf-8")
-            arxiv_context = (
-                "\n\n已检索到的 arXiv 参考（优先使用，禁止编造 arXiv ID）：\n"
-                f"{arxiv_text}\n"
-            )
+        refs_file = run_dir / "REFERENCES.md"
+        refs = _collect_references(topic)
+        refs_text = _format_references(refs)
+        refs_file.write_text(refs_text, encoding="utf-8")
         text = _llm_generate(
             client,
             model=proposer_model,
@@ -167,16 +163,13 @@ def _run_stage(
                 f"研究主题：{topic}\n\n"
                 "请在不联网的前提下输出一个可执行的文献调研地图。\n"
                 "要求：1) 列出关键子方向与关键词；2) 给出每个子方向的代表性论文类型/会议期刊；"
-                "3) 明确假设与待验证清单；4) 优先引用下方给出的 arXiv 文献；5) 输出为 Markdown。\n"
-                f"{arxiv_context}"
+                "3) 明确假设与待验证清单；4) 优先引用输入中的最新文献；5) 输出为 Markdown。\n"
+                f"输入：REFERENCES.md\n\n{refs_text}\n\n"
                 f"目标文件：{out.name}"
             ),
         )
         out.write_text(text.strip() + "\n", encoding="utf-8")
-        outputs = [out.name]
-        if arxiv_refs:
-            outputs.append(arxiv_file.name)
-        pipeline_state.stage(stage_name).outputs = outputs
+        pipeline_state.stage(stage_name).outputs = [out.name, refs_file.name]
         return
 
     if stage_name == "idea-creator":
@@ -200,10 +193,10 @@ def _run_stage(
 
     if stage_name == "novelty-check":
         idea = _read_required(run_dir / "IDEA_REPORT.md")
-        arxiv_refs_text = ""
-        arxiv_file = run_dir / "ARXIV_REFERENCES.md"
-        if arxiv_file.exists():
-            arxiv_refs_text = arxiv_file.read_text(encoding="utf-8")
+        refs_text = ""
+        refs_file = run_dir / "REFERENCES.md"
+        if refs_file.exists():
+            refs_text = refs_file.read_text(encoding="utf-8")
         out = run_dir / "FINAL_PROPOSAL.md"
         text = _llm_generate(
             client,
@@ -212,7 +205,7 @@ def _run_stage(
             user_prompt=(
                 "输入：IDEA_REPORT.md\n\n"
                 f"{idea}\n\n"
-                + (f"输入：ARXIV_REFERENCES.md\n\n{arxiv_refs_text}\n\n" if arxiv_refs_text else "")
+                + (f"输入：REFERENCES.md\n\n{refs_text}\n\n" if refs_text else "")
                 +
                 "请做严格 novelty 风险审查：列出最可能的先验工作、潜在重复点、需要证据的断言、以及如何区分。\n"
                 "最后输出一个可提交到辩论环节的 FINAL_PROPOSAL（含评估标准与可证伪实验）。\n"
@@ -226,10 +219,10 @@ def _run_stage(
 
     if stage_name == "evidence-grounding":
         proposal = _read_required(run_dir / "FINAL_PROPOSAL.md")
-        arxiv_refs_text = ""
-        arxiv_file = run_dir / "ARXIV_REFERENCES.md"
-        if arxiv_file.exists():
-            arxiv_refs_text = arxiv_file.read_text(encoding="utf-8")
+        refs_text = ""
+        refs_file = run_dir / "REFERENCES.md"
+        if refs_file.exists():
+            refs_text = refs_file.read_text(encoding="utf-8")
         out = run_dir / "EVIDENCE_TABLE.md"
         text = _llm_generate(
             client,
@@ -238,7 +231,7 @@ def _run_stage(
             user_prompt=(
                 "输入：FINAL_PROPOSAL.md\n\n"
                 f"{proposal}\n\n"
-                + (f"输入：ARXIV_REFERENCES.md\n\n{arxiv_refs_text}\n\n" if arxiv_refs_text else "")
+                + (f"输入：REFERENCES.md\n\n{refs_text}\n\n" if refs_text else "")
                 +
                 "请将主张拆成可验证 claim，并输出证据表。若无法联网，请显式标注 unsupported 与待检索动作。\n"
                 f"目标文件：{out.name}"
@@ -442,58 +435,328 @@ def _run_stage(
 
 
 def _llm_generate(client: LLMClient, model: str, system_prompt: str, user_prompt: str) -> str:
-    return client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
+    lang_cfg = _load_language_policy()
+    lang_hint = (
+        f"Language policy: think in {lang_cfg['thinking_language']} for planning quality; "
+        f"final written output must be in {lang_cfg['final_output_language']} (Chinese).\n\n"
+    )
+    return client.chat(
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=lang_hint + user_prompt,
+        temperature=0.3,
+    )
 
 
-def _fetch_arxiv_references(topic: str) -> list[dict[str, str]]:
-    max_results = 8
+def _collect_references(topic: str) -> list[dict[str, Any]]:
+    cfg = _load_reference_config()
+    refs: list[dict[str, Any]] = []
+    refs.extend(_fetch_arxiv_references(topic, cfg))
+    refs.extend(_fetch_semantic_scholar_references(topic, cfg))
+    refs.extend(_fetch_glm_coding_plan_mcp_references(topic, cfg))
+
+    # Fallback to broad English query when topic is too domain-specific or non-English.
+    if not refs:
+        fallback_topic = "multimodal large language model hallucination detection editing"
+        refs.extend(_fetch_arxiv_references(fallback_topic, cfg))
+        refs.extend(_fetch_semantic_scholar_references(fallback_topic, cfg))
+
+    dedup: dict[str, dict[str, Any]] = {}
+    for ref in refs:
+        title = str(ref.get("title", "")).strip()
+        if not title:
+            continue
+        key = re.sub(r"\s+", " ", title).lower()
+        old = dedup.get(key)
+        if old is None or int(ref.get("citation_count", 0)) > int(old.get("citation_count", 0)):
+            dedup[key] = ref
+
+    recent_years = int(cfg.get("recency_years_preferred", 3))
+    influential = int(cfg.get("influential_citation_threshold", 1000))
+    now_year = datetime.now(UTC).year
+    filtered: list[dict[str, Any]] = []
+    for ref in dedup.values():
+        abstract = str(ref.get("abstract", "")).strip()
+        if not abstract:
+            continue
+        year = int(ref.get("year", 0) or 0)
+        cites = int(ref.get("citation_count", 0) or 0)
+        is_recent = year >= now_year - recent_years
+        is_influential = cites >= influential
+        if is_recent or is_influential:
+            filtered.append(ref)
+
+    # If strict recency filtering becomes too aggressive, fall back to any abstract-bearing records.
+    if not filtered:
+        for ref in dedup.values():
+            abstract = str(ref.get("abstract", "")).strip()
+            if abstract:
+                filtered.append(ref)
+
+    filtered.sort(key=lambda x: (int(x.get("year", 0) or 0), int(x.get("citation_count", 0) or 0)), reverse=True)
+    final_count = int(cfg.get("final_reference_count", 12))
+    return filtered[:max(1, final_count)]
+
+
+def _load_reference_config(config_path: str | Path = "configs/references.yaml") -> dict[str, Any]:
+    defaults: dict[str, Any] = {
+        "arxiv_max_results": 20,
+        "semantic_scholar_max_results": 20,
+        "glm_coding_plan_mcp_max_results": 10,
+        "final_reference_count": 12,
+        "recency_years_preferred": 3,
+        "influential_citation_threshold": 1000,
+        "semantic_scholar_base_url": "https://api.semanticscholar.org/graph/v1",
+        "semantic_scholar_timeout_seconds": 25,
+        "glm_coding_plan_mcp_url": "",
+    }
+    p = Path(config_path)
+    if not p.exists():
+        return defaults
     try:
-        max_results_raw = int(str(os.getenv("ARC_ARXIV_MAX_RESULTS", "8")))
-        max_results = max(1, min(max_results_raw, 20))
+        cfg = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        refs_cfg = cfg.get("references", {}) if isinstance(cfg, dict) else {}
+        out = defaults.copy()
+        if isinstance(refs_cfg, dict):
+            out.update(refs_cfg)
+        return out
     except Exception:
-        max_results = 8
+        return defaults
 
-    query = "+AND+".join([f"all:{w}" for w in re.findall(
-        r"[A-Za-z0-9\u4e00-\u9fff]+", topic)[:8]])
-    if not query:
+
+def _load_language_policy(config_path: str | Path = "configs/references.yaml") -> dict[str, str]:
+    defaults = {
+        "thinking_language": "English",
+        "final_output_language": "Chinese",
+    }
+    p = Path(config_path)
+    if not p.exists():
+        return defaults
+    try:
+        cfg = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        lang_cfg = cfg.get("language", {}) if isinstance(cfg, dict) else {}
+        out = defaults.copy()
+        if isinstance(lang_cfg, dict):
+            if str(lang_cfg.get("thinking_language", "")).strip():
+                out["thinking_language"] = str(lang_cfg.get("thinking_language")).strip()
+            if str(lang_cfg.get("final_output_language", "")).strip():
+                out["final_output_language"] = str(lang_cfg.get("final_output_language")).strip()
+        return out
+    except Exception:
+        return defaults
+
+
+def _fetch_arxiv_references(topic: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    max_results = max(1, min(int(cfg.get("arxiv_max_results", 20)), 50))
+    query_words = re.findall(r"[A-Za-z0-9\u4e00-\u9fff]+", topic)[:10]
+    if query_words:
+        query = "+AND+".join([f"all:{quote_plus(w)}" for w in query_words])
+    else:
         query = "all:multimodal+AND+all:hallucination"
-
     url = (
         "https://export.arxiv.org/api/query?"
-        f"search_query={query}&start=0&max_results={max_results}&sortBy=relevance&sortOrder=descending"
+        f"search_query={query}&start=0&max_results={max_results}&sortBy=submittedDate&sortOrder=descending"
     )
     try:
-        resp = requests.get(url, timeout=12, headers={
-                            "User-Agent": "ARC/0.1 (research-pipeline)"})
+        resp = requests.get(url, timeout=15, headers={"User-Agent": "ARC/0.1 (research-pipeline)"})
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
     except Exception:
         return []
 
     ns = {"a": "http://www.w3.org/2005/Atom"}
-    out: list[dict[str, str]] = []
+    out: list[dict[str, Any]] = []
     for entry in root.findall("a:entry", ns):
         id_node = entry.find("a:id", ns)
         title_node = entry.find("a:title", ns)
+        summary_node = entry.find("a:summary", ns)
+        published_node = entry.find("a:published", ns)
         if id_node is None or title_node is None:
             continue
         arxiv_url = (id_node.text or "").strip()
-        title = re.sub(r"\s+", " ", (title_node.text or "").strip())
         arxiv_id = arxiv_url.rsplit("/", 1)[-1] if arxiv_url else ""
+        title = re.sub(r"\s+", " ", (title_node.text or "").strip())
+        abstract = re.sub(r"\s+", " ", (summary_node.text or "").strip()) if summary_node is not None else ""
+        year = 0
+        if published_node is not None and published_node.text:
+            m = re.match(r"(\d{4})", published_node.text.strip())
+            if m:
+                year = int(m.group(1))
         if not arxiv_id or not title:
             continue
-        out.append({"arxiv_id": arxiv_id, "title": title, "url": arxiv_url})
+        out.append(
+            {
+                "source": "arxiv",
+                "id": arxiv_id,
+                "title": title,
+                "abstract": abstract,
+                "url": arxiv_url,
+                "year": year,
+                "citation_count": 0,
+            }
+        )
     return out
 
 
-def _format_arxiv_refs(refs: list[dict[str, str]]) -> str:
-    lines = ["# ARXIV_REFERENCES", "",
-             "| arxiv_id | title | url |", "|---|---|---|"]
+def _fetch_semantic_scholar_references(topic: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+    if not api_key:
+        return []
+    base_url = str(cfg.get("semantic_scholar_base_url", "https://api.semanticscholar.org/graph/v1")).rstrip("/")
+    max_results = max(1, min(int(cfg.get("semantic_scholar_max_results", 20)), 100))
+    timeout = int(cfg.get("semantic_scholar_timeout_seconds", 25))
+    query = quote_plus(topic)
+    url = (
+        f"{base_url}/paper/search?"
+        f"query={query}&limit={max_results}&fields=title,abstract,url,year,citationCount,externalIds"
+    )
+    try:
+        resp = requests.get(url, timeout=timeout, headers={"x-api-key": api_key, "User-Agent": "ARC/0.1 (research-pipeline)"})
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for item in payload.get("data", []):
+        title = str(item.get("title") or "").strip()
+        if not title:
+            continue
+        paper_id = str((item.get("externalIds") or {}).get("ArXiv") or item.get("paperId") or "semantic").strip()
+        out.append(
+            {
+                "source": "semantic_scholar",
+                "id": paper_id,
+                "title": title,
+                "abstract": str(item.get("abstract") or "").strip(),
+                "url": str(item.get("url") or "").strip(),
+                "year": int(item.get("year") or 0),
+                "citation_count": int(item.get("citationCount") or 0),
+            }
+        )
+    return out
+
+
+def _fetch_glm_coding_plan_mcp_references(topic: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    mcp_url = os.getenv("ARC_GLM_CODING_PLAN_MCP_URL", "").strip() or str(cfg.get("glm_coding_plan_mcp_url", "")).strip()
+    if not mcp_url:
+        return []
+    max_results = max(1, min(int(cfg.get("glm_coding_plan_mcp_max_results", 10)), 50))
+    headers = {"Content-Type": "application/json", "User-Agent": "ARC/0.1 (research-pipeline)"}
+    api_key = os.getenv("ARC_GLM_CODING_PLAN_MCP_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    payload = {"query": topic, "limit": max_results}
+    try:
+        resp = requests.post(mcp_url, headers=headers, json=payload, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return []
+
+    items = data.get("data") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        return []
+
+    out: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        if not title:
+            continue
+        out.append(
+            {
+                "source": "glm_coding_plan_mcp",
+                "id": str(item.get("id") or item.get("paper_id") or "mcp").strip(),
+                "title": title,
+                "abstract": str(item.get("abstract") or "").strip(),
+                "url": str(item.get("url") or "").strip(),
+                "year": int(item.get("year") or 0),
+                "citation_count": int(item.get("citation_count") or item.get("citations") or 0),
+            }
+        )
+    return out
+
+
+def _format_references(refs: list[dict[str, Any]]) -> str:
+    lines = [
+        "# REFERENCES",
+        "",
+        "| source | id | year | citations | title | abstract | url |",
+        "|---|---|---:|---:|---|---|---|",
+    ]
+    if not refs:
+        lines.append("| n/a | n/a | 0 | 0 | No qualified references found | No abstract available | n/a |")
     for r in refs:
-        title = r["title"].replace("|", "\\|")
-        lines.append(f"| {r['arxiv_id']} | {title} | {r['url']} |")
+        title = str(r.get("title", "")).replace("|", "\\|")
+        abstract = re.sub(r"\s+", " ", str(r.get("abstract", "")).strip())
+        abstract = (abstract[:320] + "...") if len(abstract) > 320 else abstract
+        abstract = abstract.replace("|", "\\|")
+        url = str(r.get("url", "")).replace("|", "\\|")
+        lines.append(
+            f"| {r.get('source', '')} | {r.get('id', '')} | {int(r.get('year', 0) or 0)} | "
+            f"{int(r.get('citation_count', 0) or 0)} | {title} | {abstract} | {url} |"
+        )
     lines.append("")
     return "\n".join(lines)
+
+
+def _write_output_index(run_dir: Path, state: PipelineState) -> None:
+    lang_cfg = _load_language_policy()
+    records = {s.name: s for s in state.stages}
+    ordered = [
+        ("TOPIC.txt", "输入研究任务", "zh"),
+        ("REFERENCES.md", "多源参考文献（含摘要，近年优先）", "en/zh"),
+        ("LITERATURE_MAP.md", "文献地图", "zh"),
+        ("IDEA_REPORT.md", "候选方案与风险", "zh"),
+        ("FINAL_PROPOSAL.md", "提案与可证伪计划", "zh"),
+        ("EVIDENCE_TABLE.md", "主张-证据对照", "zh"),
+        ("EXPERIMENT_PLAN.md", "实验计划", "zh"),
+        ("RESEARCH_DECISION_MEMO.md", "最终决策备忘录", "zh"),
+        ("AUTO_REVIEW.md", "自动审稿迭代日志", "zh"),
+        ("pipeline_state.json", "流水线状态机", "n/a"),
+    ]
+    lines = [
+        "# OUTPUT_INDEX",
+        "",
+        "本文件用于统一解释本次运行目录中的每个产物，建议按下表顺序阅读。",
+        "",
+        f"- Thinking language preference: {lang_cfg['thinking_language']}",
+        f"- Final document language preference: {lang_cfg['final_output_language']}",
+        "",
+        "| file | purpose | language | exists |",
+        "|---|---|---|---|",
+    ]
+    for file_name, purpose, lang in ordered:
+        exists = "yes" if (run_dir / file_name).exists() else "no"
+        lines.append(f"| {file_name} | {purpose} | {lang} | {exists} |")
+
+    lines.append("")
+    lines.append("## Stage Status")
+    lines.append("")
+    lines.append("| stage | status | outputs |")
+    lines.append("|---|---|---|")
+    for stage_name in [
+        "research-lit",
+        "idea-creator",
+        "novelty-check",
+        "evidence-grounding",
+        "research-refine",
+        "experiment-bridge",
+        "debate-runner",
+        "auto-review-loop",
+        "memo-synthesis",
+    ]:
+        rec = records.get(stage_name)
+        if rec is None:
+            lines.append(f"| {stage_name} | missing | - |")
+            continue
+        outputs = ", ".join(rec.outputs) if rec.outputs else "-"
+        lines.append(f"| {stage_name} | {rec.status} | {outputs} |")
+
+    lines.append("")
+    (run_dir / "OUTPUT_INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def _read_required(path: Path) -> str:

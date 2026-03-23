@@ -1,0 +1,24 @@
+references:
+  # Per-source search counts
+  arxiv_max_results: 20
+  semantic_scholar_max_results: 20
+  glm_coding_plan_mcp_max_results: 10
+  # Final number of references injected into pipeline prompts
+  final_reference_count: 12
+
+  # Prefer papers from recent years unless citation count is very high
+  recency_years_preferred: 3
+  influential_citation_threshold: 1000
+
+  # Semantic Scholar
+  semantic_scholar_base_url: https://api.semanticscholar.org/graph/v1
+  semantic_scholar_timeout_seconds: 25
+
+  # Optional external source: GLM Coding Plan MCP endpoint
+  # If empty, this source is skipped.
+  glm_coding_plan_mcp_url: ""
+
+language:
+  # Prompting policy for generation stages
+  thinking_language: English
+  final_output_language: Chinese

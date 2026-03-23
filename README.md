@@ -268,7 +268,10 @@ arc pipeline "multimodal agent safety benchmark" \
 ```
 
 Pipeline 主要产物（默认 `reports/<timestamp>/`）：
+- `OUTPUT_INDEX.md`（统一解释每个输出文件，建议优先阅读）
 - `pipeline_state.json`
+- `TOPIC.txt`
+- `REFERENCES.md`（多源文献：arXiv + Semantic Scholar + 可选 GLM Coding Plan MCP）
 - `LITERATURE_MAP.md`
 - `IDEA_REPORT.md`
 - `FINAL_PROPOSAL.md`
@@ -279,6 +282,14 @@ Pipeline 主要产物（默认 `reports/<timestamp>/`）：
 
 说明：当前 pipeline 为安全版，不会自动执行外部实验脚本；`experiment-bridge` 仅生成计划和脚本草案。
 当启用 `--strict-gates`（默认）时，stage chain 必须包含 `novelty-check` 与 `debate-runner`。
+
+可用以下命令快速解释某次运行目录中的文件用途：
+
+```bash
+arc explain-outputs --run-dir reports/<timestamp>
+# 或默认解释 reports/LATEST_RUN 指向的最新一次运行
+arc explain-outputs
+```
 
 ### 4) Test
 

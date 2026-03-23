@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import json
 from typing import Optional
+from pathlib import Path
 
 import typer
 import requests
@@ -114,6 +115,58 @@ def pipeline(
     )
     console.print(f"[bold green]Pipeline state:[/bold green] {state_file}")
     console.print(f"[bold green]Final memo:[/bold green] {memo_file}")
+
+
+@app.command("explain-outputs")
+def explain_outputs(
+    run_dir: Optional[str] = typer.Option(
+        None, help="Run directory path, e.g. reports/20260323_191404"),
+    output_dir: str = typer.Option("reports", help="Reports root directory"),
+) -> None:
+    root = Path(output_dir)
+    target: Optional[Path] = None
+    if run_dir:
+        candidate = Path(run_dir)
+        target = candidate if candidate.is_absolute() else Path.cwd() / candidate
+    else:
+        marker = root / "LATEST_RUN"
+        if marker.exists():
+            try:
+                name = marker.read_text(encoding="utf-8").strip()
+                if name:
+                    target = root / name
+            except Exception:
+                target = None
+
+    if target is None or not target.exists() or not target.is_dir():
+        raise typer.BadParameter(
+            "Cannot find run directory. Provide --run-dir or ensure reports/LATEST_RUN exists.")
+
+    index_file = target / "OUTPUT_INDEX.md"
+    if index_file.exists():
+        console.print(f"[bold green]Output index:[/bold green] {index_file}")
+        console.print(index_file.read_text(encoding="utf-8"))
+        return
+
+    files = sorted([p.name for p in target.iterdir() if p.is_file()])
+    table = Table(title=f"Artifacts in {target}")
+    table.add_column("file")
+    table.add_column("purpose")
+    purpose_map = {
+        "TOPIC.txt": "Input research task",
+        "REFERENCES.md": "Unified references with abstracts",
+        "LITERATURE_MAP.md": "Literature mapping",
+        "IDEA_REPORT.md": "Candidate ideas",
+        "FINAL_PROPOSAL.md": "Final proposal",
+        "EVIDENCE_TABLE.md": "Claim-evidence table",
+        "EXPERIMENT_PLAN.md": "Experiment plan",
+        "RESEARCH_DECISION_MEMO.md": "Final discussion memo",
+        "AUTO_REVIEW.md": "Auto-review logs",
+        "pipeline_state.json": "Pipeline state",
+    }
+    for f in files:
+        table.add_row(f, purpose_map.get(f, "auxiliary artifact"))
+    console.print(table)
 
 
 @app.command("refine-topic")
