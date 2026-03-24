@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from tests.helpers.text_contracts import assert_contains_all, read_text
 
 
 PROMPT_MARKERS = {
@@ -48,15 +48,14 @@ PROMPT_MARKERS = {
 
 def test_prompt_contract_markers_present() -> None:
     for path_str, markers in PROMPT_MARKERS.items():
-        text = Path(path_str).read_text(encoding="utf-8")
-        for marker in markers:
-            assert marker in text, f"missing marker {marker!r} in {path_str}"
+        text = read_text(path_str)
+        assert_contains_all(text, markers, label=path_str)
 
 
 def test_prompt_contract_doc_exists() -> None:
-    doc = Path("docs/prompt-contracts.md")
-    assert doc.exists()
-    text = doc.read_text(encoding="utf-8")
-    assert "Debate Prompts" in text
-    assert "Chat Mode Prompts" in text
-    assert "Runtime-Owned Contract Fields" in text
+    text = read_text("docs/prompt-contracts.md")
+    assert_contains_all(
+        text,
+        ["Debate Prompts", "Chat Mode Prompts", "Runtime-Owned Contract Fields"],
+        label="docs/prompt-contracts.md",
+    )

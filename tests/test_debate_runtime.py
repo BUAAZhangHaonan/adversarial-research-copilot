@@ -75,3 +75,38 @@ def test_debate_resume_recovers_in_progress_round_after_interrupt(
     assert state.rounds[0].required_revisions == ["add stronger control"]
     assert next_round == 2
     assert blockers == ["missing baseline"]
+
+
+def test_debate_resume_rejects_stale_state(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    memory = DebateMemory(run_dir)
+    orchestrator = ARCOrchestrator()
+
+    memory.save_json(
+        "run_state.json",
+        {
+            "round": 1,
+            "status": "in_progress",
+            "blockers": ["stale blocker"],
+            "timestamp": "2020-01-01T00:00:00+00:00",
+        },
+    )
+    memory.save_json(
+        "final_state.json",
+        {
+            "idea": "test idea",
+            "framed_problem": "framed",
+            "rounds": [],
+        },
+    )
+
+    state, next_round, blockers, resumed = orchestrator._prepare_state(
+        memory,
+        idea="test idea",
+        resume=True,
+    )
+
+    assert resumed is False
+    assert next_round == 1
+    assert blockers == []
+    assert state.rounds == []

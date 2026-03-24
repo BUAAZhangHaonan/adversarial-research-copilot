@@ -99,3 +99,39 @@ def test_chat_mode_resume_preserves_existing_rounds(
     assert [item["round_id"] for item in state["rounds"]] == [1, 2]
     assert state["rounds"][0]["proposer"] == "old proposer round 1"
     assert "old proposer round 1" in transcript_file.read_text(encoding="utf-8")
+
+
+def test_chat_mode_resume_rejects_stale_in_progress_state(tmp_path: Path) -> None:
+    run_dir = tmp_path / "chat-run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "chat_mode_state.json").write_text(
+        json.dumps(
+            {
+                "topic": "topic",
+                "rounds": [],
+                "models": {
+                    "proposer": "p",
+                    "skeptic": "s",
+                    "moderator": "m",
+                },
+                "status": "in_progress",
+                "timestamp": "2020-01-01T00:00:00+00:00",
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    state, resumed = cmr._load_chat_resume_state(
+        run_dir,
+        topic="topic",
+        proposer_model="p",
+        skeptic_model="s",
+        moderator_model="m",
+        resume=True,
+        max_stale_hours=24,
+    )
+
+    assert state is None
+    assert resumed is False
