@@ -36,19 +36,30 @@ class ARCOrchestrator:
         resume: bool = False,
         run_dir: Path | None = None,
     ) -> tuple[Path, Path]:
-        target_run_dir = run_dir or resolve_run_dir(
-            output_dir, resume, "run_state.json")
-        memory = DebateMemory(target_run_dir)
-
         if self.config.require_cross_model_adversary and proposer_model == skeptic_model:
             raise ValueError(
                 "Proposer and Skeptic must use different models when require_cross_model_adversary=true")
 
         idea = load_idea_text(idea_file)
-        # Persist the debate input so the run directory always contains the exact prompt/idea.
-        (target_run_dir / "INPUT_IDEA.txt").write_text(idea.strip() + "\n", encoding="utf-8")
-        state, start_round, previous_blockers = self._prepare_state(
+        target_run_dir = run_dir or resolve_run_dir(
+            output_dir, resume, "run_state.json")
+        memory = DebateMemory(target_run_dir)
+        state, start_round, previous_blockers, resumed = self._prepare_state(
             memory, idea, resume)
+        if resume and not resumed and run_dir is None and (target_run_dir / "run_state.json").exists():
+            target_run_dir = resolve_run_dir(output_dir, False, "run_state.json")
+            memory = DebateMemory(target_run_dir)
+            state, start_round, previous_blockers, resumed = self._prepare_state(
+                memory, idea, False)
+
+        if resumed:
+            existing_idea = (target_run_dir / "INPUT_IDEA.txt").read_text(
+                encoding="utf-8").strip() if (target_run_dir / "INPUT_IDEA.txt").exists() else ""
+            if existing_idea and existing_idea != idea.strip():
+                raise ValueError(
+                    "Resume requested with a different idea than the in-progress run.")
+
+        (target_run_dir / "INPUT_IDEA.txt").write_text(idea.strip() + "\n", encoding="utf-8")
         previous_required_revisions: list[str] = []
         if state.rounds:
             previous_required_revisions = state.rounds[-1].required_revisions
@@ -96,6 +107,7 @@ class ARCOrchestrator:
             previous_required_revisions = required_revisions
 
             memory.append(record.model_dump())
+            memory.save_json("final_state.json", state.model_dump(mode="json"))
             self._save_run_state(memory, round_id, scorecard.average,
                                  decision, unresolved_blockers, "in_progress")
 
@@ -125,37 +137,42 @@ class ARCOrchestrator:
         )
         return report_file, state_file
 
-    def _prepare_state(self, memory: DebateMemory, idea: str, resume: bool) -> tuple[ResearchState, int, list[str]]:
+    def _prepare_state(
+        self,
+        memory: DebateMemory,
+        idea: str,
+        resume: bool,
+    ) -> tuple[ResearchState, int, list[str], bool]:
         if not resume:
-            return init_state(idea), 1, []
+            return init_state(idea), 1, [], False
 
         run_state = memory.load_json("run_state.json")
         final_state = memory.load_json("final_state.json")
         if not run_state or not final_state:
-            return init_state(idea), 1, []
+            return init_state(idea), 1, [], False
 
         if run_state.get("status") != "in_progress":
-            return init_state(idea), 1, []
+            return init_state(idea), 1, [], False
 
         ts_str = str(run_state.get("timestamp", ""))
         try:
             last_ts = datetime.fromisoformat(ts_str)
         except ValueError:
-            return init_state(idea), 1, []
+            return init_state(idea), 1, [], False
 
         now = datetime.now(UTC)
         if last_ts.tzinfo is None:
             last_ts = last_ts.replace(tzinfo=UTC)
         age_hours = (now - last_ts).total_seconds() / 3600
         if age_hours > self.config.stale_resume_hours:
-            return init_state(idea), 1, []
+            return init_state(idea), 1, [], False
 
         state = ResearchState.model_validate(final_state)
         next_round = int(run_state.get("round", len(state.rounds))) + 1
         blockers = [str(x) for x in run_state.get("blockers", [])]
         self.console.print(
             f"[cyan]Recovered run state. Resume from round {next_round}.[/cyan]")
-        return state, next_round, blockers
+        return state, next_round, blockers, True
 
     def _save_run_state(
         self,

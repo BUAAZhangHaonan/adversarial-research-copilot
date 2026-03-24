@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,28 @@ def run_chat_mode(
         cfg.export_best_consensus = export_best_consensus
 
     target_run_dir = Path(run_dir) if run_dir else resolve_run_dir(output_dir, resume, "chat_mode_state.json")
+    state_file = target_run_dir / "chat_mode_state.json"
+    resume_state, resumed = _load_chat_resume_state(
+        target_run_dir,
+        topic=topic,
+        proposer_model=proposer_model,
+        skeptic_model=skeptic_model,
+        moderator_model=moderator_model,
+        resume=resume,
+        max_stale_hours=24,
+    )
+    if resume and run_dir is None and not resumed and state_file.exists():
+        target_run_dir = resolve_run_dir(output_dir, False, "chat_mode_state.json")
+        state_file = target_run_dir / "chat_mode_state.json"
+        resume_state, resumed = _load_chat_resume_state(
+            target_run_dir,
+            topic=topic,
+            proposer_model=proposer_model,
+            skeptic_model=skeptic_model,
+            moderator_model=moderator_model,
+            resume=False,
+            max_stale_hours=24,
+        )
     target_run_dir.mkdir(parents=True, exist_ok=True)
     chat_dir = target_run_dir / "chat_rounds"
     chat_dir.mkdir(parents=True, exist_ok=True)
@@ -56,15 +79,23 @@ def run_chat_mode(
     refs = _collect_chat_references(topic, cfg.min_references)
     references_text = _format_references(refs)
 
+    if resumed:
+        existing_topic = (target_run_dir / "TOPIC_CHAT.txt").read_text(
+            encoding="utf-8").strip() if (target_run_dir / "TOPIC_CHAT.txt").exists() else ""
+        if existing_topic and existing_topic != topic.strip():
+            raise RuntimeError(
+                "Resume requested with a different topic than the in-progress chat run.")
+
     (target_run_dir / "TOPIC_CHAT.txt").write_text(topic.strip() + "\n", encoding="utf-8")
     (target_run_dir / "REFERENCES.md").write_text(references_text, encoding="utf-8")
 
-    rounds: list[dict[str, Any]] = []
-    prior_summary = ""
+    rounds: list[dict[str, Any]] = list(resume_state.get("rounds", [])) if resume_state else []
+    prior_summary = _extract_summary_anchor(str(rounds[-1].get("moderator", ""))) if rounds else ""
     stop_reason = "max_rounds_reached"
     reference_brief = _build_reference_brief(refs, max_items=cfg.min_references)
+    start_round = max((int(item.get("round_id", 0)) for item in rounds), default=0) + 1
 
-    for round_id in range(1, cfg.max_rounds + 1):
+    for round_id in range(start_round, cfg.max_rounds + 1):
         proposer_output = _chat_generate(
             client=client,
             model=proposer_model,
@@ -119,6 +150,18 @@ def run_chat_mode(
         prior_summary = _extract_summary_anchor(moderator_output)
 
         _write_round_artifacts(chat_dir, round_record)
+        _write_chat_mode_state(
+            state_file=state_file,
+            topic=topic,
+            rounds=rounds,
+            proposer_model=proposer_model,
+            skeptic_model=skeptic_model,
+            moderator_model=moderator_model,
+            cfg=cfg,
+            reference_count=len(refs),
+            stop_reason=stop_reason,
+            status="in_progress",
+        )
 
         if round_id >= cfg.min_rounds_before_stop and decision.startswith("STOP"):
             stop_reason = decision
@@ -147,36 +190,115 @@ def run_chat_mode(
         encoding="utf-8",
     )
 
-    state_file = target_run_dir / "chat_mode_state.json"
     if cfg.persist_state:
-        state_file.write_text(
-            json.dumps(
-                {
-                    "topic": topic,
-                    "rounds": rounds,
-                    "models": {
-                        "proposer": proposer_model,
-                        "skeptic": skeptic_model,
-                        "moderator": moderator_model,
-                    },
-                    "config": {
-                        "min_rounds_before_stop": cfg.min_rounds_before_stop,
-                        "max_rounds": cfg.max_rounds,
-                        "max_response_chars": cfg.max_response_chars,
-                        "max_paragraphs": cfg.max_paragraphs,
-                        "export_best_consensus": cfg.export_best_consensus,
-                    },
-                    "reference_count": len(refs),
-                    "stop_reason": stop_reason,
-                    "status": "completed",
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
+        _write_chat_mode_state(
+            state_file=state_file,
+            topic=topic,
+            rounds=rounds,
+            proposer_model=proposer_model,
+            skeptic_model=skeptic_model,
+            moderator_model=moderator_model,
+            cfg=cfg,
+            reference_count=len(refs),
+            stop_reason=stop_reason,
+            status="completed",
         )
 
     return transcript_file, state_file
+
+
+def _load_chat_resume_state(
+    run_dir: Path,
+    topic: str,
+    proposer_model: str,
+    skeptic_model: str,
+    moderator_model: str,
+    resume: bool,
+    max_stale_hours: int,
+) -> tuple[dict[str, Any] | None, bool]:
+    if not resume:
+        return None, False
+
+    state_file = run_dir / "chat_mode_state.json"
+    if not state_file.exists():
+        return None, False
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None, False
+
+    if str(state.get("status", "")).strip().lower() != "in_progress":
+        return None, False
+    if str(state.get("topic", "")).strip() != topic.strip():
+        return None, False
+
+    models = state.get("models", {})
+    if not isinstance(models, dict):
+        return None, False
+    if models.get("proposer") != proposer_model:
+        return None, False
+    if models.get("skeptic") != skeptic_model:
+        return None, False
+    if models.get("moderator") != moderator_model:
+        return None, False
+
+    timestamp = str(state.get("timestamp", "")).strip()
+    if timestamp:
+        try:
+            updated_at = datetime.fromisoformat(timestamp)
+        except ValueError:
+            return None, False
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=UTC)
+        age_hours = (datetime.now(UTC) - updated_at).total_seconds() / 3600
+        if age_hours > max_stale_hours:
+            return None, False
+
+    rounds = state.get("rounds", [])
+    if not isinstance(rounds, list):
+        return None, False
+    return state, True
+
+
+def _write_chat_mode_state(
+    state_file: Path,
+    topic: str,
+    rounds: list[dict[str, Any]],
+    proposer_model: str,
+    skeptic_model: str,
+    moderator_model: str,
+    cfg: ChatModeConfig,
+    reference_count: int,
+    stop_reason: str,
+    status: str,
+) -> None:
+    state_file.write_text(
+        json.dumps(
+            {
+                "topic": topic,
+                "rounds": rounds,
+                "models": {
+                    "proposer": proposer_model,
+                    "skeptic": skeptic_model,
+                    "moderator": moderator_model,
+                },
+                "config": {
+                    "min_rounds_before_stop": cfg.min_rounds_before_stop,
+                    "max_rounds": cfg.max_rounds,
+                    "max_response_chars": cfg.max_response_chars,
+                    "max_paragraphs": cfg.max_paragraphs,
+                    "export_best_consensus": cfg.export_best_consensus,
+                },
+                "reference_count": reference_count,
+                "stop_reason": stop_reason,
+                "status": status,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -> ChatModeConfig:

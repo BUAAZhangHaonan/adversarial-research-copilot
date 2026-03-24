@@ -42,14 +42,24 @@ def run_pipeline(
     """
 
     run_dir = resolve_run_dir(output_dir, resume, "pipeline_state.json")
-
-    # Persist the user input so each run directory is self-describing.
-    (run_dir / "TOPIC.txt").write_text(topic.strip() + "\n", encoding="utf-8")
-
     memory = DebateMemory(run_dir)
     debate_cfg = _load_debate_config()
 
-    pipeline_state = _prepare_pipeline_state(memory, topic, resume, debate_cfg)
+    pipeline_state, resumed = _prepare_pipeline_state(memory, topic, resume, debate_cfg)
+    if resume and not resumed and (run_dir / "pipeline_state.json").exists():
+        run_dir = resolve_run_dir(output_dir, False, "pipeline_state.json")
+        memory = DebateMemory(run_dir)
+        pipeline_state, resumed = _prepare_pipeline_state(memory, topic, False, debate_cfg)
+
+    if resumed:
+        existing_topic = (run_dir / "TOPIC.txt").read_text(
+            encoding="utf-8").strip() if (run_dir / "TOPIC.txt").exists() else ""
+        if existing_topic and existing_topic != topic.strip():
+            raise PipelineError(
+                "Resume requested with a different topic than the in-progress pipeline run.")
+
+    # Persist the user input so each run directory is self-describing.
+    (run_dir / "TOPIC.txt").write_text(topic.strip() + "\n", encoding="utf-8")
 
     skills: dict[str, Skill] = load_skills_dir(skills_dir)
     if "pipeline-arc" not in skills:
@@ -778,25 +788,30 @@ def _load_debate_config(config_path: str | Path = "configs/debate.yaml") -> Deba
     return DebateConfig(**cfg.get("debate", {}))
 
 
-def _prepare_pipeline_state(memory: DebateMemory, topic: str, resume: bool, debate_cfg: DebateConfig) -> PipelineState:
+def _prepare_pipeline_state(
+    memory: DebateMemory,
+    topic: str,
+    resume: bool,
+    debate_cfg: DebateConfig,
+) -> tuple[PipelineState, bool]:
     if not resume:
-        return PipelineState.new(topic=topic)
+        return PipelineState.new(topic=topic), False
 
     state_obj = memory.load_json("pipeline_state.json")
     if not state_obj:
-        return PipelineState.new(topic=topic)
+        return PipelineState.new(topic=topic), False
 
     state = PipelineState.model_validate(state_obj)
     if state.status != "in_progress":
-        return PipelineState.new(topic=topic)
+        return PipelineState.new(topic=topic), False
 
     ts = state.updated_at
     now = datetime.now(UTC)
     age_hours = (now - ts).total_seconds() / 3600
     if age_hours > debate_cfg.stale_resume_hours:
-        return PipelineState.new(topic=topic)
+        return PipelineState.new(topic=topic), False
 
-    return state
+    return state, True
 
 
 def _ensure_stage_records(state: PipelineState, stage_chain: list[str]) -> PipelineState:

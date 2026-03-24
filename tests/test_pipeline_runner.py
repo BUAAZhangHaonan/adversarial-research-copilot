@@ -118,6 +118,53 @@ def test_pipeline_resume_skips_completed_stage(tmp_path: Path) -> None:
     assert before == after
 
 
+def test_pipeline_resume_completed_run_creates_new_directory(tmp_path: Path) -> None:
+    skills_dir = tmp_path / "skills"
+    _write_skill(
+        skills_dir,
+        "pipeline-arc",
+        """
+## Stage Chain
+1. research-lit
+2. idea-creator
+
+""",
+    )
+    _write_skill(skills_dir, "research-lit", "# research-lit\n")
+    _write_skill(skills_dir, "idea-creator", "# idea-creator\n")
+
+    reports = tmp_path / "reports"
+
+    first_state, _ = run_pipeline(
+        topic="old topic",
+        proposer_model="m1",
+        skeptic_model="m2",
+        moderator_model="m3",
+        output_dir=str(reports),
+        resume=False,
+        skills_dir=str(skills_dir),
+        client=StubClient(),
+        strict_gates=False,
+    )
+    original_run_dir = first_state.parent
+    original_topic = (original_run_dir / "TOPIC.txt").read_text(encoding="utf-8")
+
+    second_state, _ = run_pipeline(
+        topic="new topic",
+        proposer_model="m1",
+        skeptic_model="m2",
+        moderator_model="m3",
+        output_dir=str(reports),
+        resume=True,
+        skills_dir=str(skills_dir),
+        client=StubClient(),
+        strict_gates=False,
+    )
+
+    assert second_state.parent != original_run_dir
+    assert (original_run_dir / "TOPIC.txt").read_text(encoding="utf-8") == original_topic
+
+
 def test_extract_auto_review_constants() -> None:
     body = """
 ## Constants
