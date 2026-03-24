@@ -12,8 +12,6 @@ Translate research design into runnable task graph.
 
 ## Outputs
 - `EXPERIMENT_PLAN.md`
-- `RUNBOOK.md`
-- `TASKS.md`
 
 ## Required Fields per Experiment
 1. objective
@@ -26,3 +24,4 @@ Translate research design into runnable task graph.
 ## Rules
 - Separate must-run vs optional experiments.
 - Flag compute-heavy experiments (>24h single GPU) explicitly.
+- 当前实现只保证产出 `EXPERIMENT_PLAN.md`，不会自动写 `RUNBOOK.md` 或 `TASKS.md`。

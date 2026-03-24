@@ -11,7 +11,6 @@ allowed-tools: Read, Write, Grep, Agent
 Generate 8-12 candidate ideas, then rank down to top 3 based on feasibility and falsifiability.
 
 ## Output Files
-- `IDEA_CANDIDATES.md`
 - `IDEA_REPORT.md`
 
 ## Required Structure

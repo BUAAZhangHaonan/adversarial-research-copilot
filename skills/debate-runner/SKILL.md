@@ -16,9 +16,10 @@ Force the proposal through adversarial scrutiny until convergence or hard-stop.
 - Moderator: scorecard + blocker gate + continue/stop
 
 ## Required Outputs
-- `DEBATE_LOG.md`
-- `reports/latest/debate_log.jsonl`
-- `reports/latest/research_decision_memo.md`
+- `debate_log.jsonl`
+- `run_state.json`
+- `final_state.json`
+- `research_decision_memo.md`
 
 ## Stop Conditions
 1. No unresolved blockers for two consecutive rounds

@@ -11,12 +11,12 @@ allowed-tools: Read, Grep, WebSearch, WebFetch, Write
 Answer one question: is this idea substantively novel under a strict baseline comparison?
 
 ## Output
-Write `NOVELTY_CHECK.md`:
+Write `FINAL_PROPOSAL.md`:
 1. Closest prior work (top 5)
 2. Overlap matrix (mechanism, data, metric, claim)
 3. True differentiators (if any)
 4. Risk of pseudo-novelty
-5. Keep / kill recommendation
+5. A proposal version that is safe to send into ARC debate
 
 ## Rules
 - Novelty cannot be based on naming or packaging differences.

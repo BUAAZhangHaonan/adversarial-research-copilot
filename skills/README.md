@@ -22,6 +22,10 @@ Expected artifacts:
 - IDEA_REPORT.md
 - FINAL_PROPOSAL.md
 - EXPERIMENT_PLAN.md
-- DEBATE_LOG.md
+- debate_log.jsonl
+- run_state.json
+- final_state.json
+- research_decision_memo.md
 - RESEARCH_DECISION_MEMO.md
-- REVIEW_STATE.json
+- AUTO_REVIEW.md
+- auto_review_state.json

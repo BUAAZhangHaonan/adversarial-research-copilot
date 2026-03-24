@@ -13,8 +13,8 @@ ARC 不是“自动做科研”的黑箱流水线，而是一个受控对抗式�
 
 ## What We Borrowed (And Why)
 
-基于对 ARIS 与 EvoScientist 的实仓审阅，ARC 在 v0.1.1 引入三项升级：
-- 跨模型对抗约束：默认要求 Proposer 与 Skeptic 使用不同模型，避免同模自审盲点。
+基于对 ARIS 与 EvoScientist 的实仓审阅，ARC 在 v0.1.0 版本收敛出三项升级：
+- 跨模型对抗约束：支持启用 Proposer 与 Skeptic 的跨模型对抗；当前默认配置不强制 Proposer 与 Skeptic 使用不同模型，但可在 `configs/debate.yaml` 中开启。
 - 可恢复循环：每轮写入 `run_state.json`，支持 `--resume` 从中断点继续。
 - 结构化裁决协议：Moderator 追加 machine-readable YAML，提升解析稳定性。
 
@@ -81,29 +81,13 @@ User Research Idea
 
 ## Debate Protocol
 
-每轮固定协议：
+当前 debate prompt 采用“人类可读分析 + 固定 YAML 尾部”协议：
 
-Proposer 必须输出 6 块：
-1. 核心命题
-2. 方法机制
-3. 为什么比已有思路强
-4. 可验证实验
-5. 最大风险
-6. 备选方案
+- Proposer：主张一个首选方案，回应上一轮 blocker / revision，并在结尾输出 `proposal_quality`、`top_next_actions`、`open_questions`。
+- Skeptic：聚焦最致命风险、证据缺口与必须回答的问题，并在结尾输出 `risk_summary`、`next_round_focus`、`evidence_to_collect`。
+- Moderator：给出整体裁决、`scorecard`、`unresolved_blockers`、`required_revisions` 与 `continue_or_stop`。
 
-Skeptic 必须输出 6 块：
-1. 最致命的问题
-2. 隐含假设
-3. 潜在伪创新点
-4. 实验设计漏洞
-5. 资源与实现风险
-6. 只有通过什么证据我才会放行
-
-Moderator 只输出 4 块：
-1. scorecard
-2. unresolved blockers
-3. required revisions
-4. continue_or_stop
+说明：人类可读部分允许灵活组织，但机器可读字段名是稳定契约，详见 `docs/prompt-contracts.md`。
 
 ## Convergence Rules
 
@@ -127,7 +111,11 @@ adversarial-research-copilot/
 ├─ prompts/
 │  ├─ proposer.md
 │  ├─ skeptic.md
-│  └─ moderator.md
+│  ├─ moderator.md
+│  └─ chat_mode/
+│     ├─ proposer_chat.md
+│     ├─ skeptic_chat.md
+│     └─ moderator_chat.md
 ├─ src/arc/
 │  ├─ cli.py
 │  ├─ orchestrator.py
@@ -135,6 +123,7 @@ adversarial-research-copilot/
 │  ├─ schemas.py
 │  ├─ memory.py
 │  ├─ llm_client.py
+│  ├─ model_registry.py
 │  ├─ agents/
 │  │  ├─ proposer.py
 │  │  ├─ skeptic.py
@@ -142,16 +131,22 @@ adversarial-research-copilot/
 │  ├─ scoring/
 │  │  └─ rubric.py
 │  ├─ runners/
-│  │  └─ debate_runner.py
+│  │  ├─ debate_runner.py
+│  │  ├─ pipeline_runner.py
+│  │  └─ chat_mode_runner.py
 │  └─ exporters/
 │     └─ markdown_report.py
+├─ skills/
+│  └─ ...
 ├─ examples/
 │  ├─ multimodal_research_idea.md
 │  └─ robotics_research_idea.md
+├─ docs/
+│  ├─ prompt-contracts.md
+│  └─ plans/
+│     └─ ...
 └─ tests/
-   ├─ test_state.py
-   ├─ test_rubric.py
-   └─ test_convergence.py
+   └─ ...
 ```
 
 ## Quick Start

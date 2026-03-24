@@ -13,7 +13,7 @@ Repeat review and correction without losing state when sessions are interrupted.
 ## Constants
 - MAX_ROUNDS = 4
 - POSITIVE_THRESHOLD = 7/10
-- STATE_FILE = `reports/latest/run_state.json`
+- STATE_FILE = `auto_review_state.json`
 - LOG_FILE = `AUTO_REVIEW.md`
 
 ## Required Round Steps
