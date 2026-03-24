@@ -61,7 +61,7 @@ def parse_decision(moderator_text: str) -> str:
 
 
 def parse_moderator_payload(moderator_text: str) -> dict | None:
-    match = re.search(r"```yaml\s*(.*?)```", moderator_text, re.IGNORECASE | re.DOTALL)
+    match = re.search(r"```(?:yaml|yml)\s*(.*?)```", moderator_text, re.IGNORECASE | re.DOTALL)
     if not match:
         return None
     payload_text = textwrap.dedent(match.group(1)).strip()
