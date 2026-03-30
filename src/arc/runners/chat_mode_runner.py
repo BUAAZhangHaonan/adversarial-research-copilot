@@ -17,6 +17,7 @@ from arc.runners.pipeline_runner import _collect_references, _format_references
 @dataclass
 class ChatModeConfig:
     min_rounds_before_stop: int = 20
+    # Use 0 for unlimited rounds (stop only by judge decision).
     max_rounds: int = 60
     min_references: int = 20
     # Approximate upper bound close to 1K tokens for most providers.
@@ -42,8 +43,10 @@ def run_chat_mode(
     if min_rounds_before_stop is not None:
         cfg.min_rounds_before_stop = max(1, min_rounds_before_stop)
     if max_rounds is not None:
-        cfg.max_rounds = max(1, max_rounds)
-    if cfg.max_rounds < cfg.min_rounds_before_stop:
+        cfg.max_rounds = int(max_rounds)
+    if cfg.max_rounds < 0:
+        cfg.max_rounds = 0
+    if cfg.max_rounds > 0 and cfg.max_rounds < cfg.min_rounds_before_stop:
         cfg.max_rounds = cfg.min_rounds_before_stop
     if export_best_consensus is not None:
         cfg.export_best_consensus = export_best_consensus
@@ -95,7 +98,10 @@ def run_chat_mode(
     reference_brief = _build_reference_brief(refs, max_items=cfg.min_references)
     start_round = max((int(item.get("round_id", 0)) for item in rounds), default=0) + 1
 
-    for round_id in range(start_round, cfg.max_rounds + 1):
+    round_id = start_round
+    while True:
+        if cfg.max_rounds > 0 and round_id > cfg.max_rounds:
+            break
         proposer_output = _chat_generate(
             client=client,
             model=proposer_model,
@@ -166,6 +172,8 @@ def run_chat_mode(
         if round_id >= cfg.min_rounds_before_stop and decision.startswith("STOP"):
             stop_reason = decision
             break
+
+        round_id += 1
 
     transcript = _build_transcript(topic, rounds)
     transcript_file = target_run_dir / "CHAT_TRANSCRIPT.md"
@@ -311,7 +319,7 @@ def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -
         cfg = data.get("chat_mode", {}) if isinstance(data, dict) else {}
         return ChatModeConfig(
             min_rounds_before_stop=max(1, int(cfg.get("min_rounds_before_stop", defaults.min_rounds_before_stop))),
-            max_rounds=max(1, int(cfg.get("max_rounds", defaults.max_rounds))),
+            max_rounds=max(0, int(cfg.get("max_rounds", defaults.max_rounds))),
             min_references=max(20, int(cfg.get("min_references", defaults.min_references))),
             max_response_chars=max(500, int(cfg.get("max_response_chars", defaults.max_response_chars))),
             max_paragraphs=max(1, int(cfg.get("max_paragraphs", defaults.max_paragraphs))),
@@ -490,7 +498,7 @@ def _build_index(
         "本次为聊天式头脑风暴模式，不要求形式化证明，但保留文献支撑。",
         "",
         f"- min_rounds_before_stop: {cfg.min_rounds_before_stop}",
-        f"- max_rounds: {cfg.max_rounds}",
+        f"- max_rounds: {'unlimited (judge decides)' if cfg.max_rounds == 0 else cfg.max_rounds}",
         f"- min_references: {cfg.min_references}",
         f"- max_response_chars_per_agent: {cfg.max_response_chars}",
         f"- max_paragraphs_per_agent: {cfg.max_paragraphs}",

@@ -203,7 +203,7 @@ def chat_mode(
     ),
     max_rounds: int = typer.Option(
         60,
-        help="Maximum rounds safety cap; set a higher value for long overnight debate",
+        help="Maximum rounds safety cap; set 0 for unlimited rounds (judge decides stop)",
     ),
     export_best_consensus: bool = typer.Option(
         True,
