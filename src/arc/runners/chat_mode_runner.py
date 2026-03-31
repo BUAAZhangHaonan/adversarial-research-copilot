@@ -94,13 +94,14 @@ def run_chat_mode(
 
     rounds: list[dict[str, Any]] = list(resume_state.get("rounds", [])) if resume_state else []
     prior_summary = _extract_summary_anchor(str(rounds[-1].get("moderator", ""))) if rounds else ""
-    stop_reason = "max_rounds_reached"
+    stop_reason = "running"
     reference_brief = _build_reference_brief(refs, max_items=cfg.min_references)
     start_round = max((int(item.get("round_id", 0)) for item in rounds), default=0) + 1
 
     round_id = start_round
     while True:
         if cfg.max_rounds > 0 and round_id > cfg.max_rounds:
+            stop_reason = "max_rounds_reached"
             break
         proposer_output = _chat_generate(
             client=client,
