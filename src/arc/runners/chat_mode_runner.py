@@ -93,16 +93,39 @@ def run_chat_mode(
     (target_run_dir / "REFERENCES.md").write_text(references_text, encoding="utf-8")
 
     rounds: list[dict[str, Any]] = list(resume_state.get("rounds", [])) if resume_state else []
+    _backfill_round_timestamps(
+        rounds=rounds,
+        chat_dir=chat_dir,
+        min_rounds_before_stop=cfg.min_rounds_before_stop,
+        fallback_timestamp=str((resume_state or {}).get("timestamp", datetime.now(UTC).isoformat())),
+    )
     prior_summary = _extract_summary_anchor(str(rounds[-1].get("moderator", ""))) if rounds else ""
     stop_reason = "running"
     reference_brief = _build_reference_brief(refs, max_items=cfg.min_references)
     start_round = max((int(item.get("round_id", 0)) for item in rounds), default=0) + 1
+
+    if rounds:
+        _write_interim_outputs(target_run_dir, topic, cfg, refs, rounds, stop_reason)
+        if cfg.persist_state:
+            _write_chat_mode_state(
+                state_file=state_file,
+                topic=topic,
+                rounds=rounds,
+                proposer_model=proposer_model,
+                skeptic_model=skeptic_model,
+                moderator_model=moderator_model,
+                cfg=cfg,
+                reference_count=len(refs),
+                stop_reason=stop_reason,
+                status="in_progress",
+            )
 
     round_id = start_round
     while True:
         if cfg.max_rounds > 0 and round_id > cfg.max_rounds:
             stop_reason = "max_rounds_reached"
             break
+        round_started_at = datetime.now(UTC).isoformat()
         proposer_output = _chat_generate(
             client=client,
             model=proposer_model,
@@ -116,6 +139,7 @@ def run_chat_mode(
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
         )
+        proposer_completed_at = datetime.now(UTC).isoformat()
 
         skeptic_output = _chat_generate(
             client=client,
@@ -130,6 +154,7 @@ def run_chat_mode(
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
         )
+        skeptic_completed_at = datetime.now(UTC).isoformat()
 
         moderator_output = _chat_generate(
             client=client,
@@ -144,19 +169,33 @@ def run_chat_mode(
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
         )
+        moderator_completed_at = datetime.now(UTC).isoformat()
 
-        decision = _parse_judge_decision(moderator_output)
+        raw_decision = _parse_judge_decision(moderator_output)
+        effective_decision = raw_decision
+        if raw_decision.startswith("STOP") and round_id < cfg.min_rounds_before_stop:
+            effective_decision = "CONTINUE_MIN_ROUNDS_NOT_MET"
+
+        round_completed_at = datetime.now(UTC).isoformat()
         round_record = {
             "round_id": round_id,
+            "round_started_at": round_started_at,
+            "proposer_completed_at": proposer_completed_at,
+            "skeptic_completed_at": skeptic_completed_at,
+            "moderator_completed_at": moderator_completed_at,
+            "round_completed_at": round_completed_at,
             "proposer": proposer_output,
             "skeptic": skeptic_output,
             "moderator": moderator_output,
-            "judge_decision": decision,
+            "judge_decision": effective_decision,
+            "judge_decision_raw": raw_decision,
+            "judge_decision_effective": effective_decision,
         }
         rounds.append(round_record)
         prior_summary = _extract_summary_anchor(moderator_output)
 
         _write_round_artifacts(chat_dir, round_record)
+        _write_interim_outputs(target_run_dir, topic, cfg, refs, rounds, stop_reason)
         _write_chat_mode_state(
             state_file=state_file,
             topic=topic,
@@ -170,8 +209,8 @@ def run_chat_mode(
             status="in_progress",
         )
 
-        if round_id >= cfg.min_rounds_before_stop and decision.startswith("STOP"):
-            stop_reason = decision
+        if round_id >= cfg.min_rounds_before_stop and effective_decision.startswith("STOP"):
+            stop_reason = effective_decision
             break
 
         round_id += 1
@@ -449,6 +488,8 @@ def _write_round_artifacts(chat_dir: Path, record: dict[str, Any]) -> None:
         "\n\n".join(
             [
                 f"# Round {rid}",
+                f"time: {record.get('round_started_at', '')} -> {record.get('round_completed_at', '')}",
+                f"decision(raw/effective): {record.get('judge_decision_raw', record.get('judge_decision', ''))} / {record.get('judge_decision_effective', record.get('judge_decision', ''))}",
                 f"## Proposer\n{record['proposer'].strip()}",
                 f"## Skeptic\n{record['skeptic'].strip()}",
                 f"## Moderator\n{record['moderator'].strip()}",
@@ -472,6 +513,9 @@ def _build_transcript(topic: str, rounds: list[dict[str, Any]]) -> str:
             [
                 f"## Round {rid}",
                 "",
+                f"time: {item.get('round_started_at', '')} -> {item.get('round_completed_at', '')}",
+                f"decision(raw/effective): {item.get('judge_decision_raw', item.get('judge_decision', ''))} / {item.get('judge_decision_effective', item.get('judge_decision', ''))}",
+                "",
                 f"### Proposer\n{item['proposer']}",
                 "",
                 f"### Skeptic\n{item['skeptic']}",
@@ -483,6 +527,82 @@ def _build_transcript(topic: str, rounds: list[dict[str, Any]]) -> str:
             ]
         )
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _backfill_round_timestamps(
+    rounds: list[dict[str, Any]],
+    chat_dir: Path,
+    min_rounds_before_stop: int,
+    fallback_timestamp: str,
+) -> None:
+    if not rounds:
+        return
+    for item in rounds:
+        rid = int(item.get("round_id", 0) or 0)
+        round_file = chat_dir / f"round_{rid:02d}.md"
+        ts = fallback_timestamp
+        try:
+            if round_file.exists():
+                ts = datetime.fromtimestamp(round_file.stat().st_mtime, tz=UTC).isoformat()
+        except Exception:
+            ts = fallback_timestamp
+
+        item.setdefault("round_started_at", ts)
+        item.setdefault("proposer_completed_at", ts)
+        item.setdefault("skeptic_completed_at", ts)
+        item.setdefault("moderator_completed_at", ts)
+        item.setdefault("round_completed_at", ts)
+
+        raw = str(item.get("judge_decision_raw", item.get("judge_decision", "CONTINUE"))).strip() or "CONTINUE"
+        eff = str(item.get("judge_decision_effective", item.get("judge_decision", raw))).strip() or raw
+        if raw.startswith("STOP") and rid < min_rounds_before_stop:
+            eff = "CONTINUE_MIN_ROUNDS_NOT_MET"
+        item["judge_decision_raw"] = raw
+        item["judge_decision_effective"] = eff
+        item["judge_decision"] = eff
+
+
+def _write_interim_outputs(
+    run_dir: Path,
+    topic: str,
+    cfg: ChatModeConfig,
+    refs: list[dict[str, Any]],
+    rounds: list[dict[str, Any]],
+    stop_reason: str,
+) -> None:
+    transcript_file = run_dir / "CHAT_TRANSCRIPT.md"
+    transcript_file.write_text(_build_transcript(topic, rounds), encoding="utf-8")
+
+    consensus_file = run_dir / "BEST_CONSENSUS.md"
+    _write_interim_consensus(topic=topic, rounds=rounds, output_file=consensus_file)
+
+    index_file = run_dir / "CHAT_MODE_INDEX.md"
+    index_file.write_text(
+        _build_index(run_dir, cfg, len(refs), rounds, stop_reason, consensus_file),
+        encoding="utf-8",
+    )
+
+
+def _write_interim_consensus(topic: str, rounds: list[dict[str, Any]], output_file: Path) -> None:
+    if not rounds:
+        return
+    last = rounds[-1]
+    content = [
+        "# BEST_CONSENSUS",
+        "",
+        "_INTERIM DRAFT: generated during running process; final version will be refined at completion._",
+        "",
+        f"topic: {topic}",
+        f"latest_round: {last.get('round_id')}",
+        f"decision(raw/effective): {last.get('judge_decision_raw', last.get('judge_decision'))} / {last.get('judge_decision_effective', last.get('judge_decision'))}",
+        f"timestamp: {last.get('round_completed_at', '')}",
+        "",
+        "## Latest Moderator Summary",
+        "",
+        str(last.get("moderator", "")).strip(),
+        "",
+    ]
+    output_file.write_text("\n".join(content), encoding="utf-8")
 
 
 def _build_index(
