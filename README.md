@@ -25,17 +25,21 @@ ARC 不是“自动做科研”的黑箱流水线，而是一个受控对抗式�
 
 ## Local References (Visible In Repo)
 
-为便于对照学习，项目内提供本地参考仓库同步目录：
+为便于对照学习，项目内提供两类参考资源：
+
+1) 本地参考仓库同步目录（可随时更新）：
 - `references/ARIS`
 - `references/EvoScientist`
 
-同步命令：
+2) 已纳入版本库的主题参考文献目录（当前包含 RLHF 相关 PDF）：
+
+说明：`references/*` 主要用于本地对照审阅；`docs/reference/*` 作为项目文献资产可随仓库版本管理。
 
 ```bash
 bash references/sync_references.sh
 ```
 
-说明：参考仓库仅用于本地对照审阅，默认不纳入 ARC 仓库版本历史。
+说明：`references/*` 主要用于本地对照审阅；`docs/reference/*` 作为项目文献资产可随仓库版本管理。
 
 ## Skills Library
 
@@ -106,7 +110,10 @@ adversarial-research-copilot/
 ├─ pyproject.toml
 ├─ .env.example
 ├─ configs/
+│  ├─ chat_mode.yaml
+│  ├─ references.yaml
 │  ├─ models.yaml
+│  ├─ runtime_models.yaml
 │  └─ debate.yaml
 ├─ prompts/
 │  ├─ proposer.md
@@ -140,9 +147,13 @@ adversarial-research-copilot/
 │  └─ ...
 ├─ examples/
 │  ├─ multimodal_research_idea.md
-│  └─ robotics_research_idea.md
+│  ├─ robotics_research_idea.md
+│  ├─ wavelet_llm_manifold_idea.md
+│  └─ sycophancy_affective_hallucination_research_brief.md
 ├─ docs/
 │  ├─ prompt-contracts.md
+│  ├─ reference/
+│  │  └─ RLHF/
 │  └─ plans/
 │     └─ ...
 └─ tests/
@@ -296,19 +307,26 @@ arc chat-mode "multimodal hallucination mitigation for editing agents" \
        --skeptic glm-5 \
        --moderator gpt-5.4 \
        --min-rounds-before-stop 20 \
-       --max-rounds 60 \
+       --max-rounds 0 \
        --export-best-consensus \
        --output-dir reports
 ```
 
 特点：
 - 至少进行 20 轮后，才允许裁判根据收敛/方案充分性判定停止
+- `--max-rounds 0` 表示不设上限，仅由裁判判定终止
 - 每轮三位 AI 都按聊天语气输出重点思路（创新 + 可行性）
 - 每位 AI 单轮输出受约束：尽量不超过 1K tokens、最多 3 段、强调精简表达
 - 每次运行至少尝试检索 20 篇参考文献（含摘要）
-- 裁判输出带结构化停机标记（CONTINUE / STOP_CONVERGED / STOP_PROPOSER_SUFFICIENT）
+- 裁判输出带结构化停机标记（CONTINUE / STOP_CONVERGED / STOP_PROPOSER_SUFFICIENT），并在未达到最少轮数时强制继续
 - 一键导出 `BEST_CONSENSUS.md`（精简最优共识方案）
+- 每轮写入详细时间戳（开始/三角色完成/轮次完成）
+- 运行过程中实时更新 `CHAT_TRANSCRIPT.md`、`CHAT_MODE_INDEX.md`、`BEST_CONSENSUS.md`（interim 草稿），避免中断后无可读结论
 - 每轮发言单独保存，便于阅读
+
+恢复运行建议：
+- 可使用 `--resume` 从 `chat_mode_state.json` 继续。
+- `--resume` 要求 topic 与三角色模型映射一致；状态超过 24 小时会按新 run 处理。
 
 Chat mode 主要产物（默认 `reports/<timestamp>/`）：
 - `TOPIC_CHAT.txt`
@@ -316,6 +334,7 @@ Chat mode 主要产物（默认 `reports/<timestamp>/`）：
 - `CHAT_TRANSCRIPT.md`
 - `BEST_CONSENSUS.md`
 - `chat_mode_state.json`
+- `CHAT_MODE_INDEX.md`
 - `chat_rounds/round_01_proposer.md`
 - `chat_rounds/round_01_skeptic.md`
 - `chat_rounds/round_01_moderator.md`
