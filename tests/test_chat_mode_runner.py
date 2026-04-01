@@ -13,7 +13,8 @@ def test_chat_mode_resume_preserves_existing_rounds(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    run_dir = tmp_path / "chat-run"
+    reports_dir = tmp_path / "reports"
+    run_dir = reports_dir / "chat-run"
     run_dir.mkdir(parents=True)
     existing_round = {
         "round_id": 1,
@@ -77,7 +78,7 @@ def test_chat_mode_resume_preserves_existing_rounds(
         ],
     )
 
-    def fake_chat_generate(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs):
+    def fake_chat_generate(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
         match = re.search(r"Round (\d+)", user_prompt)
         assert match is not None
         round_id = int(match.group(1))
@@ -91,6 +92,7 @@ def test_chat_mode_resume_preserves_existing_rounds(
         proposer_model="p",
         skeptic_model="s",
         moderator_model="m",
+        output_dir=str(reports_dir),
         run_dir=str(run_dir),
         resume=True,
     )
@@ -102,7 +104,7 @@ def test_chat_mode_resume_preserves_existing_rounds(
 
 
 def test_chat_mode_resume_rejects_stale_in_progress_state(tmp_path: Path) -> None:
-    run_dir = tmp_path / "chat-run"
+    run_dir = tmp_path / "reports" / "chat-run"
     run_dir.mkdir(parents=True)
     (run_dir / "chat_mode_state.json").write_text(
         json.dumps(
@@ -135,3 +137,13 @@ def test_chat_mode_resume_rejects_stale_in_progress_state(tmp_path: Path) -> Non
 
     assert state is None
     assert resumed is False
+
+
+def test_parse_judge_decision_does_not_false_stop_on_wording() -> None:
+    text = "Current evidence is not sufficient yet; continue the next round."
+    assert cmr._parse_judge_decision(text) == "CONTINUE"
+
+
+def test_parse_judge_decision_without_tag_returns_continue_no_tag() -> None:
+    text = "Current evidence is not sufficient yet."
+    assert cmr._parse_judge_decision(text) == "CONTINUE_NO_TAG"

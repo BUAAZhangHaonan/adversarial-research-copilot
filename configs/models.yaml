@@ -13,7 +13,7 @@ models:
     endpoint: responses
     max_output_tokens: 16384
     temperature: 0.3
-  glm-5:
+  glm-5.1:
     provider: glm
     base_url_env: GLM_BASE_URL
     api_key_env: GLM_API_KEY
@@ -23,5 +23,5 @@ models:
 
 aliases:
   proposer_default: gpt-5.4
-  skeptic_default: glm-5
+  skeptic_default: glm-5.1
   moderator_default: gpt-5.4

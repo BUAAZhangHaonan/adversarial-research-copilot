@@ -3,12 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from arc.llm_client import LLMClient
+from arc.prompting import localized_text, normalize_prompt_language, resolve_prompt_path
 
 
 class ModeratorAgent:
-    def __init__(self, client: LLMClient, model: str, prompt_path: str = "prompts/moderator.md") -> None:
+    def __init__(self, client: LLMClient, model: str, prompt_language: str | None = None) -> None:
         self.client = client
         self.model = model
+        self.prompt_language = normalize_prompt_language(prompt_language)
+        prompt_path = resolve_prompt_path("default", "moderator", self.prompt_language)
         self.system_prompt = Path(prompt_path).read_text(encoding="utf-8")
 
     def run(
@@ -21,19 +24,41 @@ class ModeratorAgent:
         round_id: int,
     ) -> str:
         blocker_text = "\n".join(
-            f"- {b}" for b in previous_blockers) if previous_blockers else "- 无"
+            f"- {b}" for b in previous_blockers) if previous_blockers else "- none"
         revision_text = (
             "\n".join(f"- {r}" for r in previous_required_revisions)
             if previous_required_revisions
-            else "- 无"
+            else "- none"
         )
-        user_prompt = (
-            f"第 {round_id} 轮。\n"
-            f"问题框架：\n{framed_problem}\n\n"
-            f"上一轮未解决 blockers：\n{blocker_text}\n\n"
-            f"上一轮 required revisions：\n{revision_text}\n\n"
-            f"Proposer 输出：\n{proposer_output}\n\n"
-            f"Skeptic 输出：\n{skeptic_output}\n\n"
-            "请严格按协议输出 4 个标题。"
+        user_prompt = localized_text(
+            self.prompt_language,
+            (
+                f"Round {round_id}.\n\n"
+                "[PROBLEM FRAME]\n"
+                f"{framed_problem}\n\n"
+                "[UNRESOLVED BLOCKERS]\n"
+                f"{blocker_text}\n\n"
+                "[REQUIRED REVISIONS]\n"
+                f"{revision_text}\n\n"
+                "[PROPOSER OUTPUT]\n"
+                f"{proposer_output}\n\n"
+                "[SKEPTIC OUTPUT]\n"
+                f"{skeptic_output}\n\n"
+                "Follow your role contract exactly and include all required sections and YAML fields."
+            ),
+            (
+                f"第 {round_id} 轮。\n\n"
+                "[问题框架]\n"
+                f"{framed_problem}\n\n"
+                "[未解决 Blockers]\n"
+                f"{blocker_text}\n\n"
+                "[必须修订项]\n"
+                f"{revision_text}\n\n"
+                "[Proposer 输出]\n"
+                f"{proposer_output}\n\n"
+                "[Skeptic 输出]\n"
+                f"{skeptic_output}\n\n"
+                "请严格遵循角色协议，输出全部必需章节与 YAML 字段。"
+            ),
         )
         return self.client.chat(self.model, self.system_prompt, user_prompt)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def resolve_run_dir(output_dir: str, resume: bool, state_file_name: str) -> Path:
-    root = Path(output_dir)
+    root = _normalize_reports_root(output_dir)
     root.mkdir(parents=True, exist_ok=True)
 
     if resume:
@@ -63,3 +63,23 @@ def _new_timestamp_dir(root: Path) -> Path:
 def _write_latest_marker(root: Path, run_dir: Path) -> None:
     marker = root / "LATEST_RUN"
     marker.write_text(run_dir.name, encoding="utf-8")
+
+
+def ensure_run_dir_within_reports(run_dir: Path, output_dir: str) -> Path:
+    root = _normalize_reports_root(output_dir).resolve()
+    candidate = run_dir.resolve()
+    if candidate == root or root in candidate.parents:
+        return candidate
+    raise ValueError(
+        f"run_dir must be located under '{root}', got '{candidate}'. "
+        "All outputs must stay inside reports."
+    )
+
+
+def _normalize_reports_root(output_dir: str) -> Path:
+    root = Path(output_dir)
+    if root.name != "reports":
+        raise ValueError(
+            f"output_dir must point to a directory named 'reports', got '{output_dir}'."
+        )
+    return root

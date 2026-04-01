@@ -15,7 +15,8 @@ def test_debate_resume_recovers_in_progress_round_after_interrupt(
 ) -> None:
     idea_file = tmp_path / "idea.md"
     idea_file.write_text("test idea\n", encoding="utf-8")
-    run_dir = tmp_path / "run"
+    reports_dir = tmp_path / "reports"
+    run_dir = reports_dir / "run"
 
     class StubAgent:
         def __init__(self, *args, **kwargs) -> None:
@@ -60,6 +61,7 @@ def test_debate_resume_recovers_in_progress_round_after_interrupt(
             proposer_model="p",
             skeptic_model="s",
             moderator_model="m",
+            output_dir=str(reports_dir),
             run_dir=run_dir,
         )
 

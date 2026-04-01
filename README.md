@@ -183,16 +183,20 @@ set -a && source .env && set +a
 - GPT 兼容 responses：`$GPT_BASE_URL/responses`
 - GLM 兼容 chat completions：`$GLM_BASE_URL/chat/completions`
 
-GLM 官方文档接口：`https://open.bigmodel.cn/api/paas/v4/chat/completions`
+GLM 官方文档接口：`https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
+
+`GLM_BASE_URL` 支持两种写法：
+- 根路径：`https://open.bigmodel.cn/api/coding/paas/v4`
+- 完整端点：`https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
 
 默认模型：
 - Proposer: gpt-5.4
-- Skeptic: glm-5
+- Skeptic: glm-5.1
 - Moderator: gpt-5.4
 
 可选模型（已内置到 `configs/models.yaml`）：
 - gpt-5.4
-- glm-5
+- glm-5.1
 
 ## Model Switcher (Terminal)
 
@@ -202,10 +206,10 @@ arc models list
 
 # 设置角色模型
 arc models set proposer gpt-5.4
-arc models set skeptic glm-5
+arc models set skeptic glm-5.1
 arc models set moderator gpt-5.4
 arc models set pipeline_writer gpt-5.4
-arc models set pipeline_reviewer glm-5
+arc models set pipeline_reviewer glm-5.1
 arc models set pipeline_moderator gpt-5.4
 
 # 诊断配置（离线）：检查 env 是否齐全
@@ -228,7 +232,7 @@ export ARC_GPT_VERBOSITY=medium
 ```bash
 arc run examples/multimodal_research_idea.md \
        --proposer gpt-5.4 \
-       --skeptic glm-5 \
+         --skeptic glm-5.1 \
   --moderator gpt-5.4 \
        --gpt-effort high \
   --output-dir reports
@@ -236,7 +240,7 @@ arc run examples/multimodal_research_idea.md \
 # 若上次运行中断，可恢复
 arc run examples/multimodal_research_idea.md \
        --proposer gpt-5.4 \
-       --skeptic glm-5 \
+       --skeptic glm-5.1 \
        --moderator gpt-5.4 \
        --gpt-effort high \
        --output-dir reports \
@@ -256,7 +260,7 @@ arc run examples/multimodal_research_idea.md \
 ```bash
 arc pipeline "multimodal agent safety benchmark" \
        --proposer gpt-5.4 \
-       --skeptic glm-5 \
+       --skeptic glm-5.1 \
        --moderator gpt-5.4 \
        --gpt-effort high \
        --output-dir reports \
@@ -265,7 +269,7 @@ arc pipeline "multimodal agent safety benchmark" \
 # 若上次 pipeline 中断，可恢复
 arc pipeline "multimodal agent safety benchmark" \
        --proposer gpt-5.4 \
-       --skeptic glm-5 \
+       --skeptic glm-5.1 \
        --moderator gpt-5.4 \
        --gpt-effort high \
        --output-dir reports \
@@ -304,7 +308,7 @@ arc explain-outputs
 ```bash
 arc chat-mode "multimodal hallucination mitigation for editing agents" \
        --proposer gpt-5.4 \
-       --skeptic glm-5 \
+       --skeptic glm-5.1 \
        --moderator gpt-5.4 \
        --min-rounds-before-stop 20 \
        --max-rounds 0 \
@@ -314,9 +318,9 @@ arc chat-mode "multimodal hallucination mitigation for editing agents" \
 
 特点：
 - 至少进行 20 轮后，才允许裁判根据收敛/方案充分性判定停止
-- `--max-rounds 0` 表示不设上限，仅由裁判判定终止
+- `--max-rounds` 作为轮次数建议值（soft target），若裁判持续给出 `CONTINUE`，不会被该值强制截断
 - 每轮三位 AI 都按聊天语气输出重点思路（创新 + 可行性）
-- 每位 AI 单轮输出受约束：尽量不超过 1K tokens、最多 3 段、强调精简表达
+- 每位 AI 单轮输出采用提示词建议长度（建议字数/段落），运行时不再强制截断
 - 每次运行至少尝试检索 20 篇参考文献（含摘要）
 - 裁判输出带结构化停机标记（CONTINUE / STOP_CONVERGED / STOP_PROPOSER_SUFFICIENT），并在未达到最少轮数时强制继续
 - 一键导出 `BEST_CONSENSUS.md`（精简最优共识方案）

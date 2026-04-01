@@ -10,21 +10,24 @@ from typing import Any
 import yaml
 
 from arc.llm_client import LLMClient
-from arc.run_paths import resolve_run_dir
+from arc.prompting import localized_text, normalize_prompt_language, resolve_prompt_path
+from arc.run_paths import ensure_run_dir_within_reports, resolve_run_dir
 from arc.runners.pipeline_runner import _collect_references, _format_references
 
 
 @dataclass
 class ChatModeConfig:
     min_rounds_before_stop: int = 20
-    # Use 0 for unlimited rounds (stop only by judge decision).
+    # Advisory round target for planning and monitoring. Does not force stop.
     max_rounds: int = 60
     min_references: int = 20
-    # Approximate upper bound close to 1K tokens for most providers.
+    # Suggested response-size hint only, no hard truncation.
     max_response_chars: int = 3200
+    # Suggested paragraph count only, no hard truncation.
     max_paragraphs: int = 3
     export_best_consensus: bool = True
     persist_state: bool = True
+    prompt_language: str = "en"
 
 
 def run_chat_mode(
@@ -38,6 +41,7 @@ def run_chat_mode(
     min_rounds_before_stop: int | None = None,
     max_rounds: int | None = None,
     export_best_consensus: bool | None = None,
+    prompt_language: str | None = None,
 ) -> tuple[Path, Path]:
     cfg = _load_chat_mode_config()
     if min_rounds_before_stop is not None:
@@ -50,8 +54,16 @@ def run_chat_mode(
         cfg.max_rounds = cfg.min_rounds_before_stop
     if export_best_consensus is not None:
         cfg.export_best_consensus = export_best_consensus
+    if prompt_language is not None:
+        cfg.prompt_language = normalize_prompt_language(prompt_language)
+    else:
+        cfg.prompt_language = normalize_prompt_language(cfg.prompt_language)
 
-    target_run_dir = Path(run_dir) if run_dir else resolve_run_dir(output_dir, resume, "chat_mode_state.json")
+    target_run_dir = (
+        ensure_run_dir_within_reports(Path(run_dir), output_dir)
+        if run_dir
+        else resolve_run_dir(output_dir, resume, "chat_mode_state.json")
+    )
     state_file = target_run_dir / "chat_mode_state.json"
     resume_state, resumed = _load_chat_resume_state(
         target_run_dir,
@@ -101,7 +113,7 @@ def run_chat_mode(
     )
     prior_summary = _extract_summary_anchor(str(rounds[-1].get("moderator", ""))) if rounds else ""
     stop_reason = "running"
-    reference_brief = _build_reference_brief(refs, max_items=cfg.min_references)
+    reference_brief = _build_reference_brief(refs, max_items=cfg.min_references, language=cfg.prompt_language)
     start_round = max((int(item.get("round_id", 0)) for item in rounds), default=0) + 1
 
     if rounds:
@@ -122,52 +134,60 @@ def run_chat_mode(
 
     round_id = start_round
     while True:
-        if cfg.max_rounds > 0 and round_id > cfg.max_rounds:
-            stop_reason = "max_rounds_reached"
-            break
         round_started_at = datetime.now(UTC).isoformat()
+        proposer_prompt_path = str(resolve_prompt_path("chat", "proposer_chat", cfg.prompt_language))
         proposer_output = _chat_generate(
             client=client,
             model=proposer_model,
-            role_prompt_path="prompts/chat_mode/proposer_chat.md",
-            user_prompt=(
-                f"Round {round_id}. 研究主题: {topic}\n\n"
-                f"参考文献摘要索引(至少{cfg.min_references}篇):\n{reference_brief}\n\n"
-                f"上一轮裁判总结: {prior_summary or '无'}\n\n"
-                "请直接给出你最有创新性、且可执行的方案路径，用聊天式表达，尝试说服反方。"
+            role_prompt_path=proposer_prompt_path,
+            user_prompt=_build_proposer_user_prompt(
+                round_id=round_id,
+                topic=topic,
+                reference_brief=reference_brief,
+                prior_summary=prior_summary,
+                min_references=cfg.min_references,
+                language=cfg.prompt_language,
             ),
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
+            language=cfg.prompt_language,
         )
         proposer_completed_at = datetime.now(UTC).isoformat()
 
+        skeptic_prompt_path = str(resolve_prompt_path("chat", "skeptic_chat", cfg.prompt_language))
         skeptic_output = _chat_generate(
             client=client,
             model=skeptic_model,
-            role_prompt_path="prompts/chat_mode/skeptic_chat.md",
-            user_prompt=(
-                f"Round {round_id}. 研究主题: {topic}\n\n"
-                f"参考文献摘要索引(至少{cfg.min_references}篇):\n{reference_brief}\n\n"
-                f"正方观点:\n{proposer_output}\n\n"
-                "请拼命找反例、边界条件和失败情境，聊天式表达，但结论要可操作。"
+            role_prompt_path=skeptic_prompt_path,
+            user_prompt=_build_skeptic_user_prompt(
+                round_id=round_id,
+                topic=topic,
+                reference_brief=reference_brief,
+                proposer_output=proposer_output,
+                min_references=cfg.min_references,
+                language=cfg.prompt_language,
             ),
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
+            language=cfg.prompt_language,
         )
         skeptic_completed_at = datetime.now(UTC).isoformat()
 
+        moderator_prompt_path = str(resolve_prompt_path("chat", "moderator_chat", cfg.prompt_language))
         moderator_output = _chat_generate(
             client=client,
             model=moderator_model,
-            role_prompt_path="prompts/chat_mode/moderator_chat.md",
-            user_prompt=(
-                f"Round {round_id}. 研究主题: {topic}\n\n"
-                f"正方:\n{proposer_output}\n\n"
-                f"反方:\n{skeptic_output}\n\n"
-                "请作为裁判给出阶段判决、折中方案、下一轮聚焦问题。"
+            role_prompt_path=moderator_prompt_path,
+            user_prompt=_build_moderator_user_prompt(
+                round_id=round_id,
+                topic=topic,
+                proposer_output=proposer_output,
+                skeptic_output=skeptic_output,
+                language=cfg.prompt_language,
             ),
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
+            language=cfg.prompt_language,
         )
         moderator_completed_at = datetime.now(UTC).isoformat()
 
@@ -184,6 +204,11 @@ def run_chat_mode(
             "skeptic_completed_at": skeptic_completed_at,
             "moderator_completed_at": moderator_completed_at,
             "round_completed_at": round_completed_at,
+            "reply_timestamps": {
+                "proposer": proposer_completed_at,
+                "skeptic": skeptic_completed_at,
+                "moderator": moderator_completed_at,
+            },
             "proposer": proposer_output,
             "skeptic": skeptic_output,
             "moderator": moderator_output,
@@ -213,6 +238,13 @@ def run_chat_mode(
             stop_reason = effective_decision
             break
 
+        if cfg.max_rounds > 0 and round_id >= cfg.max_rounds:
+            if effective_decision == "CONTINUE_NO_TAG":
+                stop_reason = f"soft_target_reached_missing_judge_tag_{round_id}"
+                break
+            if effective_decision == "CONTINUE":
+                stop_reason = f"soft_target_reached_continue_from_round_{round_id}"
+
         round_id += 1
 
     transcript = _build_transcript(topic, rounds)
@@ -230,6 +262,7 @@ def run_chat_mode(
             output_file=target_run_dir / "BEST_CONSENSUS.md",
             max_chars=cfg.max_response_chars,
             max_paragraphs=cfg.max_paragraphs,
+            language=cfg.prompt_language,
         )
 
     index_file = target_run_dir / "CHAT_MODE_INDEX.md"
@@ -336,6 +369,7 @@ def _write_chat_mode_state(
                     "max_response_chars": cfg.max_response_chars,
                     "max_paragraphs": cfg.max_paragraphs,
                     "export_best_consensus": cfg.export_best_consensus,
+                    "prompt_language": cfg.prompt_language,
                 },
                 "reference_count": reference_count,
                 "stop_reason": stop_reason,
@@ -365,6 +399,7 @@ def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -
             max_paragraphs=max(1, int(cfg.get("max_paragraphs", defaults.max_paragraphs))),
             export_best_consensus=bool(cfg.get("export_best_consensus", defaults.export_best_consensus)),
             persist_state=bool(cfg.get("persist_state", defaults.persist_state)),
+            prompt_language=normalize_prompt_language(str(cfg.get("prompt_language", defaults.prompt_language))),
         )
     except Exception:
         return defaults
@@ -406,6 +441,92 @@ def _title_key(ref: dict[str, Any]) -> str:
     return re.sub(r"\s+", " ", str(ref.get("title", "")).strip()).lower()
 
 
+def _build_proposer_user_prompt(
+    round_id: int,
+    topic: str,
+    reference_brief: str,
+    prior_summary: str,
+    min_references: int,
+    language: str,
+) -> str:
+    return localized_text(
+        language,
+        (
+            f"Round {round_id}.\n\n"
+            f"Research topic: {topic}\n\n"
+            f"Reference digest index (at least {min_references}):\n{reference_brief}\n\n"
+            f"Latest moderator summary: {prior_summary or 'none'}\n\n"
+            "Respond in English. Suggested length: 280-450 words (about 2-4 paragraphs).\n"
+            "Do not self-truncate; keep full reasoning concise.\n"
+            "Provide one strongest and executable path in chat style. Address unresolved tensions before introducing new claims."
+        ),
+        (
+            f"第 {round_id} 轮。\n\n"
+            f"研究主题: {topic}\n\n"
+            f"参考文献摘要索引(至少{min_references}篇):\n{reference_brief}\n\n"
+            f"上一轮裁判总结: {prior_summary or '无'}\n\n"
+            "请以聊天风格给出唯一最强且可执行的方案路径，先回应未解争点，再推进新主张。"
+        ),
+    )
+
+
+def _build_skeptic_user_prompt(
+    round_id: int,
+    topic: str,
+    reference_brief: str,
+    proposer_output: str,
+    min_references: int,
+    language: str,
+) -> str:
+    return localized_text(
+        language,
+        (
+            f"Round {round_id}.\n\n"
+            f"Research topic: {topic}\n\n"
+            f"Reference digest index (at least {min_references}):\n{reference_brief}\n\n"
+            f"Proposer view:\n{proposer_output}\n\n"
+            "Respond in English. Suggested length: 280-450 words (about 2-4 paragraphs).\n"
+            "Do not self-truncate; keep full reasoning concise.\n"
+            "Pressure-test with concrete failure scenarios, boundary conditions, and minimum evidence needed to unblock decisions."
+        ),
+        (
+            f"第 {round_id} 轮。\n\n"
+            f"研究主题: {topic}\n\n"
+            f"参考文献摘要索引(至少{min_references}篇):\n{reference_brief}\n\n"
+            f"正方观点:\n{proposer_output}\n\n"
+            "请给出具体失败场景、边界条件与最小补证动作，优先指出真正影响决策的关键风险。"
+        ),
+    )
+
+
+def _build_moderator_user_prompt(
+    round_id: int,
+    topic: str,
+    proposer_output: str,
+    skeptic_output: str,
+    language: str,
+) -> str:
+    return localized_text(
+        language,
+        (
+            f"Round {round_id}.\n\n"
+            f"Research topic: {topic}\n\n"
+            f"Proposer:\n{proposer_output}\n\n"
+            f"Skeptic:\n{skeptic_output}\n\n"
+            "Respond in English. Suggested length: 240-420 words (about 2-4 paragraphs).\n"
+            "Do not self-truncate; ensure the final line contains an exact [JUDGE_DECISION] tag.\n"
+            "Issue a convergence-focused ruling with one decisive next focus, then end with the exact [JUDGE_DECISION] marker."
+        ),
+        (
+            f"第 {round_id} 轮。\n\n"
+            f"研究主题: {topic}\n\n"
+            f"正方:\n{proposer_output}\n\n"
+            f"反方:\n{skeptic_output}\n\n"
+            "请给出收敛导向裁决、唯一关键下一轮焦点，并在最后一行输出精确的 [JUDGE_DECISION] 标记。"
+        ),
+    )
+
+
 def _chat_generate(
     client: LLMClient,
     model: str,
@@ -413,21 +534,23 @@ def _chat_generate(
     user_prompt: str,
     max_chars: int,
     max_paragraphs: int,
+    language: str,
 ) -> str:
     system_prompt = Path(role_prompt_path).read_text(encoding="utf-8")
     text = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.45)
-    text = _trim_to_char_limit(text, max_chars)
-    return _trim_to_paragraph_limit(text, max_paragraphs)
+    return text.strip()
 
 
-def _trim_to_char_limit(text: str, max_chars: int) -> str:
+def _trim_to_char_limit(text: str, max_chars: int, language: str) -> str:
     cleaned = text.strip()
     if len(cleaned) <= max_chars:
         return cleaned
-    return cleaned[: max_chars - 16].rstrip() + "\n\n[内容已截断]"
+    marker = localized_text(language, "[content truncated]", "[内容已截断]")
+    safe_limit = max(1, max_chars - len(marker) - 2)
+    return cleaned[:safe_limit].rstrip() + "\n\n" + marker
 
 
-def _trim_to_paragraph_limit(text: str, max_paragraphs: int) -> str:
+def _trim_to_paragraph_limit(text: str, max_paragraphs: int, language: str) -> str:
     if max_paragraphs <= 0:
         return text.strip()
     blocks = [p.strip() for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
@@ -435,12 +558,13 @@ def _trim_to_paragraph_limit(text: str, max_paragraphs: int) -> str:
         return "\n\n".join(blocks)
     kept = blocks[:max_paragraphs]
     tail = kept[-1]
-    if "[内容已截断]" not in tail:
-        kept[-1] = tail.rstrip() + "\n\n[段落已截断]"
+    marker = localized_text(language, "[paragraphs truncated]", "[段落已截断]")
+    if marker not in tail:
+        kept[-1] = tail.rstrip() + "\n\n" + marker
     return "\n\n".join(kept)
 
 
-def _build_reference_brief(refs: list[dict[str, Any]], max_items: int) -> str:
+def _build_reference_brief(refs: list[dict[str, Any]], max_items: int, language: str) -> str:
     lines: list[str] = []
     for i, ref in enumerate(refs[:max_items], start=1):
         title = str(ref.get("title", "")).strip()
@@ -450,10 +574,11 @@ def _build_reference_brief(refs: list[dict[str, Any]], max_items: int) -> str:
         abstract = re.sub(r"\s+", " ", str(ref.get("abstract", "")).strip())
         if len(abstract) > 180:
             abstract = abstract[:177] + "..."
-        lines.append(
-            f"[{i}] ({source}, {year}, cites={cites}) {title} | 摘要: {abstract}"
-        )
-    return "\n".join(lines) if lines else "无可用参考文献"
+        if normalize_prompt_language(language) == "zh":
+            lines.append(f"[{i}] ({source}, {year}, cites={cites}) {title} | 摘要: {abstract}")
+        else:
+            lines.append(f"[{i}] ({source}, {year}, cites={cites}) {title} | abstract: {abstract}")
+    return "\n".join(lines) if lines else localized_text(language, "No references available", "无可用参考文献")
 
 
 def _extract_summary_anchor(moderator_output: str) -> str:
@@ -464,13 +589,19 @@ def _extract_summary_anchor(moderator_output: str) -> str:
 
 
 def _parse_judge_decision(moderator_output: str) -> str:
-    m = re.search(r"\[JUDGE_DECISION\]\s*:\s*([A-Z_]+)", moderator_output)
+    m = re.search(r"\[JUDGE_DECISION\]\s*:\s*([A-Z_]+)", moderator_output, flags=re.IGNORECASE)
     if m:
-        return m.group(1).strip().upper()
-    text = moderator_output.lower()
-    if "收敛" in text or "足够优秀" in text or "可停止" in text:
+        decision = m.group(1).strip().upper()
+        allowed = {"CONTINUE", "STOP_CONVERGED", "STOP_PROPOSER_SUFFICIENT"}
+        return decision if decision in allowed else "CONTINUE_NO_TAG"
+    text_upper = moderator_output.upper()
+    if re.search(r"\bSTOP_CONVERGED\b", text_upper):
         return "STOP_CONVERGED"
-    return "CONTINUE"
+    if re.search(r"\bSTOP_PROPOSER_SUFFICIENT\b", text_upper):
+        return "STOP_PROPOSER_SUFFICIENT"
+    if re.search(r"\bCONTINUE\b", text_upper):
+        return "CONTINUE"
+    return "CONTINUE_NO_TAG"
 
 
 def _write_round_artifacts(chat_dir: Path, record: dict[str, Any]) -> None:
@@ -504,7 +635,7 @@ def _build_transcript(topic: str, rounds: list[dict[str, Any]]) -> str:
     lines = [
         "# CHAT_TRANSCRIPT",
         "",
-        f"主题: {topic}",
+        f"topic: {topic}",
         "",
     ]
     for item in rounds:
@@ -552,6 +683,14 @@ def _backfill_round_timestamps(
         item.setdefault("skeptic_completed_at", ts)
         item.setdefault("moderator_completed_at", ts)
         item.setdefault("round_completed_at", ts)
+        item.setdefault(
+            "reply_timestamps",
+            {
+                "proposer": item.get("proposer_completed_at", ts),
+                "skeptic": item.get("skeptic_completed_at", ts),
+                "moderator": item.get("moderator_completed_at", ts),
+            },
+        )
 
         raw = str(item.get("judge_decision_raw", item.get("judge_decision", "CONTINUE"))).strip() or "CONTINUE"
         eff = str(item.get("judge_decision_effective", item.get("judge_decision", raw))).strip() or raw
@@ -616,34 +755,35 @@ def _build_index(
     lines = [
         "# CHAT_MODE_INDEX",
         "",
-        "本次为聊天式头脑风暴模式，不要求形式化证明，但保留文献支撑。",
+        "This run uses chat-mode brainstorming with evidence grounding and non-forced length guidance.",
         "",
         f"- min_rounds_before_stop: {cfg.min_rounds_before_stop}",
-        f"- max_rounds: {'unlimited (judge decides)' if cfg.max_rounds == 0 else cfg.max_rounds}",
+        f"- max_rounds_soft_target: {'disabled' if cfg.max_rounds == 0 else cfg.max_rounds}",
         f"- min_references: {cfg.min_references}",
-        f"- max_response_chars_per_agent: {cfg.max_response_chars}",
-        f"- max_paragraphs_per_agent: {cfg.max_paragraphs}",
+        f"- suggested_max_response_chars_per_agent: {cfg.max_response_chars}",
+        f"- suggested_max_paragraphs_per_agent: {cfg.max_paragraphs}",
+        f"- prompt_language: {cfg.prompt_language}",
         f"- retrieved_references: {reference_count}",
         f"- stop_reason: {stop_reason}",
         "",
         "| file | purpose |",
         "|---|---|",
-        "| TOPIC_CHAT.txt | 输入主题 |",
-        "| REFERENCES.md | 文献列表（含摘要） |",
-        "| CHAT_TRANSCRIPT.md | 全量对话汇总 |",
-        "| BEST_CONSENSUS.md | 最优共识方案（精简版） |",
-        "| chat_mode_state.json | 结构化状态 |",
-        "| chat_rounds/round_xx_proposer.md | 每轮正方发言 |",
-        "| chat_rounds/round_xx_skeptic.md | 每轮反方发言 |",
-        "| chat_rounds/round_xx_moderator.md | 每轮裁判发言 |",
-        "| chat_rounds/round_xx.md | 每轮整合记录 |",
+        "| TOPIC_CHAT.txt | Topic input |",
+        "| REFERENCES.md | Reference list with abstracts |",
+        "| CHAT_TRANSCRIPT.md | Full conversation transcript |",
+        "| BEST_CONSENSUS.md | Condensed best consensus |",
+        "| chat_mode_state.json | Structured state with timestamps |",
+        "| chat_rounds/round_xx_proposer.md | Proposer per-round message |",
+        "| chat_rounds/round_xx_skeptic.md | Skeptic per-round message |",
+        "| chat_rounds/round_xx_moderator.md | Moderator per-round message |",
+        "| chat_rounds/round_xx.md | Combined per-round log |",
         "",
-        f"本次完成轮数: {len(rounds)}",
+        f"completed_rounds: {len(rounds)}",
     ]
     if consensus_file is None:
-        lines.append("共识导出: disabled")
+        lines.append("consensus_export: disabled")
     if not (run_dir / "REFERENCES.md").exists():
-        lines.append("\n警告: REFERENCES.md 未生成。")
+        lines.append("\nwarning: REFERENCES.md was not generated.")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -656,6 +796,7 @@ def _export_best_consensus(
     output_file: Path,
     max_chars: int,
     max_paragraphs: int,
+    language: str,
 ) -> Path:
     digest_lines: list[str] = []
     for item in rounds:
@@ -665,25 +806,43 @@ def _export_best_consensus(
             f"M: {_extract_summary_anchor(str(item.get('moderator', '')))} | "
             f"D: {item.get('judge_decision', 'CONTINUE')}"
         )
-    reference_brief = _build_reference_brief(refs, max_items=min(20, len(refs)))
+    reference_brief = _build_reference_brief(refs, max_items=min(20, len(refs)), language=language)
 
-    system_prompt = (
-        "你是研究负责人。基于完整辩论提炼一个可执行、可验证、可落地的最优共识方案。"
-        "必须使用中文，强调创新性与可行性。"
+    system_prompt = localized_text(
+        language,
+        (
+            "You are the research lead. Distill the debate into one executable and falsifiable consensus plan. "
+            "Keep it concise, evidence-bound, and decision-oriented."
+        ),
+        (
+            "你是研究负责人。基于完整辩论提炼一个可执行、可验证、可落地的最优共识方案。"
+            "保持精炼、证据绑定与决策导向。"
+        ),
     )
-    user_prompt = (
-        f"主题: {topic}\n\n"
-        "请输出精简版共识方案，要求：\n"
-        "1) 不超过3段，表达尽量精炼。\n"
-        "2) 明确最终主方案、关键风险、最先执行的3步。\n"
-        "3) 每个核心判断都要能被下列文献线索支撑（可用[1][2]这种引用标记）。\n"
-        "4) 避免形式化证明和冗长铺垫。\n\n"
-        f"文献索引:\n{reference_brief}\n\n"
-        f"辩论摘要:\n{chr(10).join(digest_lines)}"
+    user_prompt = localized_text(
+        language,
+        (
+            f"Topic: {topic}\n\n"
+            "Output a concise consensus with requirements:\n"
+            "1) No more than 3 paragraphs.\n"
+            "2) State final primary path, key risk, and first 3 execution steps.\n"
+            "3) Anchor core claims to references using citation tags like [1][2].\n"
+            "4) Avoid formal-proof style and long preambles.\n\n"
+            f"Reference index:\n{reference_brief}\n\n"
+            f"Debate digest:\n{chr(10).join(digest_lines)}"
+        ),
+        (
+            f"主题: {topic}\n\n"
+            "请输出精简版共识方案，要求：\n"
+            "1) 不超过3段，表达尽量精炼。\n"
+            "2) 明确最终主方案、关键风险、最先执行的3步。\n"
+            "3) 每个核心判断都要能被文献线索支撑（可用[1][2]引用标记）。\n"
+            "4) 避免形式化证明和冗长铺垫。\n\n"
+            f"文献索引:\n{reference_brief}\n\n"
+            f"辩论摘要:\n{chr(10).join(digest_lines)}"
+        ),
     )
     text = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.35)
-    text = _trim_to_char_limit(text, max_chars)
-    text = _trim_to_paragraph_limit(text, max_paragraphs)
     content = "# BEST_CONSENSUS\n\n" + text.strip() + "\n"
     output_file.write_text(content, encoding="utf-8")
     return output_file

@@ -4,43 +4,67 @@ from tests.helpers.text_contracts import assert_contains_all, read_text
 
 
 PROMPT_MARKERS = {
-    "prompts/proposer.md": [
-        "输入上下文：",
-        "上一轮未解决 blockers / required revisions",
-        "你必须主张一个首选方案",
+    "prompts/latest/default/proposer_en.md": [
+        "Input Context You Will Receive",
+        "Response to Prior Blockers / Revisions",
+        "Machine-Readable Output",
+        "proposal_quality:",
+    ],
+    "prompts/latest/default/skeptic_en.md": [
+        "Input Context You Will Receive",
+        "Must-Answer Questions (Gate Conditions)",
+        "Machine-Readable Output",
+        "risk_summary:",
+    ],
+    "prompts/latest/default/moderator_en.md": [
+        "Input Context You Will Receive",
+        "Verdict Logic",
+        "Machine-Readable Output",
+        "scorecard:",
+    ],
+    "prompts/latest/chat/proposer_chat_en.md": [
+        "Language policy:",
+        "Length guidance:",
+        "Commit to **one best path**",
+        "Citations:",
+    ],
+    "prompts/latest/chat/skeptic_chat_en.md": [
+        "Language policy:",
+        "Length guidance:",
+        "at least 2 specific, concrete failure scenarios",
+        "Evidence binding:",
+    ],
+    "prompts/latest/chat/moderator_chat_en.md": [
+        "Language policy:",
+        "Length guidance:",
+        "Mandatory final line",
+        "[JUDGE_DECISION]:",
+    ],
+    "prompts/latest/default/proposer_zh.md": [
+        "输入上下文",
         "机器可读 YAML",
         "proposal_quality:",
     ],
-    "prompts/skeptic.md": [
-        "输入上下文：",
-        "Proposer 输出",
-        "必须回答否则不放行的问题",
+    "prompts/latest/default/skeptic_zh.md": [
+        "输入上下文",
         "机器可读 YAML",
         "risk_summary:",
     ],
-    "prompts/moderator.md": [
-        "输入上下文：",
-        "Proposer 输出",
-        "Skeptic 输出",
+    "prompts/latest/default/moderator_zh.md": [
+        "输入上下文",
         "机器可读 YAML",
         "scorecard:",
     ],
-    "prompts/chat_mode/proposer_chat.md": [
+    "prompts/latest/chat/proposer_chat_zh.md": [
         "必须使用中文自然表达",
         "最多 3 段",
-        "优先推进一个最强主方案",
-        "所有关键判断都要绑定参考文献",
     ],
-    "prompts/chat_mode/skeptic_chat.md": [
+    "prompts/latest/chat/skeptic_chat_zh.md": [
         "必须使用中文自然表达",
-        "最多 3 段",
         "至少给出 2 个具体失败场景",
-        "所有关键反驳都要绑定参考文献",
     ],
-    "prompts/chat_mode/moderator_chat.md": [
+    "prompts/latest/chat/moderator_chat_zh.md": [
         "必须使用中文自然表达",
-        "最多 3 段",
-        "区分证据充分与证据不足的判断",
         "[JUDGE_DECISION]:",
     ],
 }

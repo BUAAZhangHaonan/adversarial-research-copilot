@@ -140,7 +140,7 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
-        url = f"{base_url}/chat/completions"
+        url = _resolve_api_url(base_url, "chat/completions")
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -173,7 +173,7 @@ class LLMClient:
         max_output_tokens: int,
         fallback_max_output_tokens: int,
     ) -> str:
-        url = f"{base_url}/responses"
+        url = _resolve_api_url(base_url, "responses")
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -334,3 +334,11 @@ def _as_optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _resolve_api_url(base_url: str, endpoint_suffix: str) -> str:
+    normalized_base = base_url.rstrip("/")
+    normalized_suffix = endpoint_suffix.strip("/")
+    if normalized_base.endswith("/" + normalized_suffix):
+        return normalized_base
+    return f"{normalized_base}/{normalized_suffix}"

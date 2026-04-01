@@ -74,7 +74,7 @@ def test_parse_yaml_payload_accepts_yml_fence() -> None:
 
 
 def test_moderator_prompt_declares_canonical_runtime_schema() -> None:
-    prompt = Path("prompts/moderator.md").read_text(encoding="utf-8")
+    prompt = Path("prompts/latest/default/moderator_en.md").read_text(encoding="utf-8")
     assert "scorecard:" in prompt
     assert "unresolved_blockers:" in prompt
     assert "required_revisions:" in prompt

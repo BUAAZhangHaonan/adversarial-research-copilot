@@ -12,7 +12,8 @@ from arc.agents.skeptic import SkepticAgent
 from arc.exporters.markdown_report import export_markdown_report
 from arc.llm_client import LLMClient
 from arc.memory import DebateMemory
-from arc.run_paths import resolve_run_dir
+from arc.prompting import normalize_prompt_language
+from arc.run_paths import ensure_run_dir_within_reports, resolve_run_dir
 from arc.schemas import DebateConfig, ResearchState, RoundRecord
 from arc.scoring.rubric import assess_convergence, parse_decision, parse_required_revisions, parse_scorecard, parse_unresolved_blockers
 from arc.state import init_state, load_idea_text
@@ -41,8 +42,11 @@ class ARCOrchestrator:
                 "Proposer and Skeptic must use different models when require_cross_model_adversary=true")
 
         idea = load_idea_text(idea_file)
-        target_run_dir = run_dir or resolve_run_dir(
-            output_dir, resume, "run_state.json")
+        target_run_dir = (
+            ensure_run_dir_within_reports(run_dir, output_dir)
+            if run_dir is not None
+            else resolve_run_dir(output_dir, resume, "run_state.json")
+        )
         memory = DebateMemory(target_run_dir)
         state, start_round, previous_blockers, resumed = self._prepare_state(
             memory, idea, resume)
@@ -64,20 +68,24 @@ class ARCOrchestrator:
         if state.rounds:
             previous_required_revisions = state.rounds[-1].required_revisions
 
-        proposer = ProposerAgent(self.client, proposer_model)
-        skeptic = SkepticAgent(self.client, skeptic_model)
-        moderator = ModeratorAgent(self.client, moderator_model)
+        prompt_language = normalize_prompt_language(None)
+        proposer = ProposerAgent(self.client, proposer_model, prompt_language=prompt_language)
+        skeptic = SkepticAgent(self.client, skeptic_model, prompt_language=prompt_language)
+        moderator = ModeratorAgent(self.client, moderator_model, prompt_language=prompt_language)
 
         for round_id in range(start_round, self.config.max_rounds + 1):
             self.console.rule(f"Round {round_id}")
+            round_started_at = datetime.now(UTC)
             proposer_output = proposer.run(
                 state.framed_problem,
                 previous_blockers,
                 previous_required_revisions,
                 round_id,
             )
+            proposer_completed_at = datetime.now(UTC)
             skeptic_output = skeptic.run(
                 state.framed_problem, proposer_output, previous_blockers, round_id)
+            skeptic_completed_at = datetime.now(UTC)
             moderator_output = moderator.run(
                 state.framed_problem,
                 proposer_output,
@@ -86,6 +94,7 @@ class ARCOrchestrator:
                 previous_required_revisions,
                 round_id,
             )
+            moderator_completed_at = datetime.now(UTC)
 
             scorecard = parse_scorecard(moderator_output)
             decision = parse_decision(moderator_output)
@@ -94,6 +103,11 @@ class ARCOrchestrator:
 
             record = RoundRecord(
                 round_id=round_id,
+                round_started_at=round_started_at,
+                proposer_completed_at=proposer_completed_at,
+                skeptic_completed_at=skeptic_completed_at,
+                moderator_completed_at=moderator_completed_at,
+                round_completed_at=datetime.now(UTC),
                 proposer=proposer_output,
                 skeptic=skeptic_output,
                 moderator=moderator_output,
@@ -106,7 +120,7 @@ class ARCOrchestrator:
             previous_blockers = unresolved_blockers
             previous_required_revisions = required_revisions
 
-            memory.append(record.model_dump())
+            memory.append(record.model_dump(mode="json"))
             memory.save_json("final_state.json", state.model_dump(mode="json"))
             self._save_run_state(memory, round_id, scorecard.average,
                                  decision, unresolved_blockers, "in_progress")

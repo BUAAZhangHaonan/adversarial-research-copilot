@@ -57,9 +57,12 @@ def run(
         "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
     gpt_verbosity: str = typer.Option(
         "medium", help="GPT output verbosity: low|medium|high"),
+    prompt_language: str = typer.Option(
+        "en", help="Prompt language for iterative discussion: en|zh"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
+    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
 
     registry = load_registry()
     runtime = load_runtime_roles(registry)
@@ -203,7 +206,7 @@ def chat_mode(
     ),
     max_rounds: int = typer.Option(
         60,
-        help="Maximum rounds safety cap; set 0 for unlimited rounds (judge decides stop)",
+        help="Advisory round target; judge decision still controls stop. Set 0 to disable the target hint.",
     ),
     export_best_consensus: bool = typer.Option(
         True,
@@ -214,9 +217,12 @@ def chat_mode(
         "medium", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
     gpt_verbosity: str = typer.Option(
         "high", help="GPT output verbosity: low|medium|high"),
+    prompt_language: str = typer.Option(
+        "en", help="Prompt language for chat iteration: en|zh"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
+    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
 
     registry = load_registry()
     runtime = load_runtime_roles(registry)
@@ -237,6 +243,7 @@ def chat_mode(
         min_rounds_before_stop=min_rounds_before_stop,
         max_rounds=max_rounds,
         export_best_consensus=export_best_consensus,
+        prompt_language=prompt_language,
     )
     console.print(f"[bold green]Chat transcript:[/bold green] {transcript_file}")
     console.print(f"[bold green]Chat state:[/bold green] {state_file}")
@@ -260,9 +267,12 @@ def refine_topic_cmd(
         "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
     gpt_verbosity: str = typer.Option(
         "medium", help="GPT output verbosity: low|medium|high"),
+    prompt_language: str = typer.Option(
+        "en", help="Prompt language for iterative refinement: en|zh"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
+    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
 
     registry = load_registry()
     runtime = load_runtime_roles(registry)
@@ -282,6 +292,7 @@ def refine_topic_cmd(
         reviewer_model=reviewer_model,
         topic=topic,
         rounds=rounds,
+        prompt_language=prompt_language,
     )
 
     original_file = run_dir / "TOPIC_RAW.md"

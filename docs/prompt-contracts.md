@@ -4,11 +4,18 @@ This document describes the stable contracts between ARC prompt files and ARC ru
 
 ## Debate Prompts
 
-`prompts/proposer.md`, `prompts/skeptic.md`, and `prompts/moderator.md` define the structured behavior for the debate loop.
+`prompts/latest/default/proposer_en.md`, `prompts/latest/default/skeptic_en.md`, and `prompts/latest/default/moderator_en.md` define the default structured behavior for the debate loop.
+
+Chinese variants are provided at:
+
+- `prompts/latest/default/proposer_zh.md`
+- `prompts/latest/default/skeptic_zh.md`
+- `prompts/latest/default/moderator_zh.md`
 
 Shared rules:
 
-- Debate prompts are written for Chinese final output.
+- Default debate prompts are English-first.
+- Equivalent Chinese variants are maintained for runtime language switching.
 - The prompt controls role boundary, reasoning focus, and narrative structure.
 - The runtime controls what input context is injected into each round.
 
@@ -20,14 +27,17 @@ Role-specific notes:
 
 ## Chat Mode Prompts
 
-`prompts/chat_mode/*.md` define a lighter debate surface with hard brevity limits.
+`prompts/latest/chat/*_en.md` define the default chat-mode prompt surface with hard brevity limits.
+
+Chinese variants are provided at `prompts/latest/chat/*_zh.md`.
 
 Shared rules:
 
 - Chat mode responses must stay concise.
-- Each agent should speak in natural Chinese.
+- Default chat-mode iteration is English.
+- Chinese mode remains available via runtime language switch.
 - Reference grounding matters, but the format is intentionally lighter than the main debate loop.
-- `moderator_chat.md` must always end with the `[JUDGE_DECISION]:` marker consumed by chat-mode parsing.
+- `moderator_chat_*.md` must always end with the `[JUDGE_DECISION]:` marker consumed by chat-mode parsing.
 
 ## Runtime-Owned Contract Fields
 

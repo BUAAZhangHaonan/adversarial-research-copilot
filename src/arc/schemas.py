@@ -27,6 +27,11 @@ class ScoreCard(BaseModel):
 
 class RoundRecord(BaseModel):
     round_id: int
+    round_started_at: datetime | None = None
+    proposer_completed_at: datetime | None = None
+    skeptic_completed_at: datetime | None = None
+    moderator_completed_at: datetime | None = None
+    round_completed_at: datetime | None = None
     proposer: str
     skeptic: str
     moderator: str
