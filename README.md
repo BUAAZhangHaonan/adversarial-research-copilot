@@ -181,7 +181,7 @@ set -a && source .env && set +a
 
 支持两类接口：
 - GPT 兼容 responses：`$GPT_BASE_URL/responses`
-- GLM 兼容 chat completions：`$GLM_BASE_URL/chat/completions`
+- GLM 兼容 chat completions：`$GLM_BASE_URL`（支持根路径或完整端点）
 
 GLM 官方文档接口：`https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
 
