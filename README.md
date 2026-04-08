@@ -131,6 +131,8 @@ adversarial-research-copilot/
 │  ├─ memory.py
 │  ├─ llm_client.py
 │  ├─ model_registry.py
+│  ├─ providers/
+│  │  └─ literature.py
 │  ├─ agents/
 │  │  ├─ proposer.py
 │  │  ├─ skeptic.py
@@ -197,6 +199,29 @@ GLM 官方文档接口：`https://open.bigmodel.cn/api/coding/paas/v4/chat/compl
 可选模型（已内置到 `configs/models.yaml`）：
 - gpt-5.4
 - glm-5.1
+
+### 2.1) Configure Literature Retrieval (Unified Internal Provider)
+
+ARC 的文献检索已统一为**单一路径**（pipeline/chat 共用）：
+- Primary: arXiv（免费全文来源优先）
+- Secondary: Semantic Scholar（免费元数据与 citation 排序增强）
+- Supplement: DeepXiv web search（仅在前两者覆盖不足时补充，且限制在免费额度内）
+
+关键配置文件：`configs/references.yaml`
+- `search_pool_size` 默认 50（目标检索池）
+- `final_reference_count` 默认 20（最终注入 prompts + 报告）
+
+可选环境变量（见 `.env.example`）：
+- `SEMANTIC_SCHOLAR_API_KEY`（可选，建议配置以提高稳定性）
+- `DEEPXIV_TOKEN`（可选，建议配置）
+- `ARC_DEEPXIV_ENABLED`（可选，默认 true）
+
+DeepXiv 官方正常获取 token 流程（不绕过任何验证机制）：
+1. 安装：`pip install deepxiv-sdk`
+2. 触发官方注册/初始化：`deepxiv search "agentic memory" --limit 1`
+3. 若出现邮箱验证、验证码或网页人工步骤，请在官方页面完成后，将 token 写入 `.env` 的 `DEEPXIV_TOKEN=...`
+
+说明：ARC 不引入独立 MCP 编排路径；DeepXiv 仅作为 ARC 内部 provider 的第三优先补充源。
 
 ## Model Switcher (Terminal)
 
@@ -281,7 +306,7 @@ Pipeline 主要产物（默认 `reports/<timestamp>/`）：
 - `OUTPUT_INDEX.md`（统一解释每个输出文件，建议优先阅读）
 - `pipeline_state.json`
 - `TOPIC.txt`
-- `REFERENCES.md`（多源文献：arXiv + Semantic Scholar + 可选 GLM Coding Plan MCP）
+- `REFERENCES.md`（统一 provider 输出：arXiv → Semantic Scholar → DeepXiv 补充）
 - `LITERATURE_MAP.md`
 - `IDEA_REPORT.md`
 - `FINAL_PROPOSAL.md`
@@ -343,6 +368,14 @@ Chat mode 主要产物（默认 `reports/<timestamp>/`）：
 - `chat_rounds/round_01_skeptic.md`
 - `chat_rounds/round_01_moderator.md`
 - `chat_rounds/round_01.md`
+
+文献流转说明（pipeline 与 chat 共用）：
+- 统一 provider 先产出规范化引用对象：`source/id/year/citation_count/title/abstract/url`
+- 这些对象会写入 `REFERENCES.md`（格式保持兼容）
+- 下游 stage/chat 再消费同一份 `REFERENCES.md`，并继续生成：
+       - `LITERATURE_MAP.md`
+       - `FINAL_PROPOSAL.md`
+       - chat mode 产物（`CHAT_TRANSCRIPT.md` / `BEST_CONSENSUS.md` 等）
 
 
 ### 4) Test

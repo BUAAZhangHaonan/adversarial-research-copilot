@@ -23,8 +23,8 @@
 - `--resume` option in CLI to recover interrupted runs.
 - Stronger prompts for evidence thresholds and severity ranking.
 - Moderator YAML payload for deterministic parsing.
+- Unified internal literature provider shared by pipeline/chat (`arXiv -> Semantic Scholar -> DeepXiv supplement`).
 
 ## What ARC Intentionally Delays
 - Heavy orchestration frameworks and many sub-agents.
 - Full autonomous experiment execution stack.
-- External evidence retrieval pipeline (planned for next phase).

@@ -147,3 +147,65 @@ def test_parse_judge_decision_does_not_false_stop_on_wording() -> None:
 def test_parse_judge_decision_without_tag_returns_continue_no_tag() -> None:
     text = "Current evidence is not sufficient yet."
     assert cmr._parse_judge_decision(text) == "CONTINUE_NO_TAG"
+
+
+def test_chat_mode_smoke_generates_references_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    reports_dir = tmp_path / "reports"
+
+    monkeypatch.setattr(
+        cmr,
+        "_load_chat_mode_config",
+        lambda: cmr.ChatModeConfig(
+            min_rounds_before_stop=1,
+            max_rounds=1,
+            min_references=1,
+            max_response_chars=3200,
+            max_paragraphs=3,
+            export_best_consensus=False,
+            persist_state=True,
+            prompt_language="en",
+        ),
+    )
+    monkeypatch.setattr(cmr, "LLMClient", lambda: object())
+    monkeypatch.setattr(
+        cmr,
+        "_collect_references",
+        lambda topic: [
+            {
+                "source": "arxiv",
+                "id": "2504.00001",
+                "year": 2026,
+                "citation_count": 12,
+                "title": "Unified Retrieval Smoke Paper",
+                "abstract": "smoke abstract",
+                "url": "https://arxiv.org/abs/2504.00001",
+            }
+        ],
+    )
+
+    def fake_chat_generate(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "moderator" in role:
+            return "Moderator summary\n[JUDGE_DECISION]: STOP_CONVERGED"
+        return f"{role} output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", fake_chat_generate)
+
+    transcript_file, state_file = cmr.run_chat_mode(
+        topic="smoke topic",
+        proposer_model="p",
+        skeptic_model="s",
+        moderator_model="m",
+        output_dir=str(reports_dir),
+        resume=False,
+    )
+
+    run_dir = transcript_file.parent
+    refs_file = run_dir / "REFERENCES.md"
+    assert transcript_file.exists()
+    assert state_file.exists()
+    assert refs_file.exists()
+    assert "Unified Retrieval Smoke Paper" in refs_file.read_text(encoding="utf-8")

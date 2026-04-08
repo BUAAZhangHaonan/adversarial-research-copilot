@@ -1,22 +1,38 @@
 references:
-  # Per-source search counts
-  arxiv_max_results: 20
-  semantic_scholar_max_results: 20
-  glm_coding_plan_mcp_max_results: 10
-  # Final number of references injected into pipeline prompts
+  # Unified retrieval target pool (arXiv first, Semantic Scholar second, DeepXiv web supplement third)
+  search_pool_size: 50
+  # Final number of references injected into pipeline/chat prompts
   final_reference_count: 20
+
+  # Primary free source: arXiv
+  arxiv_max_results: 35
+  arxiv_timeout_seconds: 20
+
+  # Secondary free source: Semantic Scholar metadata/ranking
+  semantic_scholar_max_results: 35
+  semantic_scholar_base_url: https://api.semanticscholar.org/graph/v1
+  semantic_scholar_timeout_seconds: 25
+  # Optional override; env SEMANTIC_SCHOLAR_API_KEY is preferred
+  semantic_scholar_api_key: ""
+
+  # Third source (bounded supplement only): DeepXiv web search
+  deepxiv_enabled: true
+  deepxiv_web_max_results: 20
+  deepxiv_web_max_calls: 2
+  deepxiv_timeout_seconds: 30
+  # Optional override; env DEEPXIV_TOKEN is preferred
+  deepxiv_token: ""
+
+  # Transport robustness
+  request_retry_attempts: 3
+  request_backoff_seconds: 0.6
 
   # Prefer papers from recent years unless citation count is very high
   recency_years_preferred: 3
   influential_citation_threshold: 1000
-
-  # Semantic Scholar
-  semantic_scholar_base_url: https://api.semanticscholar.org/graph/v1
-  semantic_scholar_timeout_seconds: 25
-
-  # Optional external source: GLM Coding Plan MCP endpoint
-  # If empty, this source is skipped.
-  glm_coding_plan_mcp_url: ""
+  min_recent_results: 10
+  min_relevant_results: 14
+  min_relevance_score: 0.15
 
 language:
   # Prompting policy for generation stages

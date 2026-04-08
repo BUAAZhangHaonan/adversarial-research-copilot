@@ -61,6 +61,7 @@ def test_pipeline_runs_minimal_chain(tmp_path: Path) -> None:
 
     run_dir = state_file.parent
     assert state_file.exists()
+    assert (run_dir / "REFERENCES.md").exists()
     assert (run_dir / "LITERATURE_MAP.md").exists()
     assert (run_dir / "IDEA_REPORT.md").exists()
     assert (run_dir / "FINAL_PROPOSAL.md").exists()
