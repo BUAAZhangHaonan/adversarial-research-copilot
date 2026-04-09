@@ -14,3 +14,9 @@ chat_mode:
   persist_state: true
   # Prompt language for iterative chat mode: en|zh.
   prompt_language: en
+  # Drift monitor fires every N inner debate rounds.
+  drift_check_interval: 5
+  # Maximum review cycles (outer loop). 0 = unlimited.
+  max_review_cycles: 99
+  # Maximum inner debate rounds per review cycle. 0 = unlimited.
+  max_inner_debate_rounds: 99
