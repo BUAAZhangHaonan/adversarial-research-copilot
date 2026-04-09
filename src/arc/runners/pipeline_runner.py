@@ -13,7 +13,7 @@ from arc.providers.literature import (
     collect_references as collect_references_from_provider,
     load_reference_config as load_reference_config_from_provider,
 )
-from arc.run_paths import resolve_run_dir
+from arc.run_paths import resolve_run_dir, sanitize_model_suffix
 from arc.runners.debate_runner import run_debate
 from arc.schemas import DebateConfig, PipelineStageRecord, PipelineState
 from arc.skill_engine import Skill, SkillLoadError, load_skills_dir, parse_stage_chain_from_pipeline_skill
@@ -40,13 +40,14 @@ def run_pipeline(
     Returns: (pipeline_state_file, final_memo_file)
     """
 
-    run_dir = resolve_run_dir(output_dir, resume, "pipeline_state.json")
+    _msuffix = sanitize_model_suffix(proposer_model, skeptic_model, moderator_model)
+    run_dir = resolve_run_dir(output_dir, resume, "pipeline_state.json", model_suffix=_msuffix)
     memory = DebateMemory(run_dir)
     debate_cfg = _load_debate_config()
 
     pipeline_state, resumed = _prepare_pipeline_state(memory, topic, resume, debate_cfg)
     if resume and not resumed and (run_dir / "pipeline_state.json").exists():
-        run_dir = resolve_run_dir(output_dir, False, "pipeline_state.json")
+        run_dir = resolve_run_dir(output_dir, False, "pipeline_state.json", model_suffix=_msuffix)
         memory = DebateMemory(run_dir)
         pipeline_state, resumed = _prepare_pipeline_state(memory, topic, False, debate_cfg)
 

@@ -8,11 +8,19 @@ from pathlib import Path
 import typer
 import requests
 from rich.console import Console
+
+# Auto-load .env if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # project .env
+    load_dotenv(Path.home() / ".env", override=False)  # user-wide .env (e.g. DEEPXIV_TOKEN)
+except ImportError:
+    pass
 from rich.table import Table
 
 from arc.llm_client import LLMClient
 from arc.model_registry import load_registry, load_runtime_roles, resolve_role_model, role_api_ready, set_role_model
-from arc.run_paths import resolve_run_dir
+from arc.run_paths import resolve_run_dir, sanitize_model_suffix
 from arc.runners.debate_runner import run_debate
 from arc.runners.chat_mode_runner import run_chat_mode
 from arc.runners.pipeline_runner import run_pipeline
@@ -219,6 +227,12 @@ def chat_mode(
         "high", help="GPT output verbosity: low|medium|high"),
     prompt_language: str = typer.Option(
         "en", help="Prompt language for chat iteration: en|zh"),
+    max_review_cycles: int = typer.Option(
+        99, help="Maximum review cycles (outer loop). 0 = unlimited."),
+    max_inner_rounds: int = typer.Option(
+        99, help="Maximum inner debate rounds per review cycle. 0 = unlimited."),
+    drift_interval: int = typer.Option(
+        5, help="Run drift monitor every N inner rounds."),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
@@ -244,6 +258,9 @@ def chat_mode(
         max_rounds=max_rounds,
         export_best_consensus=export_best_consensus,
         prompt_language=prompt_language,
+        max_review_cycles=max_review_cycles,
+        max_inner_debate_rounds=max_inner_rounds,
+        drift_check_interval=drift_interval,
     )
     console.print(f"[bold green]Chat transcript:[/bold green] {transcript_file}")
     console.print(f"[bold green]Chat state:[/bold green] {state_file}")
@@ -284,7 +301,8 @@ def refine_topic_cmd(
         "pipeline_moderator", registry, runtime, None)
 
     run_dir = resolve_run_dir(output_dir, resume=False,
-                              state_file_name="topic_refine_state.json")
+                              state_file_name="topic_refine_state.json",
+                              model_suffix=sanitize_model_suffix(writer_model, reviewer_model))
     client = LLMClient()
     refined, history = refine_research_topic(
         client=client,

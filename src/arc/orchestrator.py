@@ -13,7 +13,7 @@ from arc.exporters.markdown_report import export_markdown_report
 from arc.llm_client import LLMClient
 from arc.memory import DebateMemory
 from arc.prompting import normalize_prompt_language
-from arc.run_paths import ensure_run_dir_within_reports, resolve_run_dir
+from arc.run_paths import ensure_run_dir_within_reports, resolve_run_dir, sanitize_model_suffix
 from arc.schemas import DebateConfig, ResearchState, RoundRecord
 from arc.scoring.rubric import assess_convergence, parse_decision, parse_required_revisions, parse_scorecard, parse_unresolved_blockers
 from arc.state import init_state, load_idea_text
@@ -42,16 +42,17 @@ class ARCOrchestrator:
                 "Proposer and Skeptic must use different models when require_cross_model_adversary=true")
 
         idea = load_idea_text(idea_file)
+        _msuffix = sanitize_model_suffix(proposer_model, skeptic_model, moderator_model)
         target_run_dir = (
             ensure_run_dir_within_reports(run_dir, output_dir)
             if run_dir is not None
-            else resolve_run_dir(output_dir, resume, "run_state.json")
+            else resolve_run_dir(output_dir, resume, "run_state.json", model_suffix=_msuffix)
         )
         memory = DebateMemory(target_run_dir)
         state, start_round, previous_blockers, resumed = self._prepare_state(
             memory, idea, resume)
         if resume and not resumed and run_dir is None and (target_run_dir / "run_state.json").exists():
-            target_run_dir = resolve_run_dir(output_dir, False, "run_state.json")
+            target_run_dir = resolve_run_dir(output_dir, False, "run_state.json", model_suffix=_msuffix)
             memory = DebateMemory(target_run_dir)
             state, start_round, previous_blockers, resumed = self._prepare_state(
                 memory, idea, False)
