@@ -156,12 +156,23 @@ class LLMClient:
             "max_tokens": max_tokens,
             "stream": False,
         }
-        data = _post_json_with_retry(url, headers, payload)
-        text = data["choices"][0]["message"].get("content")
-        if isinstance(text, str) and text.strip():
-            return text
-        # Some gateways return empty content in non-streaming mode;
-        # fall back to streaming which reliably delivers text chunks.
+        try:
+            data = _post_json_with_retry(url, headers, payload)
+            text = data["choices"][0]["message"].get("content")
+            if isinstance(text, str) and text.strip():
+                return text
+        except requests.exceptions.HTTPError as exc:
+            # Some gateways reject non-streaming requests for large payloads
+            # but succeed with streaming.  Only fall back on client errors
+            # that might be gateway-specific (e.g. 400).
+            status = exc.response.status_code if exc.response is not None else None
+            if status is not None and status < 500 and status != 401 and status != 403:
+                pass  # fall through to streaming fallback below
+            else:
+                raise
+        # Some gateways return empty content in non-streaming mode, or
+        # reject non-streaming requests outright; fall back to streaming
+        # which reliably delivers text chunks.
         return _stream_chat_completions(url, headers, payload, timeout=_request_timeout_seconds())
 
     @staticmethod
