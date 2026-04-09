@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -156,11 +157,12 @@ class LLMClient:
             "stream": False,
         }
         data = _post_json_with_retry(url, headers, payload)
-        text = data["choices"][0]["message"]["content"]
-        if not isinstance(text, str):
-            raise RuntimeError(
-                "No text content returned by chat completions API")
-        return text
+        text = data["choices"][0]["message"].get("content")
+        if isinstance(text, str) and text.strip():
+            return text
+        # Some gateways return empty content in non-streaming mode;
+        # fall back to streaming which reliably delivers text chunks.
+        return _stream_chat_completions(url, headers, payload, timeout=_request_timeout_seconds())
 
     @staticmethod
     def _call_responses(
@@ -230,6 +232,41 @@ class LLMClient:
             return "\n".join(texts)
 
         raise RuntimeError("No text content returned by responses API")
+
+
+def _stream_chat_completions(
+    url: str,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+    timeout: float,
+) -> str:
+    """Send a chat-completions request with stream=True and concatenate delta chunks."""
+    stream_payload = {**payload, "stream": True}
+    parts: list[str] = []
+    resp = requests.post(url, headers=headers, json=stream_payload, timeout=timeout, stream=True)
+    resp.raise_for_status()
+    for line in resp.iter_lines():
+        if not line:
+            continue
+        decoded = line.decode("utf-8")
+        if not decoded.startswith("data: "):
+            continue
+        data_str = decoded[6:]
+        if data_str.strip() == "[DONE]":
+            break
+        try:
+            chunk = json.loads(data_str)
+        except json.JSONDecodeError:
+            continue
+        for choice in chunk.get("choices", []):
+            delta = choice.get("delta", {})
+            content = delta.get("content", "")
+            if content:
+                parts.append(content)
+    text = "".join(parts)
+    if not text.strip():
+        raise RuntimeError("No text content from streaming chat completions")
+    return text
 
 
 def _request_timeout_seconds() -> float:

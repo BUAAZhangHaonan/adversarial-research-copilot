@@ -10,7 +10,7 @@ models:
     provider: gpt
     base_url_env: GPT_BASE_URL
     api_key_env: GPT_API_KEY
-    endpoint: responses
+    endpoint: chat_completions
     max_output_tokens: 16384
     temperature: 0.3
   glm-5.1:
