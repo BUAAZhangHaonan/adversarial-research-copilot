@@ -438,6 +438,9 @@ def run_chat_mode(
 # Stage execution for stages 1-6, 8-9
 # ---------------------------------------------------------------------------
 
+_MAX_PROMPT_CONTENT_CHARS = 16000
+
+
 def _run_pre_debate_stage(
     stage_name: str,
     run_dir: Path,
@@ -465,33 +468,33 @@ def _run_pre_debate_stage(
         (run_dir / "LITERATURE_MAP.md").write_text(output.strip() + "\n", encoding="utf-8")
 
     elif stage_name == "idea-creation":
-        lit_map = (run_dir / "LITERATURE_MAP.md").read_text(encoding="utf-8") if (run_dir / "LITERATURE_MAP.md").exists() else ""
+        lit_map = _read_truncated(run_dir / "LITERATURE_MAP.md")
         user_prompt = f"Research topic: {topic}\n\nLiterature map:\n{lit_map}\n\nGenerate candidate research ideas."
         output = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
         (run_dir / "IDEA_REPORT.md").write_text(output.strip() + "\n", encoding="utf-8")
 
     elif stage_name == "novelty-check":
-        idea_report = (run_dir / "IDEA_REPORT.md").read_text(encoding="utf-8") if (run_dir / "IDEA_REPORT.md").exists() else ""
-        refs_text = (run_dir / "REFERENCES.md").read_text(encoding="utf-8") if (run_dir / "REFERENCES.md").exists() else ""
+        idea_report = _read_truncated(run_dir / "IDEA_REPORT.md")
+        refs_text = _read_truncated(run_dir / "REFERENCES.md")
         user_prompt = f"Research topic: {topic}\n\nIdea report:\n{idea_report}\n\nReferences:\n{refs_text}\n\nPerform a strict novelty check and produce a final proposal."
         output = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
         (run_dir / "FINAL_PROPOSAL.md").write_text(output.strip() + "\n", encoding="utf-8")
 
     elif stage_name == "evidence-grounding":
-        proposal = (run_dir / "FINAL_PROPOSAL.md").read_text(encoding="utf-8") if (run_dir / "FINAL_PROPOSAL.md").exists() else ""
-        refs_text = (run_dir / "REFERENCES.md").read_text(encoding="utf-8") if (run_dir / "REFERENCES.md").exists() else ""
+        proposal = _read_truncated(run_dir / "FINAL_PROPOSAL.md")
+        refs_text = _read_truncated(run_dir / "REFERENCES.md")
         user_prompt = f"Research topic: {topic}\n\nProposal:\n{proposal}\n\nReferences:\n{refs_text}\n\nCreate an evidence-grounding table."
         output = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
         (run_dir / "EVIDENCE_TABLE.md").write_text(output.strip() + "\n", encoding="utf-8")
 
     elif stage_name == "research-refine":
-        proposal = (run_dir / "FINAL_PROPOSAL.md").read_text(encoding="utf-8") if (run_dir / "FINAL_PROPOSAL.md").exists() else ""
+        proposal = _read_truncated(run_dir / "FINAL_PROPOSAL.md")
         user_prompt = f"Research topic: {topic}\n\nCurrent proposal:\n{proposal}\n\nRefine for falsifiability and resource constraints."
         output = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
         (run_dir / "FINAL_PROPOSAL.md").write_text(output.strip() + "\n", encoding="utf-8")
 
     elif stage_name == "experiment-bridge":
-        proposal = (run_dir / "FINAL_PROPOSAL.md").read_text(encoding="utf-8") if (run_dir / "FINAL_PROPOSAL.md").exists() else ""
+        proposal = _read_truncated(run_dir / "FINAL_PROPOSAL.md")
         user_prompt = f"Research topic: {topic}\n\nProposal:\n{proposal}\n\nGenerate an experiment plan."
         output = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3)
         (run_dir / "EXPERIMENT_PLAN.md").write_text(output.strip() + "\n", encoding="utf-8")
@@ -703,6 +706,16 @@ def _format_references(refs: list[dict[str, Any]]) -> str:
 # ---------------------------------------------------------------------------
 # Chat generation and prompt builders
 # ---------------------------------------------------------------------------
+
+def _read_truncated(path: Path, max_chars: int = _MAX_PROMPT_CONTENT_CHARS) -> str:
+    """Read file content, truncating to max_chars for LLM prompt size limits."""
+    if not path.exists():
+        return ""
+    text = path.read_text(encoding="utf-8")
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "\n...[truncated]"
+
 
 def _chat_generate(
     client: LLMClient,

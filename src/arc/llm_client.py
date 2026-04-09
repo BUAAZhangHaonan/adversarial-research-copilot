@@ -172,8 +172,18 @@ class LLMClient:
                 raise
         # Some gateways return empty content in non-streaming mode, or
         # reject non-streaming requests outright; fall back to streaming
-        # which reliably delivers text chunks.
-        return _stream_chat_completions(url, headers, payload, timeout=_request_timeout_seconds())
+        # which reliably delivers text chunks.  Retry streaming a few
+        # times on empty responses since the gateway may be flaky.
+        max_stream_retries = 3
+        delay = 2.0
+        for attempt in range(1, max_stream_retries + 1):
+            try:
+                return _stream_chat_completions(url, headers, payload, timeout=_request_timeout_seconds())
+            except RuntimeError:
+                if attempt >= max_stream_retries:
+                    raise
+                time.sleep(delay)
+                delay = min(delay * 2, 15.0)
 
     @staticmethod
     def _call_responses(
@@ -314,8 +324,10 @@ def _post_json_with_retry(url: str, headers: dict[str, str], payload: dict[str, 
                     "Retry-After", "").strip()
                 if retry_after.isdigit():
                     delay = max(delay, float(retry_after))
+                elif last_exc.response.status_code == 429:
+                    delay = max(delay, 10.0)
             time.sleep(delay)
-            delay = min(delay * 2, 5.0)
+            delay = min(delay * 2, 30.0)
 
     if last_exc is not None:
         raise last_exc
@@ -323,7 +335,7 @@ def _post_json_with_retry(url: str, headers: dict[str, str], payload: dict[str, 
 
 
 def _retry_attempts() -> int:
-    raw = os.getenv("ARC_LLM_RETRY_ATTEMPTS", "3").strip()
+    raw = os.getenv("ARC_LLM_RETRY_ATTEMPTS", "5").strip()
     try:
         value = int(raw)
     except ValueError:
