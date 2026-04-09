@@ -43,6 +43,12 @@ SOURCE_PRIORITY: dict[str, int] = {
     "deepxiv": 2,
 }
 
+CHAT_SOURCE_PRIORITY: dict[str, int] = {
+    "deepxiv": 0,
+    "arxiv": 1,
+    "semantic_scholar": 2,
+}
+
 DEFAULT_FALLBACK_TOPIC = "multimodal large language model hallucination benchmark"
 
 
@@ -93,21 +99,36 @@ def collect_references(topic: str, config_path: str | Path = "configs/references
     return provider.collect(topic)
 
 
+def collect_references_deepxiv_primary(topic: str, config_path: str | Path = "configs/references.yaml") -> list[dict[str, Any]]:
+    """Collect references with DeepXiv as the primary source (for chat mode)."""
+    cfg = load_reference_config(config_path)
+    provider = UnifiedLiteratureProvider(cfg, source_priority_override=CHAT_SOURCE_PRIORITY)
+    return provider.collect(topic)
+
+
 class UnifiedLiteratureProvider:
-    def __init__(self, cfg: dict[str, Any]):
+    def __init__(self, cfg: dict[str, Any], *, source_priority_override: dict[str, int] | None = None):
         self.cfg = cfg
+        self._source_priority_override = source_priority_override
 
     def collect(self, topic: str) -> list[dict[str, Any]]:
         q = str(topic or "").strip() or DEFAULT_FALLBACK_TOPIC
         topic_terms = _extract_topic_terms(q)
         target_pool = _to_int(self.cfg.get("search_pool_size"), 50)
+        deepxiv_first = (
+            self._source_priority_override is not None
+            and self._source_priority_override.get("deepxiv", 99) < self._source_priority_override.get("arxiv", 99)
+        )
 
         candidates: list[dict[str, Any]] = []
+
+        if deepxiv_first:
+            candidates.extend(self._fetch_deepxiv_web(q, _to_int(self.cfg.get("deepxiv_web_max_results"), 20)))
         candidates.extend(self._fetch_arxiv(q, _to_int(self.cfg.get("arxiv_max_results"), 35)))
         candidates.extend(self._fetch_semantic_scholar(q, _to_int(self.cfg.get("semantic_scholar_max_results"), 35)))
 
         deduped = self._deduplicate_by_title(candidates)
-        if self._needs_deepxiv_supplement(deduped, topic_terms, target_pool):
+        if not deepxiv_first and self._needs_deepxiv_supplement(deduped, topic_terms, target_pool):
             candidates.extend(self._fetch_deepxiv_web(q, _to_int(self.cfg.get("deepxiv_web_max_results"), 20)))
             deduped = self._deduplicate_by_title(candidates)
 
@@ -283,9 +304,10 @@ class UnifiedLiteratureProvider:
         return out
 
     def _deepxiv_websearch(self, reader: Any, query: str, limit: int) -> Any:
+        # Prefer the 'search' method (accepts size param) over 'websearch'
         for call in (
-            lambda: reader.websearch(query=query, size=limit),
-            lambda: reader.websearch(query, size=limit),
+            lambda: reader.search(query=query, size=limit),
+            lambda: reader.search(query, size=limit),
             lambda: reader.websearch(query=query),
             lambda: reader.websearch(query),
         ):
@@ -304,18 +326,19 @@ class UnifiedLiteratureProvider:
             return None
 
         token = os.getenv("DEEPXIV_TOKEN", "").strip() or str(self.cfg.get("deepxiv_token", "")).strip()
-        if token and not os.getenv("DEEPXIV_TOKEN", "").strip():
-            os.environ["DEEPXIV_TOKEN"] = token
 
         timeout = _to_int(self.cfg.get("deepxiv_timeout_seconds"), 30)
         retries = _to_int(self.cfg.get("request_retry_attempts"), 3)
 
         for kwargs in (
-            {"timeout": timeout, "max_retries": retries},
-            {"timeout": timeout},
-            {"max_retries": retries},
+            {"token": token or None, "timeout": timeout, "max_retries": retries},
+            {"token": token or None, "timeout": timeout},
+            {"token": token or None, "max_retries": retries},
+            {"token": token or None},
             {},
         ):
+            # Filter out None values so the constructor uses its defaults
+            kwargs = {k: v for k, v in kwargs.items() if v is not None}
             try:
                 return Reader(**kwargs)
             except TypeError:
@@ -550,6 +573,8 @@ class UnifiedLiteratureProvider:
         return hits / len(topic_terms)
 
     def _source_priority(self, source: str) -> int:
+        if self._source_priority_override is not None:
+            return self._source_priority_override.get(source.strip().lower(), 99)
         return SOURCE_PRIORITY.get(source.strip().lower(), 99)
 
     def _normalize_reference(self, ref: dict[str, Any]) -> dict[str, Any]:
