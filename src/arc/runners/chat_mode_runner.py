@@ -712,6 +712,14 @@ def _read_truncated(path: Path, max_chars: int = _MAX_PROMPT_CONTENT_CHARS) -> s
     if not path.exists():
         return ""
     text = path.read_text(encoding="utf-8")
+    return _truncate(text, max_chars)
+
+
+_DEBATE_FIELD_MAX = 4000
+
+
+def _truncate(text: str, max_chars: int = _DEBATE_FIELD_MAX) -> str:
+    """Truncate a string to max_chars, appending an ellipsis if truncated."""
     if len(text) <= max_chars:
         return text
     return text[:max_chars] + "\n...[truncated]"
@@ -735,6 +743,8 @@ def _build_proposer_user_prompt(
     round_id: int, topic: str, reference_brief: str, prior_summary: str,
     min_references: int, language: str,
 ) -> str:
+    reference_brief = _truncate(reference_brief)
+    prior_summary = _truncate(prior_summary or "", _DEBATE_FIELD_MAX)
     return localized_text(
         language,
         (
@@ -760,6 +770,8 @@ def _build_skeptic_user_prompt(
     round_id: int, topic: str, reference_brief: str, proposer_output: str,
     min_references: int, language: str,
 ) -> str:
+    reference_brief = _truncate(reference_brief)
+    proposer_output = _truncate(proposer_output)
     return localized_text(
         language,
         (
@@ -784,6 +796,8 @@ def _build_skeptic_user_prompt(
 def _build_moderator_user_prompt(
     round_id: int, topic: str, proposer_output: str, skeptic_output: str, language: str,
 ) -> str:
+    proposer_output = _truncate(proposer_output)
+    skeptic_output = _truncate(skeptic_output)
     return localized_text(
         language,
         (
