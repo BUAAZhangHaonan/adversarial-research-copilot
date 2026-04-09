@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
 
 
-def resolve_run_dir(output_dir: str, resume: bool, state_file_name: str) -> Path:
+def resolve_run_dir(
+    output_dir: str,
+    resume: bool,
+    state_file_name: str,
+    model_suffix: str = "",
+) -> Path:
     root = _normalize_reports_root(output_dir)
     root.mkdir(parents=True, exist_ok=True)
 
@@ -14,10 +20,23 @@ def resolve_run_dir(output_dir: str, resume: bool, state_file_name: str) -> Path
             _write_latest_marker(root, resumed)
             return resumed
 
-    run_dir = _new_timestamp_dir(root)
+    run_dir = _new_timestamp_dir(root, model_suffix)
     run_dir.mkdir(parents=True, exist_ok=False)
     _write_latest_marker(root, run_dir)
     return run_dir
+
+
+def sanitize_model_suffix(*models: str) -> str:
+    """Build a sanitized directory suffix from model names.
+
+    >>> sanitize_model_suffix("gpt-5.4", "glm-5.1", "gpt-5.4")
+    'gpt_54_glm_51_gpt_54'
+    """
+    raw = "_".join(models)
+    s = raw.lower().strip()
+    s = re.sub(r"[^a-z0-9_]", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s[:64]
 
 
 def _find_resume_dir(root: Path, state_file_name: str) -> Path | None:
@@ -46,15 +65,16 @@ def _find_resume_dir(root: Path, state_file_name: str) -> Path | None:
     return candidates[0]
 
 
-def _new_timestamp_dir(root: Path) -> Path:
+def _new_timestamp_dir(root: Path, model_suffix: str = "") -> Path:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    candidate = root / ts
+    name = f"{ts}_{model_suffix}" if model_suffix else ts
+    candidate = root / name
     if not candidate.exists():
         return candidate
 
     i = 1
     while True:
-        c = root / f"{ts}_{i:02d}"
+        c = root / f"{name}_{i:02d}"
         if not c.exists():
             return c
         i += 1
