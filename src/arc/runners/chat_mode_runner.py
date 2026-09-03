@@ -514,12 +514,20 @@ def run_chat_mode(
 
     consensus_file: Path | None = None
     if cfg.export_best_consensus:
-        consensus_file = _export_best_consensus(
-            client=client, model=models["moderator"], topic=topic, rounds=rounds,
-            refs=[], output_file=target_run_dir / "BEST_CONSENSUS.md",
-            max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
-            language=cfg.prompt_language,
-        )
+        try:
+            consensus_file = _export_best_consensus(
+                client=client, model=models["moderator"], topic=topic, rounds=rounds,
+                refs=[], output_file=target_run_dir / "BEST_CONSENSUS.md",
+                max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
+                language=cfg.prompt_language,
+            )
+        except Exception as exc:
+            # The debate itself is complete; keep the interim consensus draft
+            # rather than failing the whole run at the last LLM call.
+            logger.warning("Final consensus export failed: %s. Keeping interim draft.", exc)
+            interim = target_run_dir / "BEST_CONSENSUS.md"
+            if interim.exists():
+                consensus_file = interim
 
     # Build review cycles report
     if review_cycles_data:
@@ -531,10 +539,17 @@ def run_chat_mode(
         encoding="utf-8",
     )
 
+    # A run whose debate was cut short by exhausted retries or a failed
+    # reviewer must not be recorded as cleanly completed.
+    final_status = (
+        "error"
+        if stop_reason.startswith(("round_failed", "reviewer_failed"))
+        else "completed"
+    )
     if cfg.persist_state:
         _save_state(
             state_file=state_file, topic=topic, rounds=rounds, models=models,
-            cfg=cfg, reference_count=len(refs), stop_reason=stop_reason, status="completed",
+            cfg=cfg, reference_count=len(refs), stop_reason=stop_reason, status=final_status,
             stage_statuses=stage_statuses, review_cycles=review_cycles_data,
             debate_review_cycle=debate_review_cycle, debate_inner_round=debate_inner_round,
             prior_reviewer_feedback=prior_reviewer_feedback,

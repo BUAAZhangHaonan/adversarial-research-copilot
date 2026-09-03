@@ -249,6 +249,45 @@ def test_ensure_chat_references_reuses_cache_without_recollecting(tmp_path: Path
         cmr._collect_chat_references = orig
 
 
+def test_chat_mode_survives_final_consensus_export_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    reports_dir = tmp_path / "reports"
+
+    _setup_common_mocks(
+        monkeypatch, tmp_path,
+        config_overrides={"max_rounds": 1, "export_best_consensus": True},
+    )
+
+    def fake_chat_generate(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "moderator" in role:
+            return "Moderator summary\n[JUDGE_DECISION]: STOP_CONVERGED"
+        return f"{role} output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", fake_chat_generate)
+
+    def exploding(*args, **kwargs):
+        raise RuntimeError("api down")
+
+    monkeypatch.setattr(cmr, "_export_best_consensus", exploding)
+
+    transcript_file, state_file = cmr.run_chat_mode(
+        topic="smoke topic",
+        proposer_model="p",
+        skeptic_model="s",
+        moderator_model="m",
+        output_dir=str(reports_dir),
+        resume=False,
+    )
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["status"] == "completed"
+    # Interim consensus draft written during the debate must be retained.
+    assert (transcript_file.parent / "BEST_CONSENSUS.md").exists()
+
+
 def test_chat_mode_smoke_generates_references_file(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
