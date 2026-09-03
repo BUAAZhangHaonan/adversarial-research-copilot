@@ -889,6 +889,7 @@ def _build_skeptic_user_prompt(
     min_rounds_before_stop: int = 20,
 ) -> str:
     reference_brief = _truncate(reference_brief)
+    proposer_output = _truncate(proposer_output)
     # Convergence pressure for Skeptic
     pressure = ""
     if inner_round > 5:
@@ -923,6 +924,8 @@ def _build_moderator_user_prompt(
     min_rounds_before_stop: int = 20,
 ) -> str:
     # Add convergence context for moderator
+    proposer_output = _truncate(proposer_output)
+    skeptic_output = _truncate(skeptic_output)
     convergence_context = ""
     if inner_round > 3:
         convergence_context = f"\n[ROUND CONTEXT] This is inner round {inner_round} of review cycle {review_cycle}. "

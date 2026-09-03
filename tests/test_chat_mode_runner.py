@@ -189,6 +189,25 @@ def test_parse_judge_decision_does_not_false_stop_on_wording() -> None:
     assert cmr._parse_judge_decision(text) == "CONTINUE"
 
 
+def test_debate_prompt_builders_truncate_oversized_role_outputs() -> None:
+    """Role outputs above _DEBATE_FIELD_MAX must be truncated in downstream prompts."""
+    huge = "x" * (cmr._DEBATE_FIELD_MAX + 500)
+
+    skeptic_prompt = cmr._build_skeptic_user_prompt(
+        round_id=1, topic="t", reference_brief="refs",
+        proposer_output=huge, min_references=1, language="en",
+    )
+    assert "...[truncated]" in skeptic_prompt
+    assert huge not in skeptic_prompt
+
+    moderator_prompt = cmr._build_moderator_user_prompt(
+        round_id=1, topic="t", proposer_output=huge, skeptic_output=huge,
+        language="en",
+    )
+    assert moderator_prompt.count("...[truncated]") == 2
+    assert huge not in moderator_prompt
+
+
 def test_parse_judge_decision_without_tag_returns_continue_no_tag() -> None:
     text = "Current evidence is not sufficient yet."
     assert cmr._parse_judge_decision(text) == "CONTINUE_NO_TAG"
