@@ -1324,13 +1324,23 @@ def _backfill_round_timestamps(
         return
     for item in rounds:
         rid = int(item.get("round_id", 0) or 0)
-        round_file = chat_dir / f"round_{rid:02d}.md"
+        cycle_id = int(item.get("review_cycle", 0) or 0)
+        # Current layout nests rounds under review_cycle_XX/; older runs
+        # wrote them flat into chat_rounds/.
+        round_file_candidates = [
+            chat_dir / f"review_cycle_{cycle_id:02d}" / f"round_{rid:02d}.md",
+            chat_dir / f"round_{rid:02d}.md",
+        ] if cycle_id > 0 else [
+            chat_dir / f"round_{rid:02d}.md",
+        ]
         ts = fallback_timestamp
-        try:
-            if round_file.exists():
-                ts = datetime.fromtimestamp(round_file.stat().st_mtime, tz=UTC).isoformat()
-        except Exception:
-            ts = fallback_timestamp
+        for round_file in round_file_candidates:
+            try:
+                if round_file.exists():
+                    ts = datetime.fromtimestamp(round_file.stat().st_mtime, tz=UTC).isoformat()
+                    break
+            except Exception:
+                ts = fallback_timestamp
 
         item.setdefault("round_started_at", ts)
         item.setdefault("proposer_completed_at", ts)
