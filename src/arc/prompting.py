@@ -24,8 +24,8 @@ def resolve_prompt_path(mode: str, prompt_name: str, language: str, prompt_root:
     normalized = normalize_prompt_language(language)
     mode_dir = prompt_root / mode
     candidates = [
-        mode_dir / f"{prompt_name}.md",
         mode_dir / f"{prompt_name}_{normalized}.md",
+        mode_dir / f"{prompt_name}.md",
     ]
     for candidate in candidates:
         if candidate.exists():
