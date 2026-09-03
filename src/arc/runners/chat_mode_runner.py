@@ -504,9 +504,15 @@ def run_chat_mode(
     # ---------------------------------------------------------------
     # Final outputs
     # ---------------------------------------------------------------
-    refs = []
-    if (target_run_dir / "REFERENCES.md").exists():
-        refs = []  # references already saved to file
+    refs: list[dict[str, Any]] = []
+    references_cache = target_run_dir / "references_raw.json"
+    if references_cache.exists():
+        try:
+            cached = json.loads(references_cache.read_text(encoding="utf-8"))
+            if isinstance(cached, list):
+                refs = cached
+        except Exception:
+            refs = []
 
     transcript = _build_transcript(topic, rounds)
     transcript_file = target_run_dir / "CHAT_TRANSCRIPT.md"
