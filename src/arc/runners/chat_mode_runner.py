@@ -224,7 +224,7 @@ def run_chat_mode(
     # Stage 7: debate-rounds (nested loops with reviewer + drift monitor)
     # ---------------------------------------------------------------
     if stage_statuses.get("debate-rounds") != "completed":
-        refs = _collect_chat_references(topic, cfg.min_references)
+        refs = _ensure_chat_references(target_run_dir, topic, cfg.min_references)
         references_text = _format_references(refs)
         (target_run_dir / "REFERENCES.md").write_text(references_text, encoding="utf-8")
         reference_brief = _build_reference_brief(refs, max_items=cfg.min_references, language=cfg.prompt_language)
@@ -569,7 +569,7 @@ def _run_pre_debate_stage(
     model = models.get(_STAGE_MODEL_ROLE.get(stage_name, "proposer"), models["proposer"])
 
     if stage_name == "literature-research":
-        refs = _collect_chat_references(topic, cfg.min_references)
+        refs = _ensure_chat_references(run_dir, topic, cfg.min_references)
         references_text = _format_references(refs)
         (run_dir / "REFERENCES.md").write_text(references_text, encoding="utf-8")
         user_prompt = f"Research topic: {topic}\n\nReferences:\n{_build_reference_brief(refs, cfg.min_references, cfg.prompt_language)}\n\nGenerate a comprehensive literature map."
@@ -769,6 +769,26 @@ def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -
 # ---------------------------------------------------------------------------
 # Reference collection (DeepXiv-primary)
 # ---------------------------------------------------------------------------
+
+def _ensure_chat_references(run_dir: Path, topic: str, min_references: int) -> list[dict[str, Any]]:
+    """Return the run's references, reusing a cached collection when available.
+
+    Collection hits external APIs (arXiv / Semantic Scholar / DeepXiv) and can
+    fail transiently; once a run has references on disk, later stages and
+    resumed runs must not pay for — or die on — a second retrieval.
+    """
+    cache_file = run_dir / "references_raw.json"
+    if cache_file.exists():
+        try:
+            cached = json.loads(cache_file.read_text(encoding="utf-8"))
+            if isinstance(cached, list) and cached:
+                return cached
+        except Exception:
+            pass
+    refs = _collect_chat_references(topic, min_references)
+    cache_file.write_text(json.dumps(refs, ensure_ascii=False, indent=2), encoding="utf-8")
+    return refs
+
 
 def _collect_chat_references(topic: str, min_references: int) -> list[dict[str, Any]]:
     # DeepXiv API limits queries to ~500 chars; extract a short version for API calls.

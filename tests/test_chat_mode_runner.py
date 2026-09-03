@@ -223,6 +223,32 @@ def test_effective_round_bounds_zero_means_unlimited() -> None:
     assert cmr._effective_round_bounds(cfg) == (3, 7)
 
 
+def test_ensure_chat_references_reuses_cache_without_recollecting(tmp_path: Path) -> None:
+    calls = {"count": 0}
+
+    def fake_collect(topic, min_references):
+        calls["count"] += 1
+        return [{"source": "stub", "title": "Cached Paper", "abstract": "a", "year": 2026}]
+
+    orig = cmr._collect_chat_references
+    cmr._collect_chat_references = fake_collect
+    try:
+        first = cmr._ensure_chat_references(tmp_path, "topic", 1)
+        assert first[0]["title"] == "Cached Paper"
+        assert (tmp_path / "references_raw.json").exists()
+
+        # Simulate collector failure: cache must serve the second call.
+        def exploding(topic, min_references):
+            raise RuntimeError("network down")
+
+        cmr._collect_chat_references = exploding
+        second = cmr._ensure_chat_references(tmp_path, "topic", 1)
+        assert second == first
+        assert calls["count"] == 1
+    finally:
+        cmr._collect_chat_references = orig
+
+
 def test_chat_mode_smoke_generates_references_file(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
