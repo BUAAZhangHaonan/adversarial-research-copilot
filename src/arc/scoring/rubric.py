@@ -3,10 +3,25 @@ from __future__ import annotations
 import re
 import textwrap
 from dataclasses import dataclass
+from typing import Any
 
 import yaml
 
 from arc.schemas import DebateConfig, RoundRecord, ScoreCard
+
+
+def _safe_score_value(raw: Any) -> int:
+    """Coerce a moderator YAML score to a valid 1-5 int, defaulting to 3.
+
+    Models occasionally emit out-of-range integers or non-numeric strings;
+    the regex fallback path already tolerates these, so the structured path
+    must not crash the whole debate run over one malformed field.
+    """
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 3
+    return value if 1 <= value <= 5 else 3
 
 
 _SCORE_PATTERNS = {
@@ -28,14 +43,13 @@ def parse_scorecard(moderator_text: str) -> ScoreCard:
     structured = parse_moderator_payload(moderator_text)
     if structured and isinstance(structured.get("scorecard"), dict):
         raw = structured["scorecard"]
-        values = {
-            "novelty": int(raw.get("novelty", 3)),
-            "feasibility": int(raw.get("feasibility", 3)),
-            "falsifiability": int(raw.get("falsifiability", 3)),
-            "evaluation_clarity": int(raw.get("evaluation_clarity", 3)),
-            "resource_fit": int(raw.get("resource_fit", 3)),
-        }
-        return ScoreCard(**values)
+        return ScoreCard(
+            novelty=_safe_score_value(raw.get("novelty", 3)),
+            feasibility=_safe_score_value(raw.get("feasibility", 3)),
+            falsifiability=_safe_score_value(raw.get("falsifiability", 3)),
+            evaluation_clarity=_safe_score_value(raw.get("evaluation_clarity", 3)),
+            resource_fit=_safe_score_value(raw.get("resource_fit", 3)),
+        )
 
     values: dict[str, int] = {}
     for key, pattern in _SCORE_PATTERNS.items():

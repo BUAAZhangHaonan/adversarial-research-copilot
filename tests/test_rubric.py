@@ -79,3 +79,23 @@ def test_moderator_prompt_declares_canonical_runtime_schema() -> None:
     assert "unresolved_blockers:" in prompt
     assert "required_revisions:" in prompt
     assert "continue_or_stop:" in prompt
+
+
+def test_parse_scorecard_tolerates_invalid_yaml_scores() -> None:
+    text = """
+        ```yaml
+        scorecard:
+          novelty: 6
+          feasibility: high
+          falsifiability: null
+          evaluation_clarity: 4.7
+          resource_fit: 2
+        continue_or_stop: CONTINUE
+        ```
+        """
+    score = parse_scorecard(text)
+    assert score.novelty == 3  # out-of-range -> default
+    assert score.feasibility == 3  # non-numeric -> default
+    assert score.falsifiability == 3  # null -> default
+    assert score.evaluation_clarity == 4  # float truncates
+    assert score.resource_fit == 2
