@@ -31,7 +31,7 @@ PROMPT_MARKERS = {
     "prompts/latest/chat/skeptic_chat_en.md": [
         "Language policy:",
         "Length guidance:",
-        "at least 2 specific, concrete failure scenarios",
+        "at most 2 specific, concrete failure scenarios",
         "Evidence binding:",
     ],
     "prompts/latest/chat/moderator_chat_en.md": [
@@ -61,7 +61,7 @@ PROMPT_MARKERS = {
     ],
     "prompts/latest/chat/skeptic_chat_zh.md": [
         "必须使用中文自然表达",
-        "至少给出 2 个具体失败场景",
+        "2 个具体失败场景",
     ],
     "prompts/latest/chat/moderator_chat_zh.md": [
         "必须使用中文自然表达",

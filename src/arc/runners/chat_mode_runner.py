@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 from arc.agents.drift_monitor import DriftMonitorAgent
 from arc.agents.reviewer import ReviewerAgent, parse_reviewer_decision
@@ -66,9 +70,9 @@ _STAGE_MODEL_ROLE: dict[str, str] = {
 @dataclass
 class ChatModeConfig:
     min_rounds_before_stop: int = 20
-    max_rounds: int = 60
+    max_rounds: int = 99  # advisory soft target only; NOT a hard cap
     min_references: int = 20
-    max_response_chars: int = 3200
+    max_response_chars: int = 4000
     max_paragraphs: int = 3
     export_best_consensus: bool = True
     persist_state: bool = True
@@ -76,6 +80,7 @@ class ChatModeConfig:
     drift_check_interval: int = 5
     max_review_cycles: int = 99
     max_inner_debate_rounds: int = 99
+    context_window_cycles: int = 3  # how many past review cycles to keep in LLM context
 
 
 # ---------------------------------------------------------------------------
@@ -213,8 +218,18 @@ def run_chat_mode(
         (target_run_dir / "REFERENCES.md").write_text(references_text, encoding="utf-8")
         reference_brief = _build_reference_brief(refs, max_items=cfg.min_references, language=cfg.prompt_language)
         prior_summary = _extract_summary_anchor(str(rounds[-1].get("moderator", ""))) if rounds else ""
-        start_inner = debate_inner_round + 1 if debate_inner_round > 0 else 1
-        start_cycle = debate_review_cycle + 1 if debate_review_cycle > 0 else 1
+        if debate_review_cycle > 0 and debate_inner_round == 0:
+            # Reviewer just completed a cycle — start the next one
+            start_cycle = debate_review_cycle + 1
+            start_inner = 1
+        elif debate_review_cycle > 0 and debate_inner_round > 0:
+            # Interrupted mid-cycle — resume the same cycle from next inner round
+            start_cycle = debate_review_cycle
+            start_inner = debate_inner_round + 1
+        else:
+            # Fresh start
+            start_cycle = 1
+            start_inner = 1
 
         if rounds:
             _write_interim_outputs(target_run_dir, topic, cfg, refs, rounds, stop_reason)
@@ -231,97 +246,150 @@ def run_chat_mode(
                 global_round_id = len(rounds) + 1
                 round_started_at = datetime.now(UTC).isoformat()
 
-                # Drift monitor check
-                drift_correction = ""
-                if inner_round > 1 and inner_round % cfg.drift_check_interval == 0:
-                    drift_out = drift_monitor.run(
-                        original_topic=topic,
-                        current_summary=prior_summary,
-                        round_id=global_round_id,
-                    )
-                    drift_data = _parse_yaml_block(drift_out)
-                    if drift_data.get("drift_detected") is True and drift_data.get("correction"):
-                        drift_correction = str(drift_data["correction"])
+                # Round-level retry: if the entire round fails due to an
+                # LLM API error, retry up to _ROUND_MAX_RETRIES times
+                # before giving up.  This prevents a single transient
+                # failure from killing the whole multi-hour run.
+                _ROUND_MAX_RETRIES = 4
+                _ROUND_RETRY_BASE_DELAY = 15.0
+                round_record: dict[str, Any] | None = None
 
-                # Proposer
-                proposer_prompt_path = str(resolve_prompt_path("chat", "proposer_chat", cfg.prompt_language))
-                proposer_extra = ""
-                if cycle_reviewer_feedback:
-                    proposer_extra += f"\n[REVIEWER FEEDBACK FROM PREVIOUS CYCLE]\n{cycle_reviewer_feedback}\n"
-                if drift_correction:
-                    proposer_extra += f"\n[DRIFT CORRECTION]\n{drift_correction}\n"
-                proposer_output = _chat_generate(
-                    client=client, model=models["proposer"],
-                    role_prompt_path=proposer_prompt_path,
-                    user_prompt=_build_proposer_user_prompt(
-                        round_id=global_round_id, topic=topic, reference_brief=reference_brief,
-                        prior_summary=prior_summary, min_references=cfg.min_references,
-                        language=cfg.prompt_language,
-                    ) + proposer_extra,
-                    max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
-                    language=cfg.prompt_language,
-                )
-                proposer_completed_at = datetime.now(UTC).isoformat()
+                for _round_attempt in range(1, _ROUND_MAX_RETRIES + 1):
+                    try:
+                        # Drift monitor check
+                        drift_correction = ""
+                        if inner_round > 1 and inner_round % cfg.drift_check_interval == 0:
+                            drift_out = drift_monitor.run(
+                                original_topic=topic,
+                                current_summary=prior_summary,
+                                round_id=global_round_id,
+                            )
+                            drift_data = _parse_yaml_block(drift_out)
+                            if drift_data.get("drift_detected") is True and drift_data.get("correction"):
+                                drift_correction = str(drift_data["correction"])
 
-                # Skeptic
-                skeptic_prompt_path = str(resolve_prompt_path("chat", "skeptic_chat", cfg.prompt_language))
-                skeptic_output = _chat_generate(
-                    client=client, model=models["skeptic"],
-                    role_prompt_path=skeptic_prompt_path,
-                    user_prompt=_build_skeptic_user_prompt(
-                        round_id=global_round_id, topic=topic, reference_brief=reference_brief,
-                        proposer_output=proposer_output, min_references=cfg.min_references,
-                        language=cfg.prompt_language,
-                    ),
-                    max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
-                    language=cfg.prompt_language,
-                )
-                skeptic_completed_at = datetime.now(UTC).isoformat()
+                        # Proposer
+                        proposer_prompt_path = str(resolve_prompt_path("chat", "proposer_chat", cfg.prompt_language))
+                        proposer_extra = ""
+                        if cycle_reviewer_feedback:
+                            proposer_extra += f"\n[REVIEWER FEEDBACK FROM PREVIOUS CYCLE]\n{cycle_reviewer_feedback}\n"
+                        if drift_correction:
+                            proposer_extra += f"\n[DRIFT CORRECTION]\n{drift_correction}\n"
+                        cycle_context = _build_cycle_context_window(
+                            rounds, review_cycle_id, cfg.context_window_cycles,
+                        )
+                        proposer_output = _chat_generate(
+                            client=client, model=models["proposer"],
+                            role_prompt_path=proposer_prompt_path,
+                            user_prompt=_build_proposer_user_prompt(
+                                round_id=global_round_id, topic=topic, reference_brief=reference_brief,
+                                prior_summary=prior_summary, min_references=cfg.min_references,
+                                language=cfg.prompt_language, cycle_context=cycle_context,
+                                review_cycle=review_cycle_id, inner_round=inner_round,
+                                min_rounds_before_stop=cfg.min_rounds_before_stop,
+                            ) + proposer_extra,
+                            max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
+                            language=cfg.prompt_language,
+                        )
+                        proposer_completed_at = datetime.now(UTC).isoformat()
 
-                # Moderator
-                moderator_prompt_path = str(resolve_prompt_path("chat", "moderator_chat", cfg.prompt_language))
-                moderator_output = _chat_generate(
-                    client=client, model=models["moderator"],
-                    role_prompt_path=moderator_prompt_path,
-                    user_prompt=_build_moderator_user_prompt(
-                        round_id=global_round_id, topic=topic,
-                        proposer_output=proposer_output, skeptic_output=skeptic_output,
-                        language=cfg.prompt_language,
-                    ),
-                    max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
-                    language=cfg.prompt_language,
-                )
-                moderator_completed_at = datetime.now(UTC).isoformat()
+                        # Skeptic
+                        skeptic_prompt_path = str(resolve_prompt_path("chat", "skeptic_chat", cfg.prompt_language))
+                        skeptic_output = _chat_generate(
+                            client=client, model=models["skeptic"],
+                            role_prompt_path=skeptic_prompt_path,
+                            user_prompt=_build_skeptic_user_prompt(
+                                round_id=global_round_id, topic=topic, reference_brief=reference_brief,
+                                proposer_output=proposer_output, min_references=cfg.min_references,
+                                language=cfg.prompt_language,
+                                review_cycle=review_cycle_id, inner_round=inner_round,
+                                min_rounds_before_stop=cfg.min_rounds_before_stop,
+                            ),
+                            max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
+                            language=cfg.prompt_language,
+                        )
+                        skeptic_completed_at = datetime.now(UTC).isoformat()
 
-                raw_decision = _parse_judge_decision(moderator_output)
-                effective_decision = raw_decision
-                if raw_decision.startswith("STOP") and global_round_id < cfg.min_rounds_before_stop:
-                    effective_decision = "CONTINUE_MIN_ROUNDS_NOT_MET"
+                        # Moderator
+                        moderator_prompt_path = str(resolve_prompt_path("chat", "moderator_chat", cfg.prompt_language))
+                        moderator_output = _chat_generate(
+                            client=client, model=models["moderator"],
+                            role_prompt_path=moderator_prompt_path,
+                            user_prompt=_build_moderator_user_prompt(
+                                round_id=global_round_id, topic=topic,
+                                proposer_output=proposer_output, skeptic_output=skeptic_output,
+                                language=cfg.prompt_language,
+                                review_cycle=review_cycle_id, inner_round=inner_round,
+                                min_rounds_before_stop=cfg.min_rounds_before_stop,
+                            ),
+                            max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
+                            language=cfg.prompt_language,
+                        )
+                        moderator_completed_at = datetime.now(UTC).isoformat()
 
-                round_completed_at = datetime.now(UTC).isoformat()
-                round_record = {
-                    "round_id": global_round_id,
-                    "review_cycle": review_cycle_id,
-                    "inner_round": inner_round,
-                    "round_started_at": round_started_at,
-                    "proposer_completed_at": proposer_completed_at,
-                    "skeptic_completed_at": skeptic_completed_at,
-                    "moderator_completed_at": moderator_completed_at,
-                    "round_completed_at": round_completed_at,
-                    "reply_timestamps": {
-                        "proposer": proposer_completed_at,
-                        "skeptic": skeptic_completed_at,
-                        "moderator": moderator_completed_at,
-                    },
-                    "proposer": proposer_output,
-                    "skeptic": skeptic_output,
-                    "moderator": moderator_output,
-                    "judge_decision": effective_decision,
-                    "judge_decision_raw": raw_decision,
-                    "judge_decision_effective": effective_decision,
-                }
+                        raw_decision = _parse_judge_decision(moderator_output)
+                        effective_decision = raw_decision
+                        if raw_decision.startswith("STOP") and global_round_id < cfg.min_rounds_before_stop:
+                            effective_decision = "CONTINUE_MIN_ROUNDS_NOT_MET"
+
+                        round_completed_at = datetime.now(UTC).isoformat()
+                        round_record = {
+                            "round_id": global_round_id,
+                            "review_cycle": review_cycle_id,
+                            "inner_round": inner_round,
+                            "round_started_at": round_started_at,
+                            "proposer_completed_at": proposer_completed_at,
+                            "skeptic_completed_at": skeptic_completed_at,
+                            "moderator_completed_at": moderator_completed_at,
+                            "round_completed_at": round_completed_at,
+                            "reply_timestamps": {
+                                "proposer": proposer_completed_at,
+                                "skeptic": skeptic_completed_at,
+                                "moderator": moderator_completed_at,
+                            },
+                            "proposer": proposer_output,
+                            "skeptic": skeptic_output,
+                            "moderator": moderator_output,
+                            "judge_decision": effective_decision,
+                            "judge_decision_raw": raw_decision,
+                            "judge_decision_effective": effective_decision,
+                        }
+                        # Round succeeded — break out of retry loop
+                        break
+
+                    except Exception as exc:
+                        retry_delay = _ROUND_RETRY_BASE_DELAY * (2 ** (_round_attempt - 1))
+                        logger.warning(
+                            "Round %d attempt %d/%d failed: %s. "
+                            "Retrying in %.0fs...",
+                            global_round_id, _round_attempt, _ROUND_MAX_RETRIES,
+                            exc, retry_delay,
+                        )
+                        if _round_attempt >= _ROUND_MAX_RETRIES:
+                            logger.error(
+                                "Round %d failed after %d attempts. "
+                                "Saving state and stopping debate.",
+                                global_round_id, _ROUND_MAX_RETRIES,
+                            )
+                            stop_reason = f"round_failed_after_retries_round_{global_round_id}"
+                            # Save whatever we have so far
+                            _save_state(
+                                state_file=state_file, topic=topic, rounds=rounds, models=models,
+                                cfg=cfg, reference_count=len(refs) if refs else 0,
+                                stop_reason=stop_reason, status="error",
+                                stage_statuses=stage_statuses, review_cycles=review_cycles_data,
+                                debate_review_cycle=debate_review_cycle, debate_inner_round=debate_inner_round,
+                                prior_reviewer_feedback=prior_reviewer_feedback,
+                            )
+                            break
+                        time.sleep(retry_delay)
+
+                if round_record is None:
+                    # All retries exhausted — exit both loops
+                    break
+
                 rounds.append(round_record)
-                prior_summary = _extract_summary_anchor(moderator_output)
+                prior_summary = _extract_summary_anchor(round_record["moderator"])
 
                 _write_round_artifacts(chat_dir, round_record)
                 _write_interim_outputs(target_run_dir, topic, cfg, refs, rounds, stop_reason)
@@ -340,24 +408,52 @@ def run_chat_mode(
                 if global_round_id >= cfg.min_rounds_before_stop and effective_decision.startswith("STOP"):
                     break
 
+                # Advisory logging only: max_rounds is a soft monitoring hint,
+                # NOT a hard cap.  The per-segment hard limit is
+                # max_inner_debate_rounds (the range bound above).
+                # Total rounds can reach max_review_cycles × max_inner_debate_rounds.
                 if cfg.max_rounds > 0 and global_round_id >= cfg.max_rounds:
-                    if effective_decision == "CONTINUE_NO_TAG":
-                        stop_reason = f"soft_target_reached_missing_judge_tag_{global_round_id}"
-                        break
-                    if effective_decision == "CONTINUE":
-                        stop_reason = f"soft_target_reached_continue_from_round_{global_round_id}"
+                    logger.info(
+                        "Advisory target %d reached (global round %d, cycle %d, "
+                        "inner round %d). Continuing — per-segment limit is %d.",
+                        cfg.max_rounds, global_round_id, review_cycle_id,
+                        inner_round, cfg.max_inner_debate_rounds,
+                    )
 
             # --- Reviewer evaluation after inner loop convergence ---
+            # If all rounds failed, skip reviewer and exit
+            if stop_reason.startswith("round_failed"):
+                break
+
             consensus_file = target_run_dir / "BEST_CONSENSUS.md"
             consensus_text = consensus_file.read_text(encoding="utf-8") if consensus_file.exists() else prior_summary
 
-            reviewer_output = reviewer.run(
-                consensus_document=consensus_text,
-                topic=topic,
-                review_cycle=review_cycle_id,
-                prior_reviewer_feedback=cycle_reviewer_feedback,
-            )
-            review_decision = parse_reviewer_decision(reviewer_output)
+            _REVIEWER_MAX_RETRIES = 3
+            reviewer_output = ""
+            review_decision: dict[str, Any] = {}
+            for _rev_attempt in range(1, _REVIEWER_MAX_RETRIES + 1):
+                try:
+                    reviewer_output = reviewer.run(
+                        consensus_document=consensus_text,
+                        topic=topic,
+                        review_cycle=review_cycle_id,
+                        prior_reviewer_feedback=cycle_reviewer_feedback,
+                    )
+                    review_decision = parse_reviewer_decision(reviewer_output)
+                    break
+                except Exception as exc:
+                    logger.warning(
+                        "Reviewer call attempt %d/%d failed: %s",
+                        _rev_attempt, _REVIEWER_MAX_RETRIES, exc,
+                    )
+                    if _rev_attempt >= _REVIEWER_MAX_RETRIES:
+                        logger.error("Reviewer failed after %d attempts. Stopping.", _REVIEWER_MAX_RETRIES)
+                        stop_reason = f"reviewer_failed_cycle_{review_cycle_id}"
+                        break
+                    time.sleep(15.0 * _rev_attempt)
+
+            if stop_reason.startswith("reviewer_failed"):
+                break
 
             review_cycles_data.append({
                 "review_cycle": review_cycle_id,
@@ -373,7 +469,8 @@ def run_chat_mode(
 
             # Unresolved: inject feedback for next cycle
             issues = review_decision.get("unresolved_issues", [])
-            prior_reviewer_feedback = "\n".join(f"- {iss}" for iss in issues) if issues else reviewer_output[:500]
+            raw_feedback = "\n".join(f"- {iss}" for iss in issues) if issues else reviewer_output[:500]
+            prior_reviewer_feedback = _truncate(raw_feedback, 2000)
             debate_inner_round = 0  # reset inner round counter for next cycle
         else:
             stop_reason = f"max_review_cycles_reached_{cfg.max_review_cycles}"
@@ -414,7 +511,7 @@ def run_chat_mode(
 
     # Build review cycles report
     if review_cycles_data:
-        _write_review_cycles_report(target_run_dir, review_cycles_data)
+        _write_review_cycles_report(target_run_dir, review_cycles_data, chat_dir=chat_dir)
 
     index_file = target_run_dir / "CHAT_MODE_INDEX.md"
     index_file.write_text(
@@ -560,6 +657,7 @@ def _save_state(
                     "drift_check_interval": cfg.drift_check_interval,
                     "max_review_cycles": cfg.max_review_cycles,
                     "max_inner_debate_rounds": cfg.max_inner_debate_rounds,
+                    "context_window_cycles": cfg.context_window_cycles,
                 },
                 "reference_count": reference_count,
                 "stop_reason": stop_reason,
@@ -650,6 +748,7 @@ def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -
             drift_check_interval=max(1, int(cfg.get("drift_check_interval", defaults.drift_check_interval))),
             max_review_cycles=max(0, int(cfg.get("max_review_cycles", defaults.max_review_cycles))),
             max_inner_debate_rounds=max(0, int(cfg.get("max_inner_debate_rounds", defaults.max_inner_debate_rounds))),
+            context_window_cycles=max(1, int(cfg.get("context_window_cycles", defaults.context_window_cycles))),
         )
     except Exception:
         return defaults
@@ -660,13 +759,16 @@ def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -
 # ---------------------------------------------------------------------------
 
 def _collect_chat_references(topic: str, min_references: int) -> list[dict[str, Any]]:
-    refs = collect_references_deepxiv_primary(topic)
+    # DeepXiv API limits queries to ~500 chars; extract a short version for API calls.
+    short_topic = re.sub(r"\s+", " ", topic.strip())[:480]
+
+    refs = collect_references_deepxiv_primary(short_topic)
     if len(refs) >= min_references:
         return refs[:min_references]
 
     extra_topics = [
-        f"{topic} survey",
-        f"{topic} benchmark",
+        f"{short_topic} survey",
+        f"{short_topic} benchmark",
         "multimodal large language model evaluation reliability",
     ]
     pool = list(refs)
@@ -741,26 +843,40 @@ def _chat_generate(
 
 def _build_proposer_user_prompt(
     round_id: int, topic: str, reference_brief: str, prior_summary: str,
-    min_references: int, language: str,
+    min_references: int, language: str, cycle_context: str = "",
+    review_cycle: int = 1, inner_round: int = 1,
+    min_rounds_before_stop: int = 20,
 ) -> str:
     reference_brief = _truncate(reference_brief)
     prior_summary = _truncate(prior_summary or "", _DEBATE_FIELD_MAX)
+    context_block = ""
+    if cycle_context:
+        context_block = f"\nContext from prior review cycles:\n{cycle_context}\n"
+    # Convergence pressure when rounds are high
+    pressure = ""
+    if inner_round > 5:
+        pressure = "\n[CONVERGENCE PRESSURE] This debate segment has run {} rounds. Do NOT restate your core proposal if it has not changed. Either concede established points and advance to new territory, or explicitly state that the core mechanism has been stable and shift to implementation details.\n".format(inner_round)
+    elif round_id > min_rounds_before_stop:
+        pressure = "\n[CONVERGENCE NOTE] Total rounds: {}. Focus on narrowing remaining gaps rather than broadening the discussion.\n".format(round_id)
     return localized_text(
         language,
         (
-            f"Round {round_id}.\n\n"
+            f"Round {round_id} (review cycle {review_cycle}, inner round {inner_round}).\n\n"
             f"Research topic: {topic}\n\n"
             f"Reference digest index (at least {min_references}):\n{reference_brief}\n\n"
-            f"Latest moderator summary: {prior_summary or 'none'}\n\n"
-            "Respond in English. Suggested length: 280-450 words (about 2-4 paragraphs).\n"
-            "Do not self-truncate; keep full reasoning concise.\n"
+            f"Latest moderator summary: {prior_summary or 'none'}\n"
+            f"{context_block}"
+            f"{pressure}"
+            "Respond in English. Suggested max ~4000 characters (~2-4 paragraphs). Full output will be preserved as-is.\n"
             "Provide one strongest and executable path in chat style. Address unresolved tensions before introducing new claims."
         ),
         (
-            f"第 {round_id} 轮。\n\n"
+            f"第 {round_id} 轮 (审查周期 {review_cycle}, 内部轮次 {inner_round})。\n\n"
             f"研究主题: {topic}\n\n"
             f"参考文献摘要索引(至少{min_references}篇):\n{reference_brief}\n\n"
-            f"上一轮裁判总结: {prior_summary or '无'}\n\n"
+            f"上一轮裁判总结: {prior_summary or '无'}\n"
+            f"{context_block}"
+            f"{pressure}"
             "请以聊天风格给出唯一最强且可执行的方案路径，先回应未解争点，再推进新主张。"
         ),
     )
@@ -769,52 +885,72 @@ def _build_proposer_user_prompt(
 def _build_skeptic_user_prompt(
     round_id: int, topic: str, reference_brief: str, proposer_output: str,
     min_references: int, language: str,
+    review_cycle: int = 1, inner_round: int = 1,
+    min_rounds_before_stop: int = 20,
 ) -> str:
     reference_brief = _truncate(reference_brief)
-    proposer_output = _truncate(proposer_output)
+    # Convergence pressure for Skeptic
+    pressure = ""
+    if inner_round > 5:
+        pressure = "\n[CONVERGENCE PRESSURE] This debate segment has run {} rounds. Only raise concerns that would fundamentally invalidate the proposal. If the Proposer adequately addressed your prior concern, acknowledge it. Do not manufacture new edge cases to justify continued debate.\n".format(inner_round)
+    elif round_id > min_rounds_before_stop:
+        pressure = "\n[CONVERGENCE NOTE] Total rounds: {}. Prioritize only decision-blocking concerns. Execution details are not blockers.\n".format(round_id)
     return localized_text(
         language,
         (
-            f"Round {round_id}.\n\n"
+            f"Round {round_id} (review cycle {review_cycle}, inner round {inner_round}).\n\n"
             f"Research topic: {topic}\n\n"
             f"Reference digest index (at least {min_references}):\n{reference_brief}\n\n"
             f"Proposer view:\n{proposer_output}\n\n"
-            "Respond in English. Suggested length: 280-450 words (about 2-4 paragraphs).\n"
-            "Do not self-truncate; keep full reasoning concise.\n"
+            f"{pressure}"
+            "Respond in English. Suggested max ~4000 characters (~2-4 paragraphs). Full output will be preserved as-is.\n"
             "Pressure-test with concrete failure scenarios, boundary conditions, and minimum evidence needed to unblock decisions."
         ),
         (
-            f"第 {round_id} 轮。\n\n"
+            f"第 {round_id} 轮 (审查周期 {review_cycle}, 内部轮次 {inner_round})。\n\n"
             f"研究主题: {topic}\n\n"
             f"参考文献摘要索引(至少{min_references}篇):\n{reference_brief}\n\n"
             f"正方观点:\n{proposer_output}\n\n"
-            "请给出具体失败场景、边界条件与最小补证动作，优先指出真正影响决策的关键风险。"
+            f"{pressure}"
+            "建议不超过4000字符（约2-4段），输出将完整保留。请给出具体失败场景、边界条件与最小补证动作，优先指出真正影响决策的关键风险。"
         ),
     )
 
 
 def _build_moderator_user_prompt(
     round_id: int, topic: str, proposer_output: str, skeptic_output: str, language: str,
+    review_cycle: int = 1, inner_round: int = 1,
+    min_rounds_before_stop: int = 20,
 ) -> str:
-    proposer_output = _truncate(proposer_output)
-    skeptic_output = _truncate(skeptic_output)
+    # Add convergence context for moderator
+    convergence_context = ""
+    if inner_round > 3:
+        convergence_context = f"\n[ROUND CONTEXT] This is inner round {inner_round} of review cycle {review_cycle}. "
+        if inner_round > 8:
+            convergence_context += "The debate has run many rounds. Apply your REPETITION CHECK strictly — if both sides are rephrasing, you MUST issue STOP.\n"
+        else:
+            convergence_context += "Check whether this debate segment is converging or repeating.\n"
+    if round_id > min_rounds_before_stop:
+        convergence_context += f"[TOTAL ROUNDS] {round_id} rounds completed across all cycles. Default strongly toward STOP unless a genuinely new, decision-blocking concern has emerged this round.\n"
     return localized_text(
         language,
         (
-            f"Round {round_id}.\n\n"
+            f"Round {round_id} (review cycle {review_cycle}, inner round {inner_round}).\n\n"
             f"Research topic: {topic}\n\n"
             f"Proposer:\n{proposer_output}\n\n"
             f"Skeptic:\n{skeptic_output}\n\n"
-            "Respond in English. Suggested length: 240-420 words (about 2-4 paragraphs).\n"
-            "Do not self-truncate; ensure the final line contains an exact [JUDGE_DECISION] tag.\n"
+            f"{convergence_context}"
+            "Respond in English. Suggested max ~4000 characters (~2-4 paragraphs). Full output will be preserved as-is.\n"
+            "Ensure the final line contains an exact [JUDGE_DECISION] tag.\n"
             "Issue a convergence-focused ruling with one decisive next focus, then end with the exact [JUDGE_DECISION] marker."
         ),
         (
-            f"第 {round_id} 轮。\n\n"
+            f"第 {round_id} 轮 (审查周期 {review_cycle}, 内部轮次 {inner_round})。\n\n"
             f"研究主题: {topic}\n\n"
             f"正方:\n{proposer_output}\n\n"
             f"反方:\n{skeptic_output}\n\n"
-            "请给出收敛导向裁决、唯一关键下一轮焦点，并在最后一行输出精确的 [JUDGE_DECISION] 标记。"
+            f"{convergence_context}"
+            "建议不超过4000字符（约2-4段），输出将完整保留。请给出收敛导向裁决、唯一关键下一轮焦点，并在最后一行输出精确的 [JUDGE_DECISION] 标记。"
         ),
     )
 
@@ -872,6 +1008,45 @@ def _extract_summary_anchor(moderator_output: str) -> str:
     return text[:220] + "..."
 
 
+def _build_cycle_context_window(
+    rounds: list[dict[str, Any]],
+    current_review_cycle: int,
+    context_window_cycles: int,
+    max_summary_chars: int = 600,
+) -> str:
+    """Build a compact summary of the last N completed review cycles for LLM context.
+
+    Only includes cycles that are fully completed (i.e., have a cycle number
+    strictly less than the current one).  Returns an empty string if no prior
+    cycles exist or the window size is 0.
+    """
+    if context_window_cycles <= 0:
+        return ""
+
+    # Collect the last moderator output per completed cycle
+    cycle_summaries: dict[int, str] = {}
+    for r in rounds:
+        cid = int(r.get("review_cycle", 0))
+        if cid < current_review_cycle:
+            cycle_summaries[cid] = r.get("moderator", "")
+
+    if not cycle_summaries:
+        return ""
+
+    # Keep only the most recent N cycles
+    recent_cids = sorted(cycle_summaries.keys())[-context_window_cycles:]
+    parts: list[str] = []
+    for cid in recent_cids:
+        summary = _extract_summary_anchor(cycle_summaries[cid])
+        if summary:
+            parts.append(f"[Cycle {cid} final moderator summary]: {summary}")
+
+    context = "\n".join(parts)
+    if len(context) > max_summary_chars:
+        context = context[:max_summary_chars] + "\n...[context window truncated]"
+    return context
+
+
 def _title_key(ref: dict[str, Any]) -> str:
     return re.sub(r"\s+", " ", str(ref.get("title", "")).strip()).lower()
 
@@ -898,13 +1073,20 @@ def _build_reference_brief(refs: list[dict[str, Any]], max_items: int, language:
 
 
 def _write_round_artifacts(chat_dir: Path, record: dict[str, Any]) -> None:
+    """Write per-round artifacts into a review-cycle subfolder."""
     rid = int(record["round_id"])
-    (chat_dir / f"round_{rid:02d}_proposer.md").write_text(record["proposer"].strip() + "\n", encoding="utf-8")
-    (chat_dir / f"round_{rid:02d}_skeptic.md").write_text(record["skeptic"].strip() + "\n", encoding="utf-8")
-    (chat_dir / f"round_{rid:02d}_moderator.md").write_text(record["moderator"].strip() + "\n", encoding="utf-8")
-    (chat_dir / f"round_{rid:02d}.md").write_text(
+    cycle_id = int(record.get("review_cycle", 1))
+    inner_rid = int(record.get("inner_round", rid))
+
+    cycle_dir = chat_dir / f"review_cycle_{cycle_id:02d}"
+    cycle_dir.mkdir(parents=True, exist_ok=True)
+
+    (cycle_dir / f"round_{inner_rid:02d}_proposer.md").write_text(record["proposer"].strip() + "\n", encoding="utf-8")
+    (cycle_dir / f"round_{inner_rid:02d}_skeptic.md").write_text(record["skeptic"].strip() + "\n", encoding="utf-8")
+    (cycle_dir / f"round_{inner_rid:02d}_moderator.md").write_text(record["moderator"].strip() + "\n", encoding="utf-8")
+    (cycle_dir / f"round_{inner_rid:02d}.md").write_text(
         "\n\n".join([
-            f"# Round {rid}",
+            f"# Round {rid} (cycle {cycle_id}, inner {inner_rid})",
             f"time: {record.get('round_started_at', '')} -> {record.get('round_completed_at', '')}",
             f"decision(raw/effective): {record.get('judge_decision_raw', '')} / {record.get('judge_decision_effective', '')}",
             f"## Proposer\n{record['proposer'].strip()}",
@@ -942,21 +1124,35 @@ def _write_interim_consensus(topic: str, rounds: list[dict[str, Any]], output_fi
 
 def _build_transcript(topic: str, rounds: list[dict[str, Any]]) -> str:
     lines = ["# CHAT_TRANSCRIPT", "", f"topic: {topic}", ""]
+    last_cycle = None
     for item in rounds:
         rid = int(item["round_id"])
+        cycle = item.get("review_cycle")
+        inner = item.get("inner_round", rid)
+        # Insert cycle header when cycle changes
+        if cycle != last_cycle:
+            if last_cycle is not None:
+                lines.append("")
+            lines.extend([
+                f"---", "",
+                f"## Review Cycle {cycle}" if cycle else f"## Debate", "",
+            ])
+            last_cycle = cycle
         lines.extend([
-            f"## Round {rid}", "",
+            f"### Round {rid} (inner {inner})", "",
             f"time: {item.get('round_started_at', '')} -> {item.get('round_completed_at', '')}",
             f"decision(raw/effective): {item.get('judge_decision_raw', '')} / {item.get('judge_decision_effective', '')}",
-            "", f"### Proposer\n{item['proposer']}", "",
-            f"### Skeptic\n{item['skeptic']}", "",
-            f"### Moderator\n{item['moderator']}", "",
+            "", f"#### Proposer\n{item['proposer']}", "",
+            f"#### Skeptic\n{item['skeptic']}", "",
+            f"#### Moderator\n{item['moderator']}", "",
             f"Decision: {item.get('judge_decision', 'CONTINUE')}", "",
         ])
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _write_review_cycles_report(run_dir: Path, review_cycles: list[dict[str, Any]]) -> None:
+def _write_review_cycles_report(
+    run_dir: Path, review_cycles: list[dict[str, Any]], chat_dir: Path | None = None,
+) -> None:
     lines = ["# Review Cycles Report", ""]
     for cycle in review_cycles:
         lines.extend([
@@ -966,6 +1162,17 @@ def _write_review_cycles_report(run_dir: Path, review_cycles: list[dict[str, Any
             f"### Reviewer Output", "",
             str(cycle.get("reviewer_output", "")), "",
         ])
+        # Also write reviewer output to the per-cycle folder
+        if chat_dir is not None:
+            cycle_id = int(cycle.get("review_cycle", 0))
+            cycle_dir = chat_dir / f"review_cycle_{cycle_id:02d}"
+            cycle_dir.mkdir(parents=True, exist_ok=True)
+            (cycle_dir / "reviewer_output.md").write_text(
+                f"# Reviewer Output — Cycle {cycle_id}\n\n"
+                f"Decision: {cycle.get('review_decision', 'UNKNOWN')}\n\n"
+                f"## Full Output\n\n{cycle.get('reviewer_output', '')}\n",
+                encoding="utf-8",
+            )
     (run_dir / "REVIEW_CYCLES.md").write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -999,7 +1206,7 @@ def _build_index(
         "| AUTO_REVIEW.md | Auto-review logs |",
         "| REVIEW_CYCLES.md | Review cycles report |",
         "| chat_mode_state.json | Structured state with timestamps |",
-        "| chat_rounds/ | Per-round artifacts |", "",
+        "| chat_rounds/ | Per-cycle folders (review_cycle_XX/) with per-round artifacts and reviewer output |", "",
         f"completed_debate_rounds: {len(rounds)}",
         f"completed_review_cycles: {len(review_cycles or [])}",
     ]
