@@ -158,7 +158,12 @@ class LLMClient:
         }
         try:
             data = _post_json_with_retry(url, headers, payload)
-            text = data["choices"][0]["message"].get("content")
+            # Some gateways return 200 with an empty/missing choices array;
+            # treat malformed shapes like empty content and fall back to streaming.
+            try:
+                text = data["choices"][0]["message"].get("content")
+            except (KeyError, IndexError, AttributeError, TypeError):
+                text = None
             if isinstance(text, str) and text.strip():
                 return text
         except requests.exceptions.HTTPError as exc:
