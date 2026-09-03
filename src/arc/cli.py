@@ -208,18 +208,18 @@ def chat_mode(
     moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
     output_dir: str = typer.Option("reports", help="Output directory"),
     resume: bool = typer.Option(False, help="Resume from latest run directory"),
-    min_rounds_before_stop: int = typer.Option(
-        20,
-        help="Minimum rounds before judge is allowed to stop when convergence is reached",
+    min_rounds_before_stop: Optional[int] = typer.Option(
+        None,
+        help="Minimum rounds before judge is allowed to stop (default: configs/chat_mode.yaml)",
     ),
-    max_rounds: int = typer.Option(
-        60,
-        help="Advisory round target; judge decision still controls stop. Set 0 to disable the target hint.",
+    max_rounds: Optional[int] = typer.Option(
+        None,
+        help="Advisory round target; judge decision still controls stop. 0 disables the hint. (default: configs/chat_mode.yaml)",
     ),
-    export_best_consensus: bool = typer.Option(
-        True,
+    export_best_consensus: Optional[bool] = typer.Option(
+        None,
         "--export-best-consensus/--no-export-best-consensus",
-        help="Generate BEST_CONSENSUS.md automatically",
+        help="Generate BEST_CONSENSUS.md automatically (default: configs/chat_mode.yaml)",
     ),
     gpt_effort: str = typer.Option(
         "medium", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
@@ -227,12 +227,12 @@ def chat_mode(
         "high", help="GPT output verbosity: low|medium|high"),
     prompt_language: str = typer.Option(
         "en", help="Prompt language for chat iteration: en|zh"),
-    max_review_cycles: int = typer.Option(
-        99, help="Maximum review cycles (outer loop). 0 = unlimited."),
-    max_inner_rounds: int = typer.Option(
-        99, help="Maximum inner debate rounds per review cycle. 0 = unlimited."),
-    drift_interval: int = typer.Option(
-        5, help="Run drift monitor every N inner rounds."),
+    max_review_cycles: Optional[int] = typer.Option(
+        None, help="Maximum review cycles (outer loop). 0 = unlimited. (default: configs/chat_mode.yaml)"),
+    max_inner_rounds: Optional[int] = typer.Option(
+        None, help="Maximum inner debate rounds per review cycle. 0 = unlimited. (default: configs/chat_mode.yaml)"),
+    drift_interval: Optional[int] = typer.Option(
+        None, help="Run drift monitor every N inner rounds. (default: configs/chat_mode.yaml)"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
