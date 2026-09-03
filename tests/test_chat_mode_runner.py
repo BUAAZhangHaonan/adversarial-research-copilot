@@ -213,6 +213,16 @@ def test_parse_judge_decision_without_tag_returns_continue_no_tag() -> None:
     assert cmr._parse_judge_decision(text) == "CONTINUE_NO_TAG"
 
 
+def test_effective_round_bounds_zero_means_unlimited() -> None:
+    cfg = _base_config(max_review_cycles=0, max_inner_debate_rounds=0)
+    max_cycles, max_inner = cmr._effective_round_bounds(cfg)
+    assert max_cycles >= cmr._UNLIMITED_ROUNDS
+    assert max_inner >= cmr._UNLIMITED_ROUNDS
+
+    cfg = _base_config(max_review_cycles=3, max_inner_debate_rounds=7)
+    assert cmr._effective_round_bounds(cfg) == (3, 7)
+
+
 def test_chat_mode_smoke_generates_references_file(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

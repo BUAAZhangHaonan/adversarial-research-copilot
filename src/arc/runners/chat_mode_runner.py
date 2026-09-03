@@ -83,6 +83,17 @@ class ChatModeConfig:
     context_window_cycles: int = 3  # how many past review cycles to keep in LLM context
 
 
+# Sentinel bound for "0 = unlimited" loop limits (documented in configs and CLI help).
+_UNLIMITED_ROUNDS = 10**6
+
+
+def _effective_round_bounds(cfg: ChatModeConfig) -> tuple[int, int]:
+    """Resolve (max_review_cycles, max_inner_debate_rounds), treating 0 as unlimited."""
+    max_cycles = cfg.max_review_cycles if cfg.max_review_cycles > 0 else _UNLIMITED_ROUNDS
+    max_inner = cfg.max_inner_debate_rounds if cfg.max_inner_debate_rounds > 0 else _UNLIMITED_ROUNDS
+    return max_cycles, max_inner
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -237,12 +248,13 @@ def run_chat_mode(
         drift_monitor = DriftMonitorAgent(client, models["moderator"], cfg.prompt_language, mode="chat")
         reviewer = ReviewerAgent(client, models["skeptic"], cfg.prompt_language, mode="chat")
 
-        for review_cycle_id in range(start_cycle, cfg.max_review_cycles + 1):
+        effective_max_cycles, effective_max_inner = _effective_round_bounds(cfg)
+        for review_cycle_id in range(start_cycle, effective_max_cycles + 1):
             # Inject reviewer feedback from previous cycle
             cycle_reviewer_feedback = prior_reviewer_feedback if review_cycle_id == start_cycle and prior_reviewer_feedback else ""
             cycle_start_round = start_inner if review_cycle_id == start_cycle else 1
 
-            for inner_round in range(cycle_start_round, cfg.max_inner_debate_rounds + 1):
+            for inner_round in range(cycle_start_round, effective_max_inner + 1):
                 global_round_id = len(rounds) + 1
                 round_started_at = datetime.now(UTC).isoformat()
 
