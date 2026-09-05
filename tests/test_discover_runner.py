@@ -721,3 +721,50 @@ def test_rejection_log_records_conditional_kills_with_reopen(
     assert idea_kill["kill_evidence_type"] == "duplicate"
     assert "does not cover the candidate's conditions" in idea_kill["reopen_condition"]
     assert "reopen" in (run_dir / "REJECTION_LOG.md").read_text(encoding="utf-8").lower()
+
+
+def test_stress_test_passes_full_brief_and_cross_models(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Stress tests receive the full candidate brief and a skeptic from a
+    different model than the proposer (review 一.5)."""
+    captured: dict[str, Any] = {}
+
+    import arc.runners.chat_mode_runner as cmr
+
+    def fake_run_chat_mode(**kwargs):
+        captured.update(kwargs)
+        run_dir = Path(kwargs["run_dir"])
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "chat_mode_state.json").write_text("{}", encoding="utf-8")
+        return run_dir / "CHAT_TRANSCRIPT.md", run_dir / "chat_mode_state.json"
+
+    monkeypatch.setattr("arc.runners.chat_mode_runner.run_chat_mode", fake_run_chat_mode)
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True)
+    ideas = [{"id": "I1", "one_sentence_problem": "Does X fail under Y?",
+              "gap_evidence": "[a1] both admit", "who_needs_it": "builders",
+              "why_now": "new logs", "minimal_falsifiable_test": "oracle replay on 100 failures",
+              "anti_scope": "not a benchmark"}]
+    judgments = [{"id": "I1", "verdict": "KEEP", "reason": "new question",
+                  "knowledge_gain": "failure attribution"}]
+    (run_dir / "ideas.json").write_text(json.dumps(ideas), encoding="utf-8")
+    (run_dir / "judgments.json").write_text(json.dumps(judgments), encoding="utf-8")
+    (run_dir / "duplicate_checks.json").write_text(json.dumps([
+        {"idea_id": "I1", "novelty_verdict": "DISTINCT",
+         "closest_works": ["Prior W"], "differentiation": "delta D"}]), encoding="utf-8")
+
+    state = dr.DiscoverState(
+        topic="t", models={"generator": "flash", "judge": "pro"},
+        config=dr.DiscoverConfig(stress_test=True, stress_rounds=4))
+
+    dr._run_stress_test(run_dir, state)
+
+    assert captured["proposer_model"] == "flash"
+    assert captured["skeptic_model"] == "pro", "skeptic must differ from proposer"
+    assert captured["moderator_model"] == "pro"
+    topic = captured["topic"]
+    for marker in ("oracle replay on 100 failures", "not a benchmark", "delta D", "Prior W"):
+        assert marker in topic, f"brief lost evidence: {marker}"

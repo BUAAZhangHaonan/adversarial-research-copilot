@@ -854,24 +854,51 @@ def _run_stress_test(run_dir: Path, state: DiscoverState) -> None:
     judgments = json.loads(_read_text(run_dir / "judgments.json"))
     ideas = {i.get("id"): i for i in json.loads(_read_text(run_dir / "ideas.json"))}
     keeps = [j for j in judgments if str(j.get("verdict", "")).upper() == "KEEP"][: cfg.stress_top_k]
+    dedup_by_id = {str(c.get("idea_id")): c for c in
+                   _as_list_of_dicts(_load_json(run_dir / "duplicate_checks.json"))}
+
+    def _idea_brief(idea: dict[str, Any], judgment: dict[str, Any]) -> str:
+        """Full candidate brief, not a bare sentence: the stress test must start
+        from the accumulated evidence and boundaries, and it must NOT re-run a
+        literature pipeline from scratch around a one-liner (review 一.5)."""
+        dedup = dedup_by_id.get(str(idea.get("id", "")), {})
+        parts = [
+            f"Research problem to stress-test: {idea.get('one_sentence_problem', '')}",
+            f"Gap evidence: {idea.get('gap_evidence', '')}",
+            f"Who needs it: {idea.get('who_needs_it', '')}",
+            f"Why now: {idea.get('why_now', '')}",
+            f"Minimal falsifiable test (proposed): {idea.get('minimal_falsifiable_test', '')}",
+            f"Anti-scope (what this is NOT): {idea.get('anti_scope', '')}",
+            f"Taste-gate verdict: {judgment.get('verdict', '')} — {judgment.get('reason', '')}",
+            f"Knowledge gain claimed: {judgment.get('knowledge_gain', '')}",
+        ]
+        if dedup:
+            parts.append(
+                f"Closest prior work: {'; '.join(str(w) for w in (dedup.get('closest_works') or [])[:3])}")
+            parts.append(f"Novelty differentiation: {dedup.get('differentiation', '')}")
+        return "\n".join(p for p in parts if str(p).strip())
+
     manifest: list[dict[str, str]] = []
     for j in keeps:
         idea = ideas.get(j.get("id"))
         if not idea:
             continue
-        problem = str(idea.get("one_sentence_problem", "")).strip()
-        if not problem:
+        brief = _idea_brief(idea, j)
+        if not brief:
             continue
-        slug = re.sub(r"[^a-z0-9]+", "_", problem.lower()).strip("_")[:30] or "idea"
+        slug = re.sub(r"[^a-z0-9]+", "_", str(idea.get("one_sentence_problem", "")).lower()).strip("_")[:30] or "idea"
         stress_dir = run_dir / "stress_tests"
         stress_dir.mkdir(parents=True, exist_ok=True)
         target = stress_dir / slug
         target.mkdir(parents=True, exist_ok=True)
         try:
             run_chat_mode(
-                topic=problem,
+                topic=brief,
                 proposer_model=state.models["generator"],
-                skeptic_model=state.models["generator"],
+                # Cross-model adversarial setup (review 一.5): the skeptic is
+                # deliberately the judge model — a different model family from
+                # the generator whenever the role split is configured.
+                skeptic_model=state.models["judge"],
                 moderator_model=state.models["judge"],
                 output_dir=str(run_dir),
                 resume=False,
@@ -883,11 +910,13 @@ def _run_stress_test(run_dir: Path, state: DiscoverState) -> None:
                 max_inner_debate_rounds=cfg.stress_rounds,
                 run_dir=str(target),
             )
-            manifest.append({"idea_id": str(j.get("id")), "problem": problem,
+            manifest.append({"idea_id": str(j.get("id")),
+                             "problem": idea.get("one_sentence_problem", ""),
                              "run_dir": str(target)})
         except Exception as exc:  # stress test is best-effort
             logger.warning("stress test failed for %s: %s", j.get("id"), exc)
-            manifest.append({"idea_id": str(j.get("id")), "problem": problem,
+            manifest.append({"idea_id": str(j.get("id")),
+                             "problem": idea.get("one_sentence_problem", ""),
                              "error": str(exc)})
     (run_dir / "STRESS_TESTS.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
