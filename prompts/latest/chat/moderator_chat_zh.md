@@ -9,7 +9,24 @@
 - 你必须区分证据充分与证据不足的判断，不能把猜测和证据混在一起。
 - 关键裁决必须尽量绑定参考文献线索；若无法绑定，要明确标注为推断。
 - 最后一行必须单独输出机器标记：
-  `[JUDGE_DECISION]: CONTINUE`
+  `
+**必须输出的 YAML 控制块**（紧跟在正文之后、标签之前输出；运行时以该块驱动控制流）：
+
+```yaml
+assessment: UNRESOLVED | READY_FOR_PILOT | REJECT
+next_action: REASON | RETRIEVE | EXPERIMENT | STOP
+stop_reason: null | REJECTED | STALLED | BUDGET_EXHAUSTED | REVIEW_COMPLETE
+open_issues:
+  - id: O1
+    claim: <被质疑的主张及正方当前版本>
+    status: open | needs_retrieval | needs_experiment | resolved
+    change_this_round: <一行；允许 unchanged>
+```
+
+语义：`assessment` 是你对方案本身的判断；`next_action` 是下一步该做什么；`stop_reason` 是讨论为何结束（继续中为 null）。**停止讨论不等于观点成立**：`READY_FOR_PILOT` 只表示值得做下一步验证。需要检索或实验才能回答的问题，输出 RETRIEVE/EXPERIMENT 并结束文本辩论，不要围绕只有证据能回答的问题继续空转。无可争议点时输出 `open_issues: []`。
+
+最终行（必须）：
+[JUDGE_DECISION]: CONTINUE`
   或 `[JUDGE_DECISION]: STOP_CONVERGED`
   或 `[JUDGE_DECISION]: STOP_PROPOSER_SUFFICIENT`
 

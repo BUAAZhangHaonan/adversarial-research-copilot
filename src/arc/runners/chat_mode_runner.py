@@ -248,6 +248,13 @@ def run_chat_mode(
         drift_monitor = DriftMonitorAgent(client, models["moderator"], cfg.prompt_language, mode="chat")
         reviewer = ReviewerAgent(client, models["skeptic"], cfg.prompt_language, mode="chat")
 
+        # Research object grounding (review R4): the debate argues about the
+        # artifacts the pre-debate stages already paid for.
+        research_object = _build_research_object(target_run_dir)
+        open_issues_text = ""
+        pending_actions: list[dict[str, Any]] = list(
+            (resume_state or {}).get("pending_actions", []) or [])
+
         effective_max_cycles, effective_max_inner = _effective_round_bounds(cfg)
         for review_cycle_id in range(start_cycle, effective_max_cycles + 1):
             # Reviewer feedback from the previous cycle must reach this cycle's
@@ -312,6 +319,8 @@ def run_chat_mode(
                                         language=cfg.prompt_language, cycle_context=cycle_context,
                                         review_cycle=review_cycle_id, inner_round=inner_round,
                                         min_rounds_before_stop=cfg.min_rounds_before_stop,
+                                        research_object=research_object if not rounds else "",
+                                        open_issues_text=open_issues_text,
                                     ) + proposer_extra,
                                     max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
                                     language=cfg.prompt_language,
@@ -333,6 +342,8 @@ def run_chat_mode(
                                         language=cfg.prompt_language,
                                         review_cycle=review_cycle_id, inner_round=inner_round,
                                         min_rounds_before_stop=cfg.min_rounds_before_stop,
+                                        research_object=research_object if not rounds else "",
+                                        open_issues_text=open_issues_text,
                                     ),
                                     max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
                                     language=cfg.prompt_language,
@@ -363,6 +374,16 @@ def run_chat_mode(
                         if raw_decision.startswith("STOP") and global_round_id < cfg.min_rounds_before_stop:
                             effective_decision = "CONTINUE_MIN_ROUNDS_NOT_MET"
 
+                        # Structured control (assessment / next_action /
+                        # stop_reason / open_issues). Missing/invalid YAML is a
+                        # protocol degradation: fall back to the tag and mark it.
+                        structured = _parse_moderator_structured(moderator_output)
+                        structured_ok = structured is not None
+                        if not structured_ok:
+                            logger.warning(
+                                "Round %d moderator output missing valid control YAML; "
+                                "falling back to [JUDGE_DECISION] tag.", global_round_id)
+
                         round_completed_at = datetime.now(UTC).isoformat()
                         round_record = {
                             "round_id": global_round_id,
@@ -384,6 +405,11 @@ def run_chat_mode(
                             "judge_decision": effective_decision,
                             "judge_decision_raw": raw_decision,
                             "judge_decision_effective": effective_decision,
+                            "structured_ok": structured_ok,
+                            "assessment": structured["assessment"] if structured else None,
+                            "next_action": structured["next_action"] if structured else None,
+                            "structured_stop_reason": structured["stop_reason"] if structured else None,
+                            "open_issues": structured["open_issues"] if structured else [],
                         }
                         # Round succeeded — break out of retry loop
                         break
@@ -411,6 +437,7 @@ def run_chat_mode(
                                 stage_statuses=stage_statuses, review_cycles=review_cycles_data,
                                 debate_review_cycle=debate_review_cycle, debate_inner_round=debate_inner_round,
                                 prior_reviewer_feedback=prior_reviewer_feedback,
+                                pending_actions=pending_actions,
                             )
                             break
                         time.sleep(retry_delay)
@@ -421,6 +448,9 @@ def run_chat_mode(
 
                 rounds.append(round_record)
                 prior_summary = _extract_summary_anchor(round_record["moderator"])
+                # Refresh the issue ledger for the next round's debaters.
+                open_issues_text = _build_open_issues_text(
+                    structured if structured else None)
 
                 _write_round_artifacts(chat_dir, round_record)
                 _write_interim_outputs(target_run_dir, topic, cfg, refs, rounds, stop_reason)
@@ -433,11 +463,31 @@ def run_chat_mode(
                     stage_statuses=stage_statuses, review_cycles=review_cycles_data,
                     debate_review_cycle=debate_review_cycle, debate_inner_round=debate_inner_round,
                     prior_reviewer_feedback=prior_reviewer_feedback,
+                    pending_actions=pending_actions,
                 )
 
-                # Inner loop stopping conditions
-                if global_round_id >= cfg.min_rounds_before_stop and effective_decision.startswith("STOP"):
-                    break
+                # Inner loop stopping conditions. Structured next_action drives
+                # control when present (review 四.3): RETRIEVE/EXPERIMENT end the
+                # TEXT debate and record what external work is needed — the
+                # debate must not keep circling questions only evidence can
+                # answer. Tag-based STOP remains the fallback.
+                next_action = structured["next_action"] if structured else None
+                if global_round_id >= cfg.min_rounds_before_stop:
+                    if next_action in {"STOP", "RETRIEVE", "EXPERIMENT"}:
+                        if next_action in {"RETRIEVE", "EXPERIMENT"}:
+                            issue_ids = [
+                                i["id"] for i in (structured.get("open_issues") or [])
+                                if i.get("status") in {"needs_retrieval", "needs_experiment"}]
+                            pending_actions.append({
+                                "type": next_action.lower(),
+                                "round": global_round_id,
+                                "serves_issues": issue_ids,
+                                "judge_note": _extract_summary_anchor(moderator_output),
+                            })
+                            stop_reason = f"moderator_next_action_{next_action}"
+                        break
+                    if effective_decision.startswith("STOP"):
+                        break
 
                 # Hard budget cap: max_rounds is a true upper bound on total
                 # debate rounds across all review cycles (0 = unlimited).
@@ -446,8 +496,10 @@ def run_chat_mode(
                     break
 
             # --- Reviewer evaluation after inner loop convergence ---
-            # If all rounds failed or the hard cap fired, skip reviewer and exit
-            if stop_reason.startswith(("round_failed", "max_rounds")):
+            # Skip the reviewer when the judge already routed the question to
+            # external work: reopening a pure-text cycle around a question only
+            # evidence can answer is exactly the failure mode to avoid.
+            if stop_reason.startswith(("round_failed", "max_rounds", "moderator_next_action")):
                 break
 
             consensus_file = target_run_dir / "BEST_CONSENSUS.md"
@@ -552,6 +604,21 @@ def run_chat_mode(
     if review_cycles_data:
         _write_review_cycles_report(target_run_dir, review_cycles_data, chat_dir=chat_dir)
 
+    if pending_actions:
+        lines = ["# PENDING_ACTIONS", "",
+                 "External work the judge routed out of the text debate.",
+                 "Stopping the discussion is not an endorsement; these items are the",
+                 "conditions under which the open questions can actually be settled.", ""]
+        for i, action in enumerate(pending_actions, 1):
+            serves = ", ".join(action.get("serves_issues", [])) or "-"
+            lines += [
+                f"## {i}. {action.get('type', '?').upper()} (requested at round {action.get('round', '?')})",
+                f"- serves issues: {serves}",
+                f"- judge note: {action.get('judge_note', '')}",
+                "",
+            ]
+        (target_run_dir / "PENDING_ACTIONS.md").write_text("\n".join(lines), encoding="utf-8")
+
     index_file = target_run_dir / "CHAT_MODE_INDEX.md"
     index_file.write_text(
         _build_index(target_run_dir, cfg, len(refs), rounds, stop_reason, consensus_file, review_cycles_data),
@@ -572,6 +639,7 @@ def run_chat_mode(
             stage_statuses=stage_statuses, review_cycles=review_cycles_data,
             debate_review_cycle=debate_review_cycle, debate_inner_round=debate_inner_round,
             prior_reviewer_feedback=prior_reviewer_feedback,
+            pending_actions=pending_actions,
         )
 
     return transcript_file, state_file
@@ -686,6 +754,7 @@ def _save_state(
     debate_review_cycle: int = 0,
     debate_inner_round: int = 0,
     prior_reviewer_feedback: str = "",
+    pending_actions: list[dict[str, Any]] | None = None,
 ) -> None:
     state_file.write_text(
         json.dumps(
@@ -713,6 +782,7 @@ def _save_state(
                 "debate_review_cycle": debate_review_cycle,
                 "debate_inner_round": debate_inner_round,
                 "prior_reviewer_feedback": prior_reviewer_feedback,
+                "pending_actions": pending_actions or [],
                 "timestamp": datetime.now(UTC).isoformat(),
             },
             ensure_ascii=False,
@@ -912,12 +982,17 @@ def _build_proposer_user_prompt(
     min_references: int, language: str, cycle_context: str = "",
     review_cycle: int = 1, inner_round: int = 1,
     min_rounds_before_stop: int = 20,
+    research_object: str = "", open_issues_text: str = "",
 ) -> str:
     reference_brief = _truncate(reference_brief)
     prior_summary = _truncate(prior_summary or "", _DEBATE_FIELD_MAX)
     context_block = ""
     if cycle_context:
         context_block = f"\nContext from prior review cycles:\n{cycle_context}\n"
+    if research_object:
+        context_block += f"\n[RESEARCH OBJECT]\n{_truncate(research_object, _DEBATE_FIELD_MAX)}\n"
+    if open_issues_text:
+        context_block += f"\n[OPEN ISSUES]\n{open_issues_text}\n"
     # Convergence pressure when rounds are high
     pressure = ""
     if inner_round > 5:
@@ -953,9 +1028,15 @@ def _build_skeptic_user_prompt(
     min_references: int, language: str,
     review_cycle: int = 1, inner_round: int = 1,
     min_rounds_before_stop: int = 20,
+    research_object: str = "", open_issues_text: str = "",
 ) -> str:
     reference_brief = _truncate(reference_brief)
     proposer_output = _truncate(proposer_output)
+    grounding_block = ""
+    if research_object:
+        grounding_block += f"\n[RESEARCH OBJECT]\n{_truncate(research_object, _DEBATE_FIELD_MAX)}\n"
+    if open_issues_text:
+        grounding_block += f"\n[OPEN ISSUES]\n{open_issues_text}\n"
     # Convergence pressure for Skeptic
     pressure = ""
     if inner_round > 5:
@@ -968,6 +1049,7 @@ def _build_skeptic_user_prompt(
             f"Round {round_id} (review cycle {review_cycle}, inner round {inner_round}).\n\n"
             f"Research topic: {topic}\n\n"
             f"Reference digest index (at least {min_references}):\n{reference_brief}\n\n"
+            f"{grounding_block}"
             f"Proposer view:\n{proposer_output}\n\n"
             f"{pressure}"
             "Respond in English. Suggested max ~4000 characters (~2-4 paragraphs). Full output will be preserved as-is.\n"
@@ -977,6 +1059,7 @@ def _build_skeptic_user_prompt(
             f"第 {round_id} 轮 (审查周期 {review_cycle}, 内部轮次 {inner_round})。\n\n"
             f"研究主题: {topic}\n\n"
             f"参考文献摘要索引(至少{min_references}篇):\n{reference_brief}\n\n"
+            f"{grounding_block}"
             f"正方观点:\n{proposer_output}\n\n"
             f"{pressure}"
             "建议不超过4000字符（约2-4段），输出将完整保留。请给出具体失败场景、边界条件与最小补证动作，优先指出真正影响决策的关键风险。"
@@ -1010,7 +1093,7 @@ def _build_moderator_user_prompt(
             f"Skeptic:\n{skeptic_output}\n\n"
             f"{convergence_context}"
             "Respond in English. Suggested max ~4000 characters (~2-4 paragraphs). Full output will be preserved as-is.\n"
-            "Ensure the final line contains an exact [JUDGE_DECISION] tag.\n"
+            "Emit the control YAML block (assessment / next_action / stop_reason / open_issues), then end with the exact [JUDGE_DECISION] tag.\n"
             "Issue a convergence-focused ruling with one decisive next focus, then end with the exact [JUDGE_DECISION] marker."
         ),
         (
@@ -1042,6 +1125,77 @@ def _parse_judge_decision(moderator_output: str) -> str:
     if re.search(r"\bCONTINUE\b", text_upper):
         return "CONTINUE"
     return "CONTINUE_NO_TAG"
+
+
+_ASSESSMENT_VALUES = {"UNRESOLVED", "READY_FOR_PILOT", "REJECT"}
+_NEXT_ACTION_VALUES = {"REASON", "RETRIEVE", "EXPERIMENT", "STOP"}
+_STOP_REASON_VALUES = {"REJECTED", "STALLED", "BUDGET_EXHAUSTED", "REVIEW_COMPLETE", None}
+
+
+def _parse_moderator_structured(text: str) -> dict[str, Any] | None:
+    """Parse the moderator's control YAML (assessment / next_action /
+    stop_reason / open_issues). Returns None on protocol failure — the runner
+    then falls back to the [JUDGE_DECISION] tag and marks the round degraded."""
+    payload = _parse_yaml_block(text)
+    if not isinstance(payload, dict):
+        return None
+    assessment = str(payload.get("assessment", "")).strip().upper()
+    next_action = str(payload.get("next_action", "")).strip().upper()
+    stop_reason = payload.get("stop_reason")
+    stop_reason = str(stop_reason).strip().upper() if stop_reason not in (None, "") else None
+    if assessment not in _ASSESSMENT_VALUES or next_action not in _NEXT_ACTION_VALUES:
+        return None
+    if stop_reason is not None and stop_reason not in _STOP_REASON_VALUES:
+        stop_reason = None
+    raw_issues = payload.get("open_issues", [])
+    issues = []
+    if isinstance(raw_issues, list):
+        for item in raw_issues:
+            if isinstance(item, dict) and item.get("id") is not None:
+                issues.append({
+                    "id": str(item.get("id")),
+                    "claim": str(item.get("claim", "")).strip(),
+                    "status": str(item.get("status", "open")).strip().lower() or "open",
+                    "change_this_round": str(item.get("change_this_round", "")).strip(),
+                })
+    return {
+        "assessment": assessment,
+        "next_action": next_action,
+        "stop_reason": stop_reason,
+        "open_issues": issues,
+    }
+
+
+def _build_open_issues_text(structured: dict[str, Any] | None) -> str:
+    """Render the issue ledger for the next round's debaters (review 四.2)."""
+    if not structured:
+        return ""
+    issues = structured.get("open_issues") or []
+    if not issues:
+        return ""
+    lines = ["Contested-issue ledger from the judge (respond to these, do not re-argue settled points):"]
+    for i in issues:
+        lines.append(
+            f"- [{i.get('id')}] status={i.get('status')} | claim: {i.get('claim', '')} | "
+            f"last change: {i.get('change_this_round', '')}")
+    return "\n".join(lines)
+
+
+def _build_research_object(run_dir: Path) -> str:
+    """Grounding block from the pre-debate stage outputs (review R4): the
+    debate must argue about the artifacts it already paid for, not a bare topic."""
+    sections = []
+    for fname, label in (
+        ("FINAL_PROPOSAL.md", "Current proposal (from pre-debate stages)"),
+        ("EVIDENCE_TABLE.md", "Evidence table (claim-evidence pairs)"),
+        ("EXPERIMENT_PLAN.md", "Experiment plan"),
+    ):
+        text = _read_truncated(run_dir / fname, max_chars=2500)
+        if text:
+            sections.append(f"### {label}\n{text}")
+    if not sections:
+        return ""
+    return "Research object under debate (produced by earlier stages):\n" + "\n\n".join(sections)
 
 
 def _parse_yaml_block(text: str) -> dict:
@@ -1274,6 +1428,7 @@ def _build_index(
         "| RESEARCH_DECISION_MEMO.md | Final research decision memo |",
         "| AUTO_REVIEW.md | Auto-review logs |",
         "| REVIEW_CYCLES.md | Review cycles report |",
+        "| PENDING_ACTIONS.md | External work (retrieve/experiment) requested by the judge |",
         "| chat_mode_state.json | Structured state with timestamps |",
         "| chat_rounds/ | Per-cycle folders (review_cycle_XX/) with per-round artifacts and reviewer output |", "",
         f"completed_debate_rounds: {len(rounds)}",

@@ -481,3 +481,159 @@ def test_round_retry_reuses_successful_role_outputs(
     assert calls["moderator"] == 2, "moderator retried once"
     assert calls["proposer"] == 1, "successful proposer output must be reused"
     assert calls["skeptic"] == 1, "successful skeptic output must be reused"
+
+
+def _moderator_yaml(next_action="CONTINUE_AS_TAG", assessment="UNRESOLVED",
+                    stop_reason="null", issues=None, tag="CONTINUE"):
+    issues = issues if issues is not None else []
+    issue_lines = "\n".join(
+        f"  - id: {i['id']}\n    claim: {i['claim']}\n"
+        f"    status: {i['status']}\n    change_this_round: {i['change']}"
+        for i in issues
+    ) or "  []"
+    return (
+        "Moderator analysis.\n"
+        f"```yaml\nassessment: {assessment}\nnext_action: {next_action}\n"
+        f"stop_reason: {stop_reason}\nopen_issues:\n{issue_lines}\n```\n"
+        f"[JUDGE_DECISION]: {tag}\n"
+    )
+
+
+def test_parse_moderator_structured_validates_enums() -> None:
+    good = _moderator_yaml(next_action="EXPERIMENT", stop_reason="null")
+    parsed = cmr._parse_moderator_structured(good)
+    assert parsed is not None
+    assert parsed["next_action"] == "EXPERIMENT"
+    assert parsed["assessment"] == "UNRESOLVED"
+    assert parsed["stop_reason"] is None
+
+    bad_enum = _moderator_yaml(next_action="MAYBE")
+    assert cmr._parse_moderator_structured(bad_enum) is None
+    no_yaml = "just a tag\n[JUDGE_DECISION]: CONTINUE"
+    assert cmr._parse_moderator_structured(no_yaml) is None
+
+
+def test_next_action_experiment_stops_debate_and_records_pending(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Judge routes to EXPERIMENT -> text debate ends, pending action persisted,
+    reviewer does not reopen a text cycle (review 四.3)."""
+    reports_dir = tmp_path / "reports"
+    _setup_common_mocks(monkeypatch, tmp_path, config_overrides={
+        "max_rounds": 10, "min_rounds_before_stop": 1,
+        "max_review_cycles": 3, "max_inner_debate_rounds": 10,
+    })
+    reviewer_calls = {"count": 0}
+
+    def counting_reviewer(*a, **kw):
+        class R:
+            def run(self, **kwargs):
+                reviewer_calls["count"] += 1
+                return "```yaml\nreview_decision: UNRESOLVED\nunresolved_issues:\n  - x\n```"
+        return R()
+
+    monkeypatch.setattr(cmr, "ReviewerAgent", counting_reviewer)
+
+    def gen(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "moderator" in role:
+            return _moderator_yaml(
+                next_action="EXPERIMENT", stop_reason="null", tag="CONTINUE",
+                issues=[{"id": "O1", "claim": "reward signal validity",
+                         "status": "needs_experiment", "change": "raised"}])
+        return "role output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", gen)
+
+    _, state_file = cmr.run_chat_mode(
+        topic="exp topic", proposer_model="p", skeptic_model="s", moderator_model="m",
+        output_dir=str(reports_dir), resume=False)
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["stop_reason"] == "moderator_next_action_EXPERIMENT"
+    assert len(state["pending_actions"]) == 1
+    assert state["pending_actions"][0]["type"] == "experiment"
+    assert state["pending_actions"][0]["serves_issues"] == ["O1"]
+    assert len(state["rounds"]) == 1, "text debate must not continue after EXPERIMENT"
+    assert reviewer_calls["count"] == 0, "reviewer must not reopen a text cycle"
+    pending = (state_file.parent / "PENDING_ACTIONS.md").read_text(encoding="utf-8")
+    assert "EXPERIMENT" in pending and "reward signal validity" in pending
+
+
+def test_open_issues_ledger_flows_to_next_round(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The judge's issue ledger reaches the next round's proposer and skeptic (review 四.2)."""
+    reports_dir = tmp_path / "reports"
+    _setup_common_mocks(monkeypatch, tmp_path, config_overrides={
+        "max_rounds": 2, "min_rounds_before_stop": 1,
+        "max_review_cycles": 1, "max_inner_debate_rounds": 2,
+    })
+    proposer_prompts: list[str] = []
+    skeptic_prompts: list[str] = []
+    round_no = {"n": 0}
+
+    def gen(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "proposer" in role:
+            proposer_prompts.append(user_prompt)
+        if "skeptic" in role:
+            skeptic_prompts.append(user_prompt)
+        if "moderator" in role:
+            round_no["n"] += 1
+            if round_no["n"] == 1:
+                return _moderator_yaml(
+                    next_action="REASON", tag="CONTINUE",
+                    issues=[{"id": "O1", "claim": "UNIQUE-LEDGER-CLAIM-7",
+                             "status": "open", "change": "raised"}])
+            return _moderator_yaml(next_action="STOP", stop_reason="REVIEW_COMPLETE",
+                                   tag="STOP_CONVERGED")
+        return "role output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", gen)
+    cmr.run_chat_mode(
+        topic="ledger topic", proposer_model="p", skeptic_model="s", moderator_model="m",
+        output_dir=str(reports_dir), resume=False)
+
+    assert len(proposer_prompts) == 2
+    assert "UNIQUE-LEDGER-CLAIM-7" not in proposer_prompts[0], "ledger starts empty"
+    assert "UNIQUE-LEDGER-CLAIM-7" in proposer_prompts[1], "round-2 proposer sees the ledger"
+    assert "UNIQUE-LEDGER-CLAIM-7" in skeptic_prompts[1], "round-2 skeptic sees the ledger"
+
+
+def test_research_object_grounds_first_round(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Pre-debate artifacts (FINAL_PROPOSAL etc.) reach the first debate round (review R4)."""
+    reports_dir = tmp_path / "reports"
+    _setup_common_mocks(monkeypatch, tmp_path, config_overrides={
+        "max_rounds": 1, "min_rounds_before_stop": 1,
+        "max_review_cycles": 1, "max_inner_debate_rounds": 1,
+    })
+    # The mocked pre-debate stage writes FINAL_PROPOSAL.md with fake content.
+    proposer_prompts: list[str] = []
+    skeptic_prompts: list[str] = []
+
+    def gen(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "proposer" in role:
+            proposer_prompts.append(user_prompt)
+        if "skeptic" in role:
+            skeptic_prompts.append(user_prompt)
+        if "moderator" in role:
+            return _moderator_yaml(next_action="STOP", stop_reason="REVIEW_COMPLETE",
+                                   tag="STOP_CONVERGED")
+        return "role output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", gen)
+    cmr.run_chat_mode(
+        topic="grounded topic", proposer_model="p", skeptic_model="s", moderator_model="m",
+        output_dir=str(reports_dir), resume=False)
+
+    assert "[RESEARCH OBJECT]" in proposer_prompts[0]
+    assert "Fake novelty-check output" in proposer_prompts[0], (
+        "FINAL_PROPOSAL.md content must be injected")
+    assert "[RESEARCH OBJECT]" in skeptic_prompts[0]

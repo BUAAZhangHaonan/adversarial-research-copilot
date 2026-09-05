@@ -39,6 +39,9 @@ PROMPT_MARKERS = {
         "Length guidance:",
         "Mandatory final line",
         "[JUDGE_DECISION]:",
+        "next_action: REASON | RETRIEVE | EXPERIMENT | STOP",
+        "open_issues:",
+        "stopping the discussion is NOT an endorsement",
     ],
     "prompts/latest/default/proposer_zh.md": [
         "输入上下文",
@@ -66,6 +69,8 @@ PROMPT_MARKERS = {
     "prompts/latest/chat/moderator_chat_zh.md": [
         "必须使用中文自然表达",
         "[JUDGE_DECISION]:",
+        "next_action: REASON | RETRIEVE | EXPERIMENT | STOP",
+        "停止讨论不等于观点成立",
     ],
     "prompts/latest/discover/theme_framer.md": [
         "Cognitive task",
