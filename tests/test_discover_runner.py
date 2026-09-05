@@ -335,3 +335,113 @@ def test_run_discover_all_gaps_killed_still_reports(
     state = json.loads(state_file.read_text(encoding="utf-8"))
     assert state["status"] == "completed"
     assert state["stop_reason"] == "all_gaps_killed"
+
+
+def _many_gap_llm(n_gaps: int):
+    """Fake LLM whose gap miner returns n_gaps gaps; audit echoes KEEP for the asked gap."""
+    class ManyGapLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Mine the research gaps" in user_prompt:
+                entries = "\n".join(
+                    f"  - id: G{i}\n    type: recurring_limitation\n"
+                    f"    question: q{i}?\n    evidence_ids: [2401.00001]\n"
+                    f"    evidence_summary: e\n    why_unexplored: w\n"
+                    f"    who_needs_it: builders\n    confidence: 0.7"
+                    for i in range(1, n_gaps + 1)
+                )
+                return f"```yaml\ngaps:\n{entries}\n```\n"
+            return super().chat(model, system_prompt, user_prompt, temperature)
+    return ManyGapLLM
+
+
+def test_audit_gaps_beyond_budget_are_not_audited_and_never_pass(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    n = 10  # _MAX_GAPS_TO_AUDIT is 8: G9/G10 must not pass
+    captured_ideas_prompt: dict[str, str] = {}
+
+    class CapturingLLM(_many_gap_llm(n)):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Compose up to" in user_prompt:
+                captured_ideas_prompt["value"] = user_prompt
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: CapturingLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, state_file = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+    run_dir = report_file.parent
+
+    audits = json.loads((run_dir / "audits.json").read_text(encoding="utf-8"))
+    by_gap = {a["gap_id"]: a["verdict"] for a in audits}
+    assert len(audits) == n, "every gap must carry exactly one audit record"
+    assert by_gap["G9"] == "NOT_AUDITED"
+    assert by_gap["G10"] == "NOT_AUDITED"
+    assert "G9" not in captured_ideas_prompt["value"], "unaudited gap must not reach idea composition"
+    assert "G10" not in captured_ideas_prompt["value"]
+
+
+def test_audit_web_failure_yields_insufficient_evidence_not_keep(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from arc.providers.mcp_bridge import MCPError
+
+    class BrokenWebServices(FakeServices):
+        def __init__(self):
+            self.scholartrace = FakeScholartrace()
+            self.scholaranalysis = FakeScholaranalysis()
+
+            class Broken:
+                def call_tool(self, name, arguments, timeout=60.0):
+                    raise MCPError("searxng down")
+
+            self.webresearch = Broken()
+
+    class NoAuditCalls:
+        calls = {"audit": 0}
+
+    monkeypatch.setattr(dr, "connect_services", lambda: BrokenWebServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: _many_gap_llm(2)())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, _ = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+    run_dir = report_file.parent
+    audits = json.loads((run_dir / "audits.json").read_text(encoding="utf-8"))
+    assert all(a["verdict"] == "INSUFFICIENT_EVIDENCE" for a in audits)
+    assert all("webresearch unavailable" in a["reason"] for a in audits)
+    # No gap survived -> report explains, run still completes.
+    report = (run_dir / "DISCOVERY_REPORT.md").read_text(encoding="utf-8")
+    assert "No surviving problems" in report
+
+
+def test_audit_unparseable_output_yields_insufficient_evidence_not_keep(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class GarbageAuditLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Audit this gap" in user_prompt:
+                return "I assessed it and it seems fine, no structure today."
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: GarbageAuditLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, _ = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+    audits = json.loads(
+        (report_file.parent / "audits.json").read_text(encoding="utf-8"))
+    assert audits
+    assert all(a["verdict"] == "INSUFFICIENT_EVIDENCE" for a in audits)

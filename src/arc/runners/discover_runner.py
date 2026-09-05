@@ -472,6 +472,18 @@ def _stage_saturation_audit(
     state: DiscoverState,
     gaps: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    """Audit each gap. Audit states are tri-state plus unaudited:
+
+    KEEP                  audited, enough evidence to keep investigating
+    KILL                  audited, explicit disqualifying evidence
+    INSUFFICIENT_EVIDENCE audit could not be completed (web research down,
+                          model output unparseable, unknown verdict) —
+                          never silently treated as KEEP or KILL
+    NOT_AUDITED           beyond the audit budget cap
+
+    No evidence never means automatic passage: every gap ends up with
+    exactly one audit record, and only audited KEEP enters the survivor set.
+    """
     cfg = state.config
     system = _load_prompt("saturation_auditor", cfg.prompt_language)
     audits: list[dict[str, Any]] = []
@@ -487,24 +499,57 @@ def _stage_saturation_audit(
             dossier = _digest_web_results(raw, cfg.webresearch_max_results)
         except MCPError as exc:
             logger.warning("webresearch failed for %s: %s", gap_id, exc)
-            dossier = "(web research unavailable for this gap)"
+            audits.append({
+                "gap_id": gap_id, "verdict": "INSUFFICIENT_EVIDENCE",
+                "reason": f"webresearch unavailable: {exc}"})
+            continue
+
         user = (
             f"Candidate gap {gap_id}:\n{json.dumps(gap, ensure_ascii=False, indent=1)}\n\n"
             f"Web-research dossier:\n{_clip(dossier, _DOSSIER_MAX_CHARS)}\n\n"
             "Audit this gap per your instructions."
         )
-        payload = _structured_call(
-            client, state.models["judge"], system, user, temperature=0.2, key="audits")
+        try:
+            payload = _structured_call(
+                client, state.models["judge"], system, user, temperature=0.2, key="audits")
+        except DiscoverError as exc:
+            audits.append({
+                "gap_id": gap_id, "verdict": "INSUFFICIENT_EVIDENCE",
+                "reason": f"audit output unparseable: {exc}"})
+            continue
         entries = _as_list_of_dicts(payload.get("audits"))
-        if entries:
-            entry = entries[-1]
-            # The audited gap id is known from the request; never trust the
-            # model's echo (a mismatched id would silently leave the gap unaudited).
-            entry["gap_id"] = gap_id
-            audits.append(entry)
-        else:
-            audits.append({"gap_id": gap_id, "verdict": "KEEP",
-                           "reason": "audit unparseable; conservative keep"})
+        if not entries:
+            audits.append({
+                "gap_id": gap_id, "verdict": "INSUFFICIENT_EVIDENCE",
+                "reason": "audit returned no entries"})
+            continue
+        entry = entries[-1]
+        # The audited gap id is known from the request; never trust the
+        # model's echo (a mismatched id would silently leave the gap unaudited).
+        entry["gap_id"] = gap_id
+        verdict = str(entry.get("verdict", "")).strip().upper()
+        if verdict not in {"KEEP", "KILL", "INSUFFICIENT_EVIDENCE"}:
+            entry["reason"] = f"unknown verdict {verdict!r}; {entry.get('reason', '')}"
+            verdict = "INSUFFICIENT_EVIDENCE"
+        entry["verdict"] = verdict
+        audits.append(entry)
+
+    # Gaps beyond the audit budget get explicit NOT_AUDITED records so the
+    # report shows exactly which candidates never passed an audit.
+    audited_ids = {str(a.get("gap_id", "")) for a in audits}
+    for gap in gaps[_MAX_GAPS_TO_AUDIT:]:
+        gap_id = str(gap.get("id", ""))
+        if gap_id not in audited_ids:
+            audits.append({
+                "gap_id": gap_id, "verdict": "NOT_AUDITED",
+                "reason": f"beyond audit budget ({_MAX_GAPS_TO_AUDIT} audits per run)"})
+
+    # Set completeness: one audit record per gap, no orphans.
+    gap_ids = sorted(str(g.get("id", "")) for g in gaps)
+    audit_ids = sorted(str(a.get("gap_id", "")) for a in audits)
+    if gap_ids != audit_ids:
+        raise DiscoverError(
+            f"audit set incomplete: {len(gap_ids)} gaps but {len(audit_ids)} audit records")
     return audits
 
 
@@ -703,8 +748,8 @@ def _as_list_of_dicts(value: Any) -> list[dict[str, Any]]:
 def _audit_verdict(audits: list[dict[str, Any]], gap_id: str) -> str:
     for a in audits:
         if str(a.get("gap_id", "")) == gap_id:
-            return str(a.get("verdict", "KEEP")).upper()
-    return "KEEP"
+            return str(a.get("verdict", "NOT_AUDITED")).upper()
+    return "NOT_AUDITED"
 
 
 def _digest_web_results(raw: str, max_results: int) -> str:
@@ -884,16 +929,17 @@ def _render_report(
             "## No surviving problems", "",
             "The saturation audit killed every mined gap. This is a result, not a",
             "failure: it says this pool offers no unsaturated, real-pain problem", "",
-            "| gap | type | question | kill reason |",
-            "|---|---|---|---|",
+            "| gap | type | verdict | question | reason |",
+            "|---|---|---|---|---|",
         ]
         for g in gaps:
-            verdict = next(
+            audit = next(
                 (a for a in audits if str(a.get("gap_id", "")) == str(g.get("id", ""))), {})
             lines.append(
                 f"| {g.get('id', '?')} | {g.get('type', '')} | "
+                f"**{str(audit.get('verdict', 'NOT_AUDITED')).upper()}** | "
                 f"{_clip(str(g.get('question', '')), 110)} | "
-                f"{_clip(str(verdict.get('reason', 'no audit')), 130)} |")
+                f"{_clip(str(audit.get('reason', 'no audit record')), 130)} |")
         lines += [
             "",
             "Suggestions: broaden the field (the theme may be too narrow),",
