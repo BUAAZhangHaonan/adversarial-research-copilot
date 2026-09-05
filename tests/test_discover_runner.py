@@ -445,3 +445,60 @@ def test_audit_unparseable_output_yields_insufficient_evidence_not_keep(
         (report_file.parent / "audits.json").read_text(encoding="utf-8"))
     assert audits
     assert all(a["verdict"] == "INSUFFICIENT_EVIDENCE" for a in audits)
+
+
+def test_deep_read_ranking_prefers_agent_ranked_papers(tmp_path: Path) -> None:
+    """Mixed pool: agent-ranked papers must be deep-read before unranked ones (review R2)."""
+    class Noop:
+        def call_tool(self, *a, **kw):
+            raise AssertionError("should not be called")
+
+    class NoopServices:
+        scholartrace = Noop()
+        scholaranalysis = Noop()
+        webresearch = Noop()
+
+        def close_all(self):
+            pass
+
+    pool = [
+        {"paper_id": "t:unranked", "title": "No agent rank", "agent_rank": None,
+         "composite_score": 0.9},
+        {"paper_id": "t:rank2", "title": "Ranked second", "agent_rank": 2,
+         "composite_score": 0.2},
+        {"paper_id": "t:rank1", "title": "Ranked first", "agent_rank": 1,
+         "composite_score": 0.1},
+        {"paper_id": "t:unranked2", "title": "No agent rank either", "agent_rank": None,
+         "composite_score": 0.8},
+    ]
+
+    # Reuse the ranking logic through _stage_deep_read by pre-seeding cached
+    # notes for every paper: the read order is observable via file creation order.
+    import contextlib
+
+    calls: list[str] = []
+
+    class RecordingServices:
+        def __init__(self):
+            self.scholartrace = self
+            self.scholaranalysis = self
+            self.webresearch = Noop()
+
+        def call_tool(self, name, arguments, timeout=60.0):
+            calls.append((name, arguments.get("paper_id") or arguments.get("query")))
+            if name == "read":
+                pid = arguments["paper_id"]
+                return json.dumps({"paper_id": pid, "arxiv_id": "2401.0" + pid[-1]})
+            if name == "analyze_paper":
+                return json.dumps({"status": "success",
+                                   "analysis": {"answer": f"claim for {arguments['query']}"}})
+            raise AssertionError(name)
+
+        def close_all(self):
+            pass
+
+    notes = dr._stage_deep_read(RecordingServices(), tmp_path, pool,
+                                dr.DiscoverConfig(deep_read=2, min_deep_read_ok=1))
+    assert [n["title"] for n in notes] == ["Ranked first", "Ranked second"], (
+        "deep-read budget must go to agent-ranked papers first; unranked papers "
+        "must not consume the budget before them")

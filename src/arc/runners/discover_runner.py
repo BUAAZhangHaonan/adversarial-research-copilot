@@ -363,7 +363,8 @@ def _stage_deep_read(
     ranked = sorted(
         pool,
         key=lambda p: (
-            p.get("agent_rank") is not None,
+            # Papers the agent reranked come first; then by rank, then score.
+            p.get("agent_rank") is None,
             p.get("agent_rank") if p.get("agent_rank") is not None else 10**6,
             -(p.get("composite_score") or 0.0),
         ),

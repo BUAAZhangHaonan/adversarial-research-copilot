@@ -12,3 +12,4 @@ htmlcov/
 reports/
 *.db
 *.egg-info/
+.zcode/
