@@ -19,8 +19,10 @@ def test_parse_scorecard() -> None:
 
 
 def test_parse_decision() -> None:
-    assert parse_decision("continue_or_stop\nSTOP") == "STOP"
-    assert parse_decision("continue_or_stop\nCONTINUE") == "CONTINUE"
+    # Structured field only; plain prose is a protocol failure (None).
+    assert parse_decision("```yaml\ncontinue_or_stop: STOP\n```") == "STOP"
+    assert parse_decision("```yaml\ncontinue_or_stop: CONTINUE\n```") == "CONTINUE"
+    assert parse_decision("continue_or_stop\nSTOP") is None
 
 
 def test_parse_yaml_payload() -> None:
@@ -99,3 +101,18 @@ def test_parse_scorecard_tolerates_invalid_yaml_scores() -> None:
     assert score.falsifiability == 3  # null -> default
     assert score.evaluation_clarity == 4  # float truncates
     assert score.resource_fit == 2
+
+
+def test_parse_decision_never_guesses_stop_from_prose() -> None:
+    # Review R8: prose containing the word STOP must not control the loop.
+    assert parse_decision("Do not STOP; CONTINUE collecting evidence.") is None
+    assert parse_decision("We should probably stop here maybe.") is None
+
+
+def test_parse_decision_reads_structured_field_only() -> None:
+    stop_yaml = "```yaml\ncontinue_or_stop: STOP\nreason: converged\n```"
+    cont_yaml = "```yaml\ncontinue_or_stop: CONTINUE\n```"
+    assert parse_decision(stop_yaml) == "STOP"
+    assert parse_decision(cont_yaml) == "CONTINUE"
+    # Invalid enum value inside the YAML is still a protocol failure.
+    assert parse_decision("```yaml\ncontinue_or_stop: MAYBE\n```") is None

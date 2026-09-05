@@ -61,17 +61,20 @@ def parse_scorecard(moderator_text: str) -> ScoreCard:
     return ScoreCard(**values)
 
 
-def parse_decision(moderator_text: str) -> str:
+def parse_decision(moderator_text: str) -> str | None:
+    """Return 'STOP'/'CONTINUE' from the structured YAML field.
+
+    Returns None on protocol failure (no valid YAML block or no valid
+    continue_or_stop value). Control decisions must come only from the
+    validated structured field — never guessed from prose (a sentence like
+    'Do not STOP; CONTINUE collecting evidence' is not a control signal).
+    """
     structured = parse_moderator_payload(moderator_text)
     if structured and isinstance(structured.get("continue_or_stop"), str):
         value = structured["continue_or_stop"].strip().upper()
         if value in {"STOP", "CONTINUE"}:
             return value
-
-    text = moderator_text.upper()
-    if re.search(r"\bSTOP\b", text):
-        return "STOP"
-    return "CONTINUE"
+    return None
 
 
 def parse_moderator_payload(moderator_text: str) -> dict | None:

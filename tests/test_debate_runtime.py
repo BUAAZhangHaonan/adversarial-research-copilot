@@ -7,6 +7,7 @@ import pytest
 from arc.memory import DebateMemory
 from arc.orchestrator import ARCOrchestrator
 from arc.schemas import ScoreCard
+import json
 
 
 def test_debate_resume_recovers_in_progress_round_after_interrupt(
@@ -112,3 +113,112 @@ def test_debate_resume_rejects_stale_state(tmp_path: Path) -> None:
     assert next_round == 1
     assert blockers == []
     assert state.rounds == []
+
+
+def test_debate_protocol_failure_retries_then_degrades_to_continue(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Moderator output without valid continue_or_stop: one corrective retry,
+    then parse_degraded=True and conservative CONTINUE (never a guessed STOP)."""
+    idea_file = tmp_path / "idea.md"
+    idea_file.write_text("test idea\n", encoding="utf-8")
+    reports_dir = tmp_path / "reports"
+    run_dir = reports_dir / "run"
+
+    valid_output = (
+        "Verdict text.\n```yaml\nscorecard:\n  novelty: 4\n  feasibility: 4\n"
+        "  falsifiability: 4\n  evaluation_clarity: 4\n  resource_fit: 4\n"
+        "unresolved_blockers: []\nrequired_revisions: []\n"
+        "continue_or_stop: STOP\nreason: done\n```"
+    )
+
+    class ProtocolFlakyModerator:
+        calls = {"count": 0}
+
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def run(self, *args, **kwargs) -> str:
+            ProtocolFlakyModerator.calls["count"] += 1
+            if ProtocolFlakyModerator.calls["count"] == 1:
+                return "Do not STOP; CONTINUE collecting evidence. (no yaml)"
+            return valid_output
+
+    class StubAgent:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def run(self, *args, **kwargs) -> str:
+            return "stub output"
+
+    monkeypatch.setattr("arc.orchestrator.ProposerAgent", StubAgent)
+    monkeypatch.setattr("arc.orchestrator.SkepticAgent", StubAgent)
+    monkeypatch.setattr("arc.orchestrator.ModeratorAgent", ProtocolFlakyModerator)
+
+    def interrupt(rounds, config):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr("arc.orchestrator.assess_convergence", interrupt)
+
+    orchestrator = ARCOrchestrator()
+    with pytest.raises(KeyboardInterrupt):
+        orchestrator.run(
+            idea_file=str(idea_file),
+            proposer_model="p", skeptic_model="s", moderator_model="m",
+            output_dir=str(reports_dir), run_dir=run_dir,
+        )
+
+    final = json.loads((run_dir / "final_state.json").read_text(encoding="utf-8"))
+    record = final["rounds"][0]
+    assert record["decision"] == "STOP"  # recovered via the corrective retry
+    assert record["parse_degraded"] is False
+    assert ProtocolFlakyModerator.calls["count"] == 2
+
+
+def test_debate_protocol_failure_after_retry_marks_degraded(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    idea_file = tmp_path / "idea.md"
+    idea_file.write_text("test idea\n", encoding="utf-8")
+    reports_dir = tmp_path / "reports"
+    run_dir = reports_dir / "run"
+
+    class AlwaysBrokenModerator:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def run(self, *args, **kwargs) -> str:
+            return "I refuse to emit YAML. Do not STOP."
+
+    class StubAgent:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def run(self, *args, **kwargs) -> str:
+            return "stub output"
+
+    monkeypatch.setattr("arc.orchestrator.ProposerAgent", StubAgent)
+    monkeypatch.setattr("arc.orchestrator.SkepticAgent", StubAgent)
+    monkeypatch.setattr("arc.orchestrator.ModeratorAgent", AlwaysBrokenModerator)
+
+    def interrupt(rounds, config):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr("arc.orchestrator.assess_convergence", interrupt)
+
+    orchestrator = ARCOrchestrator()
+    with pytest.raises(KeyboardInterrupt):
+        orchestrator.run(
+            idea_file=str(idea_file),
+            proposer_model="p", skeptic_model="s", moderator_model="m",
+            output_dir=str(reports_dir), run_dir=run_dir,
+        )
+
+    final = json.loads((run_dir / "final_state.json").read_text(encoding="utf-8"))
+    record = final["rounds"][0]
+    assert record["decision"] == "CONTINUE"  # conservative, never a guessed STOP
+    assert record["parse_degraded"] is True
+    run_state = json.loads((run_dir / "run_state.json").read_text(encoding="utf-8"))
+    assert run_state["protocol_errors"] == 1

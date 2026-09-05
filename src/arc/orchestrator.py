@@ -26,6 +26,7 @@ class ARCOrchestrator:
         self.config = DebateConfig(**config_data.get("debate", {}))
         self.console = Console()
         self.client = LLMClient()
+        self._protocol_errors = 0
 
     def run(
         self,
@@ -99,6 +100,29 @@ class ARCOrchestrator:
 
             scorecard = parse_scorecard(moderator_output)
             decision = parse_decision(moderator_output)
+            parse_degraded = False
+            if decision is None:
+                # Protocol failure: no valid continue_or_stop in the YAML.
+                # One corrective retry, then degrade conservatively — never
+                # guess STOP from prose (conservative = keep debating).
+                moderator_output = moderator.run(
+                    state.framed_problem,
+                    proposer_output,
+                    skeptic_output,
+                    previous_blockers,
+                    previous_required_revisions,
+                    round_id,
+                    extra_instruction=(
+                        "Your previous response had no parseable YAML block with a valid "
+                        "continue_or_stop field. Repeat your full verdict and end with the "
+                        "required machine-readable YAML block."
+                    ),
+                )
+                decision = parse_decision(moderator_output)
+                if decision is None:
+                    parse_degraded = True
+                    decision = "CONTINUE"
+                    self._protocol_errors += 1
             unresolved_blockers = parse_unresolved_blockers(moderator_output)
             required_revisions = parse_required_revisions(moderator_output)
 
@@ -116,6 +140,7 @@ class ARCOrchestrator:
                 unresolved_blockers=unresolved_blockers,
                 required_revisions=required_revisions,
                 decision=decision,
+                parse_degraded=parse_degraded,
             )
             state.add_round(record)
             previous_blockers = unresolved_blockers
@@ -208,6 +233,7 @@ class ARCOrchestrator:
                 "last_score": avg_score,
                 "last_decision": decision,
                 "blockers": blockers,
+                "protocol_errors": self._protocol_errors,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
         )

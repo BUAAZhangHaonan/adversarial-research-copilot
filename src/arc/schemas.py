@@ -39,6 +39,7 @@ class RoundRecord(BaseModel):
     unresolved_blockers: list[str]
     required_revisions: list[str]
     decision: Literal["CONTINUE", "STOP"]
+    parse_degraded: bool = False
 
 
 class DebateConfig(BaseModel):

@@ -22,6 +22,7 @@ class ModeratorAgent:
         previous_blockers: list[str],
         previous_required_revisions: list[str],
         round_id: int,
+        extra_instruction: str = "",
     ) -> str:
         blocker_text = "\n".join(
             f"- {b}" for b in previous_blockers) if previous_blockers else "- none"
@@ -30,6 +31,7 @@ class ModeratorAgent:
             if previous_required_revisions
             else "- none"
         )
+        extra = f"{extra_instruction}\n\n" if extra_instruction else ""
         user_prompt = localized_text(
             self.prompt_language,
             (
@@ -44,6 +46,7 @@ class ModeratorAgent:
                 f"{proposer_output}\n\n"
                 "[SKEPTIC OUTPUT]\n"
                 f"{skeptic_output}\n\n"
+                f"{extra}"
                 "Follow your role contract exactly and include all required sections and YAML fields."
             ),
             (
@@ -58,6 +61,7 @@ class ModeratorAgent:
                 f"{proposer_output}\n\n"
                 "[Skeptic 输出]\n"
                 f"{skeptic_output}\n\n"
+                f"{extra}"
                 "请严格遵循角色协议，输出全部必需章节与 YAML 字段。"
             ),
         )
