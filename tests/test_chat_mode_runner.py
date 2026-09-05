@@ -319,3 +319,68 @@ def test_chat_mode_smoke_generates_references_file(
     assert state_file.exists()
     assert refs_file.exists()
     assert "Stub Paper" in refs_file.read_text(encoding="utf-8")
+
+
+def test_reviewer_feedback_reaches_next_cycle_proposer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Cycle-1 reviewer feedback must appear in cycle-2 proposer prompts (review R3)."""
+    reports_dir = tmp_path / "reports"
+
+    _setup_common_mocks(
+        monkeypatch, tmp_path,
+        config_overrides={
+            "max_rounds": 0,  # disable advisory target
+            "max_review_cycles": 2,
+            "max_inner_debate_rounds": 1,
+            "min_rounds_before_stop": 1,
+        },
+    )
+
+    marker = "UNIQUE-REVIEWER-MARKER-42"
+    reviewer_calls = {"count": 0}
+
+    def fake_reviewer_factory(*a, **kw):
+        class StatefulReviewer:
+            def run(self, **kwargs):
+                reviewer_calls["count"] += 1
+                if reviewer_calls["count"] == 1:
+                    return (
+                        "Cycle 1 unresolved.\n```yaml\n"
+                        f"review_decision: UNRESOLVED\nunresolved_issues:\n  - {marker}\n"
+                        "priority_actions: []\n```"
+                    )
+                # Second call should also have received the prior feedback.
+                reviewer_calls["prior_feedback_seen"] = str(kwargs.get("prior_reviewer_feedback", ""))
+                return "Resolved.\n```yaml\nreview_decision: RESOLVED\nunresolved_issues: []\n```"
+        return StatefulReviewer()
+
+    monkeypatch.setattr(cmr, "ReviewerAgent", fake_reviewer_factory)
+
+    proposer_prompts: list[str] = []
+
+    def fake_chat_generate(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "proposer" in role:
+            proposer_prompts.append(user_prompt)
+        if "moderator" in role:
+            return "Moderator summary\n[JUDGE_DECISION]: STOP_CONVERGED"
+        return f"{role} output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", fake_chat_generate)
+
+    cmr.run_chat_mode(
+        topic="feedback topic",
+        proposer_model="p",
+        skeptic_model="s",
+        moderator_model="m",
+        output_dir=str(reports_dir),
+        resume=False,
+    )
+
+    assert len(proposer_prompts) >= 2, "expected two review cycles"
+    assert marker not in proposer_prompts[0], "cycle 1 has no prior feedback yet"
+    assert marker in proposer_prompts[1], "cycle 2 proposer must receive cycle 1 reviewer feedback"
+    assert marker in reviewer_calls["prior_feedback_seen"], (
+        "reviewer must see its own prior feedback when re-reviewing")

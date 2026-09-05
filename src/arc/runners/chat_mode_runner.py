@@ -250,8 +250,9 @@ def run_chat_mode(
 
         effective_max_cycles, effective_max_inner = _effective_round_bounds(cfg)
         for review_cycle_id in range(start_cycle, effective_max_cycles + 1):
-            # Inject reviewer feedback from previous cycle
-            cycle_reviewer_feedback = prior_reviewer_feedback if review_cycle_id == start_cycle and prior_reviewer_feedback else ""
+            # Reviewer feedback from the previous cycle must reach this cycle's
+            # proposer AND the reviewer itself (it should see its own prior points).
+            cycle_reviewer_feedback = prior_reviewer_feedback
             cycle_start_round = start_inner if review_cycle_id == start_cycle else 1
 
             for inner_round in range(cycle_start_round, effective_max_inner + 1):
