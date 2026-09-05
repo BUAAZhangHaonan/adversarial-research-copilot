@@ -224,12 +224,13 @@ def _run_stages(
                  if _audit_verdict(audits, g.get("id", "")) == "KEEP"]
 
     if not survivors:
-        # A fully-killed pool is a valid (and useful) outcome: the report must
-        # still explain what was considered and why nothing survived.
-        state.stop_reason = "all_gaps_killed"
+        # A fully-killed (or zero-mined) pool is a valid and useful outcome:
+        # the report must still explain what was considered and why nothing
+        # survived — an empty candidate set is first-class.
+        state.stop_reason = "zero_gaps_mined" if not gaps else "no_surviving_gaps"
         (run_dir / "ideas.json").write_text("[]", encoding="utf-8")
         (run_dir / "IDEA_PORTFOLIO.md").write_text(
-            "# IDEA_PORTFOLIO\n\nNo gaps survived the saturation audit.\n", encoding="utf-8")
+            "# IDEA_PORTFOLIO\n\nNo gaps survived to idea composition.\n", encoding="utf-8")
         (run_dir / "judgments.json").write_text("[]", encoding="utf-8")
         state.stage_statuses["idea-portfolio"] = "completed"
         state.stage_statuses["taste-gate"] = "completed"
@@ -250,6 +251,17 @@ def _run_stages(
         mark("idea-portfolio")
 
     ideas: list[dict[str, Any]] = json.loads(_read_text(run_dir / "ideas.json"))
+
+    if not ideas:
+        # Surviving gaps but the composer produced nothing worth judging.
+        state.stop_reason = "no_composable_ideas"
+        (run_dir / "judgments.json").write_text("[]", encoding="utf-8")
+        state.stage_statuses["taste-gate"] = "completed"
+        judgments: list[dict[str, Any]] = []
+        (run_dir / "DISCOVERY_REPORT.md").write_text(
+            _render_report(state, theme, notes, gaps, audits, ideas, judgments),
+            encoding="utf-8")
+        return
 
     # --- Stage 7: taste gate (judge model) ---------------------------------
     if not done("taste-gate"):
@@ -460,8 +472,8 @@ def _stage_gap_mining(
     )
     text = _structured_call(client, state.models["judge"], system, user, temperature=0.25, key="gaps")
     gaps = _as_list_of_dicts(text.get("gaps"))
-    if not gaps:
-        raise DiscoverError("gap-mining produced no gaps")
+    # Zero gaps is a valid outcome ("nothing worth investigating in this pool");
+    # the runner renders it as a first-class empty report.
     for i, gap in enumerate(gaps, 1):
         gap.setdefault("id", f"G{i}")
     return gaps
@@ -576,8 +588,7 @@ def _stage_idea_portfolio(
     payload = _structured_call(
         client, state.models["generator"], system, user, temperature=0.5, key="ideas")
     ideas = _as_list_of_dicts(payload.get("ideas"))
-    if not ideas:
-        raise DiscoverError("idea-portfolio produced no ideas")
+    # Empty portfolio is legal: the generator found nothing worth composing.
     for i, idea in enumerate(ideas[: cfg.ideas], 1):
         idea.setdefault("id", f"I{i}")
     return ideas[: cfg.ideas]
@@ -586,6 +597,8 @@ def _stage_idea_portfolio(
 def _stage_taste_gate(
     client: LLMClient, state: DiscoverState, ideas: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    if not ideas:
+        return []
     cfg = state.config
     system = _load_prompt("taste_judge", cfg.prompt_language)
     user = (
@@ -596,8 +609,6 @@ def _stage_taste_gate(
     payload = _structured_call(
         client, state.models["judge"], system, user, temperature=0.15, key="judgments")
     judgments = _as_list_of_dicts(payload.get("judgments"))
-    if not judgments:
-        raise DiscoverError("taste-gate produced no judgments")
     # Enforce the hard rules in code, independent of LLM compliance.
     for j in judgments:
         try:
@@ -704,10 +715,14 @@ def _structured_call(
     temperature: float,
     key: str,
 ) -> dict[str, Any]:
-    """Call the model and require a YAML block containing `key`; retry once."""
+    """Call the model and require a YAML block containing list-valued `key`.
+
+    An explicit empty list (e.g. `gaps: []`) is a valid first-class answer —
+    "checked, nothing found" — and must not trigger a retry or an error.
+    """
     text = client.chat(model, system, user, temperature=temperature)
     payload = _parse_yaml_block(text)
-    if isinstance(payload, dict) and payload.get(key):
+    if _has_list_key(payload, key):
         return payload
     retry = client.chat(
         model, system,
@@ -717,9 +732,13 @@ def _structured_call(
         temperature=max(0.0, temperature - 0.1),
     )
     payload = _parse_yaml_block(retry)
-    if isinstance(payload, dict) and payload.get(key):
+    if _has_list_key(payload, key):
         return payload
     raise DiscoverError(f"structured output missing '{key}' after retry")
+
+
+def _has_list_key(payload: Any, key: str) -> bool:
+    return isinstance(payload, dict) and key in payload and isinstance(payload[key], list)
 
 
 def _parse_yaml_block(text: str) -> dict[str, Any]:
@@ -925,11 +944,11 @@ def _render_report(
         f" -> {len(ideas)} ideas -> {len(keeps)} KEEP", "",
     ]
 
-    if not ideas and gaps:
+    if not ideas:
         lines += [
             "## No surviving problems", "",
-            "The saturation audit killed every mined gap. This is a result, not a",
-            "failure: it says this pool offers no unsaturated, real-pain problem", "",
+            "The pipeline ended with an empty candidate set. This is a result,",
+            "not a failure — what was considered and why nothing survived:", "",
             "| gap | type | verdict | question | reason |",
             "|---|---|---|---|---|",
         ]

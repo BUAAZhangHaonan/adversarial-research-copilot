@@ -334,7 +334,7 @@ def test_run_discover_all_gaps_killed_still_reports(
     assert "metric saturated" in report
     state = json.loads(state_file.read_text(encoding="utf-8"))
     assert state["status"] == "completed"
-    assert state["stop_reason"] == "all_gaps_killed"
+    assert state["stop_reason"] == "no_surviving_gaps"
 
 
 def _many_gap_llm(n_gaps: int):
@@ -502,3 +502,58 @@ def test_deep_read_ranking_prefers_agent_ranked_papers(tmp_path: Path) -> None:
     assert [n["title"] for n in notes] == ["Ranked first", "Ranked second"], (
         "deep-read budget must go to agent-ranked papers first; unranked papers "
         "must not consume the budget before them")
+
+
+def test_zero_gaps_is_first_class_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """`gaps: []` must complete without retry or error (review R6)."""
+    calls = {"gap_mining": 0}
+
+    class ZeroGapLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Mine the research gaps" in user_prompt:
+                calls["gap_mining"] += 1
+                return "Checked all four categories; nothing qualifies.\n```yaml\ngaps: []\n```\n"
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: ZeroGapLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, state_file = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+
+    assert calls["gap_mining"] == 1, "empty list is valid: no retry expected"
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["status"] == "completed"
+    assert state["stop_reason"] == "zero_gaps_mined"
+    assert "No surviving problems" in report_file.read_text(encoding="utf-8")
+
+
+def test_empty_ideas_is_first_class_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class NoIdeasLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Compose up to" in user_prompt:
+                return "Nothing composable.\n```yaml\nideas: []\n```\n"
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: NoIdeasLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, state_file = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["status"] == "completed"
+    assert state["stop_reason"] == "no_composable_ideas"
+    assert "No surviving problems" in report_file.read_text(encoding="utf-8")
