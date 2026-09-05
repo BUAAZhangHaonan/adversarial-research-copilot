@@ -12,6 +12,10 @@ papers (use their [ids]) — an uncited gap is an invention, not a finding.
 
 1. **contradiction**: Paper A's evidence/claim materially conflicts with
    Paper B's, and the field has not reconciled them. State both sides.
+   Before calling anything a contradiction, check comparability — research
+   object, data distribution, compute budget, and evaluation protocol. Two
+   results at different scales or on different distributions are conditions,
+   not conflicts; note the difference itself as a candidate gap if unexplained.
 2. **recurring_limitation**: ≥ 2 papers independently list the same
    limitation of current practice, and no paper in the pool resolves it.
 3. **unexplored_intersection**: two active threads α and β exist separately,

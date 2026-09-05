@@ -305,10 +305,18 @@ def _run_stages(
 # ---------------------------------------------------------------------------
 
 _DEEP_READ_QUESTION = (
-    "For this paper, extract: (1) core claim/contribution in 3 sentences; "
-    "(2) the limitations the authors themselves state (quote or paraphrase closely); "
-    "(3) the future work they call for; (4) the key assumptions their method or "
-    "conclusions rely on. Be specific; include section references where possible."
+    "For this paper, extract four sections. Label author-stated content vs your "
+    "own inference explicitly.\n"
+    "(1) VERIFIED CLAIMS: what was actually demonstrated, under which conditions "
+    "(data distribution, scale/compute budget, evaluation protocol), with which "
+    "variables controlled — and which alternative explanations the evaluation "
+    "does NOT rule out. Cite section/figure where possible.\n"
+    "(2) AUTHOR-STATED LIMITATIONS: the limitations the authors themselves write "
+    "(quote or paraphrase closely, with location).\n"
+    "(3) OPENED QUESTIONS: the future work they call for, and — separately — "
+    "questions their verified claims leave unanswered but they do not mention.\n"
+    "(4) LOAD-BEARING ASSUMPTIONS: assumptions the method or conclusions rely on "
+    "that newer evidence could invalidate."
 )
 
 
