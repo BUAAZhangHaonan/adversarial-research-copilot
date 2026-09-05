@@ -557,3 +557,51 @@ def test_empty_ideas_is_first_class_outcome(
     assert state["status"] == "completed"
     assert state["stop_reason"] == "no_composable_ideas"
     assert "No surviving problems" in report_file.read_text(encoding="utf-8")
+
+
+def test_deep_read_restores_cached_notes_without_repaying(
+    tmp_path: Path,
+) -> None:
+    """A note already on disk from an interrupted run is restored, not re-analyzed (review R7b)."""
+    deep_dir = tmp_path / "DEEP_READ"
+    deep_dir.mkdir(parents=True)
+    cached_note = {
+        "arxiv_id": "2401.00001", "paper_id": "t:rank1",
+        "title": "Ranked first", "year": 2025, "venue": "arXiv",
+        "analysis": "cached extraction from previous run",
+    }
+    (deep_dir / "2401.00001.json").write_text(
+        json.dumps(cached_note, ensure_ascii=False), encoding="utf-8")
+
+    analyze_calls = {"count": 0}
+
+    class CountingServices:
+        def __init__(self):
+            self.scholartrace = self
+            self.scholaranalysis = self
+
+        def call_tool(self, name, arguments, timeout=60.0):
+            if name == "analyze_paper":
+                analyze_calls["count"] += 1
+                return json.dumps({"status": "success",
+                                   "analysis": {"answer": "fresh analysis"}})
+            if name == "read":
+                return json.dumps({"paper_id": arguments["paper_id"],
+                                   "arxiv_id": "2401.0000" + arguments["paper_id"][-1]})
+            raise AssertionError(name)
+
+        def close_all(self):
+            pass
+
+    pool = [
+        {"paper_id": "t:rank1", "title": "Ranked first", "agent_rank": 1,
+         "composite_score": 0.5},
+        {"paper_id": "t:rank2", "title": "Ranked second", "agent_rank": 2,
+         "composite_score": 0.4},
+    ]
+    notes = dr._stage_deep_read(CountingServices(), tmp_path, pool,
+                                dr.DiscoverConfig(deep_read=2, min_deep_read_ok=1))
+
+    by_id = {n["arxiv_id"]: n for n in notes}
+    assert by_id["2401.00001"]["analysis"] == "cached extraction from previous run"
+    assert analyze_calls["count"] == 1, "only the uncached paper should be re-analyzed"

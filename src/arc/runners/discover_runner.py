@@ -384,6 +384,7 @@ def _stage_deep_read(
 
     notes: list[dict[str, Any]] = []
     tried = 0
+    arxiv_id_map = _load_json(run_dir / "deep_read_ids.json") or {}
     for paper in ranked:
         if len(notes) >= cfg.deep_read or tried >= cfg.deep_read * 3:
             break
@@ -393,9 +394,18 @@ def _stage_deep_read(
             continue
 
         tried += 1
-        arxiv_id = _resolve_arxiv_id(services, paper_id, cfg)
+        arxiv_id = arxiv_id_map.get(paper_id) or _resolve_arxiv_id(services, paper_id, cfg)
         if not arxiv_id:
             logger.info("deep-read skip (no arxiv id): %s", title[:80])
+            continue
+        arxiv_id_map[paper_id] = arxiv_id
+        _save_json(run_dir / "deep_read_ids.json", arxiv_id_map)
+
+        # A note already on disk (previous interrupted run) is restored, not
+        # re-purchased: deep-read is the most expensive stage per paper.
+        cached = _load_cached_note(deep_dir, arxiv_id)
+        if cached is not None:
+            notes.append(cached)
             continue
 
         try:
@@ -427,11 +437,13 @@ def _stage_deep_read(
         }
         notes.append(note)
         slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")[:40]
-        (deep_dir / f"{arxiv_id.replace('/', '_')}_{slug}.md").write_text(
+        stem = f"{arxiv_id.replace('/', '_')}_{slug}"
+        (deep_dir / f"{stem}.md").write_text(
             f"# {title}\n\n- arxiv: {arxiv_id}\n- venue: {paper.get('venue', '')}\n\n"
             f"## Extraction\n\n{answer}\n",
             encoding="utf-8",
         )
+        _save_json(deep_dir / f"{stem}.json", note)
 
     if len(notes) < cfg.min_deep_read_ok:
         raise DiscoverError(
@@ -454,6 +466,47 @@ def _resolve_arxiv_id(services: MCPServices, paper_id: str, cfg: DiscoverConfig)
     # Last resort: some records only carry an S2/OpenAlex id — unusable for
     # scholaranalysis (arXiv-only), so give up cleanly.
     return ""
+
+
+def _load_cached_note(deep_dir: Path, arxiv_id: str) -> dict[str, Any] | None:
+    """Restore a per-paper deep-read note written by a previous (interrupted) run."""
+    stem_prefix = arxiv_id.replace("/", "_")
+    sidecar = deep_dir / f"{stem_prefix}.json"
+    if sidecar.exists():
+        try:
+            data = json.loads(sidecar.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and str(data.get("analysis", "")).strip():
+                return data
+        except Exception:
+            pass
+    # Legacy layout: only the .md existed; recover the extraction section.
+    for md in sorted(deep_dir.glob(f"{stem_prefix}*.md")):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        marker = "## Extraction"
+        if marker not in text:
+            continue
+        answer = text.split(marker, 1)[1].strip()
+        if not answer:
+            continue
+        return {"arxiv_id": arxiv_id, "paper_id": "", "title": "",
+                "year": None, "venue": "", "analysis": answer}
+    return None
+
+
+def _load_json(path: Path) -> Any:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _save_json(path: Path, payload: Any) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _stage_gap_mining(
