@@ -221,6 +221,23 @@ def _run_stages(
     survivors = [g for g in gaps
                  if _audit_verdict(audits, g.get("id", "")) == "KEEP"]
 
+    if not survivors:
+        # A fully-killed pool is a valid (and useful) outcome: the report must
+        # still explain what was considered and why nothing survived.
+        state.stop_reason = "all_gaps_killed"
+        (run_dir / "ideas.json").write_text("[]", encoding="utf-8")
+        (run_dir / "IDEA_PORTFOLIO.md").write_text(
+            "# IDEA_PORTFOLIO\n\nNo gaps survived the saturation audit.\n", encoding="utf-8")
+        (run_dir / "judgments.json").write_text("[]", encoding="utf-8")
+        state.stage_statuses["idea-portfolio"] = "completed"
+        state.stage_statuses["taste-gate"] = "completed"
+        ideas: list[dict[str, Any]] = []
+        judgments: list[dict[str, Any]] = []
+        (run_dir / "DISCOVERY_REPORT.md").write_text(
+            _render_report(state, theme, notes, gaps, audits, ideas, judgments),
+            encoding="utf-8")
+        return
+
     # --- Stage 6: idea portfolio (generator model) ------------------------
     if not done("idea-portfolio"):
         ideas_out = _stage_idea_portfolio(client, state, survivors, notes)
@@ -479,7 +496,9 @@ def _stage_saturation_audit(
         entries = _as_list_of_dicts(payload.get("audits"))
         if entries:
             entry = entries[-1]
-            entry.setdefault("gap_id", gap_id)
+            # The audited gap id is known from the request; never trust the
+            # model's echo (a mismatched id would silently leave the gap unaudited).
+            entry["gap_id"] = gap_id
             audits.append(entry)
         else:
             audits.append({"gap_id": gap_id, "verdict": "KEEP",
@@ -856,10 +875,36 @@ def _render_report(
         f"models: {state.models}",
         f"pool: {len(gaps)} gaps -> {len([a for a in audits if str(a.get('verdict')).upper() == 'KEEP'])} kept"
         f" -> {len(ideas)} ideas -> {len(keeps)} KEEP", "",
-        "## Verdicts", "",
-        "| id | novelty | incr.risk | arrow-first | so-what | decisive | verdict | reason |",
-        "|---|---|---|---|---|---|---|---|",
     ]
+
+    if not ideas and gaps:
+        lines += [
+            "## No surviving problems", "",
+            "The saturation audit killed every mined gap. This is a result, not a",
+            "failure: it says this pool offers no unsaturated, real-pain problem", "",
+            "| gap | type | question | kill reason |",
+            "|---|---|---|---|",
+        ]
+        for g in gaps:
+            verdict = next(
+                (a for a in audits if str(a.get("gap_id", "")) == str(g.get("id", ""))), {})
+            lines.append(
+                f"| {g.get('id', '?')} | {g.get('type', '')} | "
+                f"{_clip(str(g.get('question', '')), 110)} | "
+                f"{_clip(str(verdict.get('reason', 'no audit')), 130)} |")
+        lines += [
+            "",
+            "Suggestions: broaden the field (the theme may be too narrow),",
+            "increase --deep-read for more mining surface, or pick a field where",
+            "deployment reality has recently shifted.", "",
+        ]
+
+    if ideas:
+        lines += [
+            "## Verdicts", "",
+            "| id | novelty | incr.risk | arrow-first | so-what | decisive | verdict | reason |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
     for j in judgments:
         lines.append(
             f"| {j.get('id', '?')} | {j.get('problem_novelty', '?')} | "

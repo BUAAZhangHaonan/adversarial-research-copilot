@@ -303,3 +303,35 @@ def test_run_discover_hard_fails_when_mcp_down(
         dr.run_discover(
             topic="t", generator_model="flash", judge_model="pro",
             output_dir=str(tmp_path / "reports"))
+
+
+def test_run_discover_all_gaps_killed_still_reports(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class KillingLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Audit this gap" in user_prompt:
+                return (
+                    "```yaml\naudits:\n"
+                    "  - gap_id: G1\n    pain_saturation: 5\n    community_pain: 1\n"
+                    "    incremental_risk: 4\n    evidence: solved\n"
+                    "    verdict: KILL\n    reason: metric saturated at 98%+\n```\n"
+                )
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: KillingLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, state_file = dr.run_discover(
+        topic="fake topic", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+
+    report = report_file.read_text(encoding="utf-8")
+    assert "No surviving problems" in report
+    assert "metric saturated" in report
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["status"] == "completed"
+    assert state["stop_reason"] == "all_gaps_killed"
