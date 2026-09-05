@@ -604,6 +604,27 @@ def run_chat_mode(
     if review_cycles_data:
         _write_review_cycles_report(target_run_dir, review_cycles_data, chat_dir=chat_dir)
 
+    (target_run_dir / "COST_REPORT.md").write_text(
+        "\n".join([
+            "# COST_REPORT", "",
+            "## ARC-owned LLM calls", "",
+            "| model | calls | prompt tok | completion tok | total tok | wall time (s) | reports w/o usage |",
+            "|---|---:|---:|---:|---:|---:|---:|",
+            *[
+                f"| {model} | {stats.get('calls', 0)} | {stats.get('prompt_tokens', 0)} | "
+                f"{stats.get('completion_tokens', 0)} | {stats.get('total_tokens', 0)} | "
+                f"{stats.get('duration_ms', 0.0) / 1000.0:.1f} | {stats.get('reports_without_usage', 0)} |"
+                for model, stats in (client.snapshot_usage() if hasattr(client, "snapshot_usage") else {}).items()
+            ],
+            "",
+            "Note: literature retrieval uses the internal provider (arXiv /",
+            "Semantic Scholar / DeepXiv); their internal LLM spend is not",
+            "visible to ARC and is not included here.",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+
     if pending_actions:
         lines = ["# PENDING_ACTIONS", "",
                  "External work the judge routed out of the text debate.",

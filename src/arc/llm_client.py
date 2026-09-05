@@ -34,6 +34,11 @@ class LLMClient:
         self._default_fallback_max_output_tokens = _as_int(
             defaults.get("fallback_max_output_tokens"), 4096)
         self._models: dict[str, ModelSpec] = {}
+        # Per-model cumulative accounting: calls, prompt/completion/total
+        # tokens, wall time. Gateways that omit usage count as zeros and are
+        # flagged in cost reports (unknown != zero).
+        self.usage: dict[str, dict[str, float]] = {}
+        self.usage_unknown_reports = 0
         for name, spec in config.get("models", {}).items():
             self._models[name] = ModelSpec(
                 name=name,
@@ -46,6 +51,25 @@ class LLMClient:
                 max_tokens=_as_optional_int(spec.get("max_tokens")),
                 temperature=_as_optional_float(spec.get("temperature")),
             )
+
+    def _record_usage(self, model: str, usage_raw: Any, duration_ms: float) -> None:
+        entry = self.usage.setdefault(model, {
+            "calls": 0, "prompt_tokens": 0, "completion_tokens": 0,
+            "total_tokens": 0, "duration_ms": 0.0, "reports_without_usage": 0})
+        entry["calls"] += 1
+        entry["duration_ms"] += duration_ms
+        if isinstance(usage_raw, dict) and usage_raw.get("total_tokens") is not None:
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                try:
+                    entry[key] += int(usage_raw.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    pass
+        else:
+            entry["reports_without_usage"] += 1
+            self.usage_unknown_reports += 1
+
+    def snapshot_usage(self) -> dict[str, dict[str, float]]:
+        return {model: dict(stats) for model, stats in self.usage.items()}
 
     def chat(self, model: str, system_prompt: str, user_prompt: str, temperature: float = 0.3) -> str:
         if model not in self._models:
@@ -65,6 +89,8 @@ class LLMClient:
         delay = 0.6
         last_text: str | None = None
         for attempt in range(1, empty_retry_attempts + 1):
+            started = time.monotonic()
+            usage_out: dict[str, Any] = {}
             if spec.endpoint == "chat_completions":
                 text = self._call_chat_completions(
                     base_url,
@@ -74,6 +100,7 @@ class LLMClient:
                     user_prompt,
                     self._resolve_temperature(spec, temperature),
                     self._resolve_chat_max_tokens(spec),
+                    usage_out=usage_out,
                 )
             elif spec.endpoint == "responses":
                 text = self._call_responses(
@@ -85,12 +112,15 @@ class LLMClient:
                     self._resolve_temperature(spec, temperature),
                     self._resolve_max_output_tokens(spec),
                     self._resolve_fallback_max_output_tokens(),
+                    usage_out=usage_out,
                 )
             else:
                 raise ValueError(f"Unsupported endpoint: {spec.endpoint}")
 
             last_text = text
             if isinstance(text, str) and text.strip():
+                self._record_usage(model, usage_out.get("usage"),
+                                   (time.monotonic() - started) * 1000.0)
                 return text
 
             if attempt < empty_retry_attempts:
@@ -140,6 +170,7 @@ class LLMClient:
         user_prompt: str,
         temperature: float,
         max_tokens: int,
+        usage_out: dict[str, Any] | None = None,
     ) -> str:
         url = _resolve_api_url(base_url, "chat/completions")
         headers = {
@@ -158,6 +189,8 @@ class LLMClient:
         }
         try:
             data = _post_json_with_retry(url, headers, payload)
+            if usage_out is not None and isinstance(data, dict):
+                usage_out["usage"] = data.get("usage")
             # Some gateways return 200 with an empty/missing choices array;
             # treat malformed shapes like empty content and fall back to streaming.
             try:
@@ -200,6 +233,7 @@ class LLMClient:
         temperature: float,
         max_output_tokens: int,
         fallback_max_output_tokens: int,
+        usage_out: dict[str, Any] | None = None,
     ) -> str:
         url = _resolve_api_url(base_url, "responses")
         headers = {
@@ -243,6 +277,8 @@ class LLMClient:
                 fallback_payload["temperature"] = payload["temperature"]
             data = _post_json_with_retry(url, headers, fallback_payload)
 
+        if usage_out is not None and isinstance(data, dict):
+            usage_out["usage"] = data.get("usage")
         # Responses API may return either output_text shortcut or nested output items.
         if isinstance(data.get("output_text"), str) and data["output_text"].strip():
             return data["output_text"]

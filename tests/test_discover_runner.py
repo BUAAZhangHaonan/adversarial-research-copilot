@@ -768,3 +768,50 @@ def test_stress_test_passes_full_brief_and_cross_models(
     topic = captured["topic"]
     for marker in ("oracle replay on 100 failures", "not a benchmark", "delta D", "Prior W"):
         assert marker in topic, f"brief lost evidence: {marker}"
+
+
+def test_llm_client_records_usage(tmp_path: Path) -> None:
+    from arc.llm_client import LLMClient
+
+    cfg = tmp_path / "models.yaml"
+    cfg.write_text(
+        "models:\n  m1:\n    provider: p\n    base_url_env: B\n    api_key_env: K\n"
+        "    endpoint: chat_completions\n",
+        encoding="utf-8")
+
+    class FakeClient(LLMClient):
+        pass
+
+    client = FakeClient(config_path=str(cfg))
+    monkey = None
+    import arc.llm_client as lc
+
+    def fake_post(url, headers, payload, timeout=60.0):
+        class R:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"choices": [{"message": {"content": "hello"}}],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5,
+                                  "total_tokens": 15}}
+        return R()
+
+    original = lc.requests.post
+    lc.requests.post = fake_post
+    try:
+        import os
+        os.environ.setdefault("B", "http://x")
+        os.environ.setdefault("K", "k")
+        text = client.chat("m1", "sys", "user")
+    finally:
+        lc.requests.post = original
+
+    assert text == "hello"
+    stats = client.snapshot_usage()["m1"]
+    assert stats["calls"] == 1
+    assert stats["prompt_tokens"] == 10
+    assert stats["total_tokens"] == 15
+    assert stats["reports_without_usage"] == 0

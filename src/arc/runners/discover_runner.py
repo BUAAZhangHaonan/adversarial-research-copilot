@@ -82,6 +82,62 @@ class DiscoverState:
     timestamp: str = ""
 
 
+class _CountingMCP:
+    """Counts calls to an MCP client; server-side token spend is invisible to
+    ARC, so cost reports record call counts and say so honestly (review 七)."""
+
+    def __init__(self, inner: Any, counter: dict[str, int], name: str) -> None:
+        self._inner = inner
+        self._counter = counter
+        self._name = name
+
+    def call_tool(self, name: str, arguments: dict[str, Any], timeout: float = 600.0) -> str:
+        self._counter[self._name] = self._counter.get(self._name, 0) + 1
+        return self._inner.call_tool(name, arguments, timeout=timeout)
+
+    def close(self) -> None:
+        close = getattr(self._inner, "close", None)
+        if close:
+            close()
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._inner, item)
+
+
+def _render_cost_report(
+    llm_usage: dict[str, dict[str, float]],
+    mcp_calls: dict[str, int],
+) -> str:
+    lines = [
+        "# COST_REPORT", "",
+        "## ARC-owned LLM calls (billed to the configured DeepSeek key)", "",
+        "| model | calls | prompt tok | completion tok | total tok | wall time (s) | reports w/o usage |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for model, stats in llm_usage.items():
+        lines.append(
+            f"| {model} | {stats.get('calls', 0)} | {stats.get('prompt_tokens', 0)} | "
+            f"{stats.get('completion_tokens', 0)} | {stats.get('total_tokens', 0)} | "
+            f"{stats.get('duration_ms', 0.0) / 1000.0:.1f} | {stats.get('reports_without_usage', 0)} |")
+    if not llm_usage:
+        lines.append("| (none) | | | | | | |")
+    lines += [
+        "",
+        "## MCP service calls (billed to each service's own key)", "",
+    ]
+    for name, count in mcp_calls.items():
+        lines.append(f"- {name}: {count} tool calls")
+    lines += [
+        "",
+        "Note: MCP services run their own LLM pipelines internally and do not",
+        "report token usage to ARC; their cost is only bounded by these call",
+        "counts, not measured. Reports without usage are gateway responses that",
+        "omitted the usage field (recorded as zero, flagged in the last column).",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def run_discover(
     topic: str,
     generator_model: str,
@@ -132,7 +188,13 @@ def run_discover(
     (run_dir / "TOPIC_DISCOVER.txt").write_text(topic.strip() + "\n", encoding="utf-8")
 
     client = LLMClient()
-    services = connect_services()  # hard-fails with startup hints
+    raw_services = connect_services()  # hard-fails with startup hints
+    mcp_call_counts: dict[str, int] = {}
+    services = MCPServices(
+        webresearch=_CountingMCP(raw_services.webresearch, mcp_call_counts, "webresearch"),
+        scholartrace=_CountingMCP(raw_services.scholartrace, mcp_call_counts, "scholartrace"),
+        scholaranalysis=_CountingMCP(raw_services.scholaranalysis, mcp_call_counts, "scholaranalysis"),
+    )
     state = DiscoverState(topic=topic, models=models, config=cfg)
     if resumed_state is not None:
         saved_statuses = resumed_state.get("stage_statuses")
@@ -146,6 +208,10 @@ def run_discover(
 
     if cfg.stress_test:
         _run_stress_test(run_dir, state)
+
+    usage = client.snapshot_usage() if hasattr(client, "snapshot_usage") else {}
+    (run_dir / "COST_REPORT.md").write_text(
+        _render_cost_report(usage, mcp_call_counts), encoding="utf-8")
 
     state.status = "completed"
     state.stop_reason = state.stop_reason if state.stop_reason != "running" else "completed"
