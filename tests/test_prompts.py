@@ -67,6 +67,40 @@ PROMPT_MARKERS = {
         "必须使用中文自然表达",
         "[JUDGE_DECISION]:",
     ],
+    "prompts/latest/discover/theme_framer.md": [
+        "Cognitive task",
+        "Anti-patterns",
+        "theme:",
+        "search_queries:",
+    ],
+    "prompts/latest/discover/gap_miner.md": [
+        "Cognitive task",
+        "Judgment anchors",
+        "Anti-patterns",
+        "gaps:",
+        "evidence_ids:",
+        "question:",
+    ],
+    "prompts/latest/discover/saturation_auditor.md": [
+        "Cognitive task",
+        "audits:",
+        "pain_saturation:",
+        "verdict:",
+    ],
+    "prompts/latest/discover/idea_generator.md": [
+        "Cognitive task",
+        "ideas:",
+        "one_sentence_problem:",
+        "minimal_falsifiable_test:",
+        "anti_scope:",
+    ],
+    "prompts/latest/discover/taste_judge.md": [
+        "Hard rules",
+        "judgments:",
+        "problem_novelty:",
+        "arrow_before_target:",
+        "verdict:",
+    ],
 }
 
 
