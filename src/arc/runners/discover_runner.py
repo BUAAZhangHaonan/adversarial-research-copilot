@@ -556,7 +556,7 @@ def _stage_saturation_audit(
     for gap in gaps[:_MAX_GAPS_TO_AUDIT]:
         gap_id = str(gap.get("id", ""))
         question = str(gap.get("question", "")) or str(gap.get("statement", ""))
-        query = f"{question} benchmark state of the art limitation pain point"
+        query = f"{question} benchmark evidence limitations open problem"
         try:
             raw = services.webresearch.call_tool("web_search", {
                 "query": query,

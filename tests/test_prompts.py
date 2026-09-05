@@ -84,7 +84,9 @@ PROMPT_MARKERS = {
     "prompts/latest/discover/saturation_auditor.md": [
         "Cognitive task",
         "audits:",
-        "pain_saturation:",
+        "INSUFFICIENT_EVIDENCE",
+        "evidence_basis:",
+        "missing_evidence:",
         "verdict:",
     ],
     "prompts/latest/discover/idea_generator.md": [
