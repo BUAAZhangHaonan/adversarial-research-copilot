@@ -136,7 +136,7 @@ def run_discover(
             state.stage_statuses = dict(saved_statuses)
 
     try:
-        _run_stages(run_dir, client, services, state)
+        _run_stages(run_dir, state_file, client, services, state)
     finally:
         services.close_all()
 
@@ -153,6 +153,7 @@ def run_discover(
 
 def _run_stages(
     run_dir: Path,
+    state_file: Path,
     client: LLMClient,
     services: MCPServices,
     state: DiscoverState,
@@ -165,7 +166,8 @@ def _run_stages(
 
     def mark(stage: str) -> None:
         state.stage_statuses[stage] = "completed"
-        state.timestamp = datetime.now(UTC).isoformat()
+        # Persist after every stage so an interrupted run is resumable.
+        _save_state(state_file, state)
 
     # --- Stage 1: theme framing (generator model) -----------------------
     if not done("theme-framing"):
