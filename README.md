@@ -191,14 +191,18 @@ GLM 官方文档接口：`https://open.bigmodel.cn/api/coding/paas/v4/chat/compl
 - 根路径：`https://open.bigmodel.cn/api/coding/paas/v4`
 - 完整端点：`https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
 
-默认模型：
-- Proposer: gpt-5.4
-- Skeptic: glm-5.1
-- Moderator: gpt-5.4
+默认模型（DeepSeek 分工：flash 负责生成类角色，pro 负责裁决类角色）：
+- Proposer: deepseek-v4-flash
+- Skeptic: deepseek-v4-flash
+- Moderator: deepseek-v4-pro
 
 可选模型（已内置到 `configs/models.yaml`）：
-- gpt-5.4
-- glm-5.1
+- deepseek-v4-flash
+- deepseek-v4-pro
+- gpt-5.4（保留条目，需自备有效 key）
+- glm-5.1（保留条目，需自备有效 key）
+
+DeepSeek 官方接口（OpenAI 兼容）：`https://api.deepseek.com`，配置 `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_API_KEY`。
 
 ### 2.1) Configure Literature Retrieval (Unified Internal Provider)
 

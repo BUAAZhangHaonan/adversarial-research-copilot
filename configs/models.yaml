@@ -6,6 +6,20 @@ generation_defaults:
   fallback_max_output_tokens: 4096
 
 models:
+  deepseek-v4-flash:
+    provider: deepseek
+    base_url_env: DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY
+    endpoint: chat_completions
+    max_tokens: 16384
+    temperature: 0.3
+  deepseek-v4-pro:
+    provider: deepseek
+    base_url_env: DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY
+    endpoint: chat_completions
+    max_tokens: 16384
+    temperature: 0.3
   gpt-5.4:
     provider: gpt
     base_url_env: GPT_BASE_URL
@@ -22,6 +36,6 @@ models:
     temperature: 0.3
 
 aliases:
-  proposer_default: gpt-5.4
-  skeptic_default: glm-5.1
-  moderator_default: gpt-5.4
+  proposer_default: deepseek-v4-flash
+  skeptic_default: deepseek-v4-flash
+  moderator_default: deepseek-v4-pro

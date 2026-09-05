@@ -1,7 +1,7 @@
 roles:
-  proposer: gpt-5.4
-  skeptic: glm-5.1
-  moderator: gpt-5.4
-  pipeline_writer: gpt-5.4
-  pipeline_reviewer: glm-5.1
-  pipeline_moderator: gpt-5.4
+  proposer: deepseek-v4-flash
+  skeptic: deepseek-v4-flash
+  moderator: deepseek-v4-pro
+  pipeline_writer: deepseek-v4-flash
+  pipeline_reviewer: deepseek-v4-pro
+  pipeline_moderator: deepseek-v4-pro
