@@ -59,6 +59,7 @@ Runtime-owned contract fields (must not drift without updating
 - `theme_framer`: `theme` → `field`, `subtopics`, `must_include`, `exclude`, `search_queries`
 - `gap_miner`: `gaps` → `id`, `type`, `question`, `evidence_ids`, `why_unexplored`, `who_needs_it`, `confidence`
 - `saturation_auditor`: `audits` → `gap_id`, `verdict` (KEEP | INSUFFICIENT_EVIDENCE | KILL), `evidence_basis` (real_world_failure | scientific_deficit | none), `evidence`, `missing_evidence`, `reason`
+- `duplicate_checker`: `checks` → `idea_id`, `closest_works`, `differentiation`, `novelty_verdict` (DISTINCT | POSSIBLY_DUPLICATE | DUPLICATE), `duplicate_of`, `unchecked`, `reason`
 - `idea_generator`: `ideas` → `id`, `from_gaps`, `one_sentence_problem`, `gap_evidence`, `who_needs_it`, `why_now`, `minimal_falsifiable_test`, `anti_scope`
 - `taste_judge`: `judgments` → `id`, `problem_novelty`, `incremental_risk`, `arrow_before_target`, `so_what`, `decisiveness`, `verdict`, `reason`
 

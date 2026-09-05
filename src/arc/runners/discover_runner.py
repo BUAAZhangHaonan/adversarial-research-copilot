@@ -37,6 +37,7 @@ DISCOVER_STAGES = [
     "gap-mining",
     "saturation-audit",
     "idea-portfolio",
+    "duplicate-check",
     "taste-gate",
 ]
 
@@ -58,6 +59,9 @@ class DiscoverConfig:
     deep_read: int = 12
     ideas: int = 8
     webresearch_max_results: int = 6
+    dedup_web_queries: int = 2
+    dedup_scholartrace_enabled: bool = True
+    dedup_scholartrace_limit: int = 5
     stress_test: bool = False
     stress_rounds: int = 10
     stress_top_k: int = 3
@@ -231,13 +235,18 @@ def _run_stages(
         (run_dir / "ideas.json").write_text("[]", encoding="utf-8")
         (run_dir / "IDEA_PORTFOLIO.md").write_text(
             "# IDEA_PORTFOLIO\n\nNo gaps survived to idea composition.\n", encoding="utf-8")
+        (run_dir / "duplicate_checks.json").write_text("[]", encoding="utf-8")
+        (run_dir / "DUPLICATE_CHECK.md").write_text(
+            "# DUPLICATE_CHECK\n\nNo ideas to check.\n", encoding="utf-8")
         (run_dir / "judgments.json").write_text("[]", encoding="utf-8")
         state.stage_statuses["idea-portfolio"] = "completed"
+        state.stage_statuses["duplicate-check"] = "completed"
         state.stage_statuses["taste-gate"] = "completed"
         ideas: list[dict[str, Any]] = []
         judgments: list[dict[str, Any]] = []
+        dedup_checks: list[dict[str, Any]] = []
         (run_dir / "DISCOVERY_REPORT.md").write_text(
-            _render_report(state, theme, notes, gaps, audits, ideas, judgments),
+            _render_report(state, theme, notes, gaps, audits, ideas, judgments, dedup_checks),
             encoding="utf-8")
         return
 
@@ -255,24 +264,39 @@ def _run_stages(
     if not ideas:
         # Surviving gaps but the composer produced nothing worth judging.
         state.stop_reason = "no_composable_ideas"
+        (run_dir / "duplicate_checks.json").write_text("[]", encoding="utf-8")
+        (run_dir / "DUPLICATE_CHECK.md").write_text(
+            "# DUPLICATE_CHECK\n\nNo ideas to check.\n", encoding="utf-8")
         (run_dir / "judgments.json").write_text("[]", encoding="utf-8")
+        state.stage_statuses["duplicate-check"] = "completed"
         state.stage_statuses["taste-gate"] = "completed"
         judgments: list[dict[str, Any]] = []
+        dedup_checks = _as_list_of_dicts(_load_json(run_dir / "duplicate_checks.json"))
         (run_dir / "DISCOVERY_REPORT.md").write_text(
-            _render_report(state, theme, notes, gaps, audits, ideas, judgments),
+            _render_report(state, theme, notes, gaps, audits, ideas, judgments, dedup_checks),
             encoding="utf-8")
         return
 
-    # --- Stage 7: taste gate (judge model) ---------------------------------
+    # --- Stage 7: duplicate check (targeted novelty forensics) -------------
+    if not done("duplicate-check"):
+        checks = _stage_duplicate_check(run_dir, client, services, state, ideas)
+        (run_dir / "DUPLICATE_CHECK.md").write_text(
+            _render_duplicate_checks(checks), encoding="utf-8")
+        mark("duplicate-check")
+
+    dedup_checks: list[dict[str, Any]] = json.loads(
+        _read_text(run_dir / "duplicate_checks.json") or "[]")
+
+    # --- Stage 8: taste gate (judge model) ---------------------------------
     if not done("taste-gate"):
-        judgments = _stage_taste_gate(client, state, ideas)
+        judgments = _stage_taste_gate(client, state, ideas, dedup_checks)
         (run_dir / "judgments.json").write_text(
             json.dumps(judgments, ensure_ascii=False, indent=2), encoding="utf-8")
         mark("taste-gate")
 
     judgments: list[dict[str, Any]] = json.loads(_read_text(run_dir / "judgments.json"))
     (run_dir / "DISCOVERY_REPORT.md").write_text(
-        _render_report(state, theme, notes, gaps, audits, ideas, judgments),
+        _render_report(state, theme, notes, gaps, audits, ideas, judgments, dedup_checks),
         encoding="utf-8")
 
 
@@ -647,8 +671,126 @@ def _stage_idea_portfolio(
     return ideas[: cfg.ideas]
 
 
+def _stage_duplicate_check(
+    run_dir: Path,
+    client: LLMClient,
+    services: MCPServices,
+    state: DiscoverState,
+    ideas: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Targeted novelty forensics per candidate (review 二.2).
+
+    After a candidate exists, actively search for the prior work most likely
+    to destroy its novelty — synonymous phrasings and mechanism terms via
+    webresearch, substance-level matches via a small scholartrace query — and
+    produce closest_works + differentiation for the taste gate.
+    """
+    cfg = state.config
+    system = _load_prompt("duplicate_checker", cfg.prompt_language)
+    checks_file = run_dir / "duplicate_checks.json"
+    checks: list[dict[str, Any]] = _as_list_of_dicts(_load_json(checks_file))
+    checked_ids = {str(c.get("idea_id")) for c in checks}
+
+    for idea in ideas:
+        idea_id = str(idea.get("id", ""))
+        if not idea_id or idea_id in checked_ids:
+            continue
+        problem = str(idea.get("one_sentence_problem", ""))
+        mechanism = str(idea.get("minimal_falsifiable_test", ""))[:160]
+
+        web_parts: list[str] = []
+        queries = [problem, f"{problem} mechanism {mechanism}"][: max(1, cfg.dedup_web_queries)]
+        for q in queries:
+            try:
+                raw = services.webresearch.call_tool(
+                    "web_search", {"query": q, "max_results": 5}, timeout=120.0)
+                web_parts.append(_digest_web_results(raw, 5))
+            except MCPError as exc:
+                web_parts.append(f"(web search unavailable: {exc})")
+
+        hits_text = "(scholartrace dedup disabled)"
+        if cfg.dedup_scholartrace_enabled:
+            try:
+                raw = services.scholartrace.call_tool("query", {
+                    "theme_document": f"Novelty check for candidate: {problem}",
+                    "final_limit": cfg.dedup_scholartrace_limit,
+                    "agent_candidate_limit": 10,
+                    "coarse_pool_limit": 20,
+                    "include_rationale": False,
+                }, timeout=cfg.mcp_call_timeout)
+                hits = _as_list_of_dicts(json.loads(raw).get("papers", []))
+                hits_text = "\n".join(
+                    f"- {h.get('title', '')} ({h.get('year', '')}): "
+                    f"{_clip(str(h.get('abstract', '')), 240)}"
+                    for h in hits
+                ) or "(no hits)"
+            except (MCPError, json.JSONDecodeError) as exc:
+                hits_text = f"(scholartrace unavailable: {exc})"
+
+        user = (
+            f"Duplicate-check candidate {idea_id}:\n"
+            f"{json.dumps(idea, ensure_ascii=False, indent=1)}\n\n"
+            f"Web dossier:\n{_clip(chr(10).join(web_parts), _DOSSIER_MAX_CHARS)}\n\n"
+            f"Paper-search hits:\n{_clip(hits_text, _DOSSIER_MAX_CHARS)}\n\n"
+            "Check this candidate per your instructions."
+        )
+        try:
+            payload = _structured_call(
+                client, state.models["judge"], system, user, temperature=0.2, key="checks")
+        except DiscoverError as exc:
+            checks.append({"idea_id": idea_id, "novelty_verdict": "POSSIBLY_DUPLICATE",
+                           "reason": f"duplicate-check unparseable: {exc}",
+                           "closest_works": [], "differentiation": "", "unchecked": ""})
+            _save_json(checks_file, checks)
+            continue
+        entries = _as_list_of_dicts(payload.get("checks"))
+        entry = entries[-1] if entries else {}
+        entry["idea_id"] = idea_id
+        verdict = str(entry.get("novelty_verdict", "")).strip().upper()
+        if verdict not in {"DISTINCT", "POSSIBLY_DUPLICATE", "DUPLICATE"}:
+            entry["reason"] = f"unknown verdict {verdict!r}; {entry.get('reason', '')}"
+            verdict = "POSSIBLY_DUPLICATE"
+        entry["novelty_verdict"] = verdict
+        checks.append(entry)
+        checked_ids.add(idea_id)
+        _save_json(checks_file, checks)  # incremental: interrupted reruns skip done ids
+
+    return checks
+
+
+def _dedup_digest(dedup_checks: list[dict[str, Any]]) -> str:
+    if not dedup_checks:
+        return "(no duplicate-check material)"
+    parts: list[str] = []
+    for c in dedup_checks:
+        works = "; ".join(str(w) for w in (c.get("closest_works") or [])[:3])
+        parts.append(
+            f"[{c.get('idea_id')}] novelty={c.get('novelty_verdict', '?')} | "
+            f"closest: {works or 'none listed'} | "
+            f"delta: {_clip(str(c.get('differentiation', '')), 400)} | "
+            f"unchecked: {_clip(str(c.get('unchecked', '')), 200)}")
+    return "\n".join(parts)
+
+
+def _render_duplicate_checks(checks: list[dict[str, Any]]) -> str:
+    lines = ["# DUPLICATE_CHECK", "", f"candidates checked: {len(checks)}", ""]
+    for c in checks:
+        lines.append(f"## {c.get('idea_id', '?')} — {c.get('novelty_verdict', '?')}")
+        lines.append("")
+        for w in c.get("closest_works") or []:
+            lines.append(f"- closest: {w}")
+        lines.append(f"differentiation: {c.get('differentiation', '')}")
+        lines.append(f"unchecked: {c.get('unchecked', '')}")
+        lines.append(f"reason: {c.get('reason', '')}")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def _stage_taste_gate(
-    client: LLMClient, state: DiscoverState, ideas: list[dict[str, Any]],
+    client: LLMClient,
+    state: DiscoverState,
+    ideas: list[dict[str, Any]],
+    dedup_checks: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     if not ideas:
         return []
@@ -657,6 +799,8 @@ def _stage_taste_gate(
     user = (
         "Candidate research problems:\n\n"
         + "\n\n".join(json.dumps(i, ensure_ascii=False, indent=1) for i in ideas)
+        + "\n\nDuplicate-check material (novelty forensics per candidate):\n"
+        + _dedup_digest(dedup_checks or [])
         + "\n\nJudge each per your instructions; order best first."
     )
     payload = _structured_call(
@@ -739,12 +883,15 @@ def _load_config(config_path: str | Path = "configs/discover.yaml") -> DiscoverC
         raw = data.get("discover", {}) if isinstance(data, dict) else {}
         if isinstance(raw, dict):
             for key in ("papers", "deep_read", "ideas", "webresearch_max_results",
+                        "dedup_web_queries", "dedup_scholartrace_limit",
                         "stress_rounds", "stress_top_k", "stale_resume_hours",
                         "min_deep_read_ok"):
                 if key in raw:
                     setattr(cfg, key, int(raw[key]))
             if "stress_test" in raw:
                 cfg.stress_test = bool(raw["stress_test"])
+            if "dedup_scholartrace_enabled" in raw:
+                cfg.dedup_scholartrace_enabled = bool(raw["dedup_scholartrace_enabled"])
             if "prompt_language" in raw:
                 cfg.prompt_language = str(raw["prompt_language"])
             if "mcp_call_timeout" in raw:
@@ -982,7 +1129,9 @@ def _render_report(
     audits: list[dict[str, Any]],
     ideas: list[dict[str, Any]],
     judgments: list[dict[str, Any]],
+    dedup_checks: list[dict[str, Any]] | None = None,
 ) -> str:
+    dedup_checks = dedup_checks or []
     by_id = {i.get("id"): i for i in ideas}
     keeps = [j for j in judgments if str(j.get("verdict", "")).upper() == "KEEP"]
     keeps.sort(key=lambda j: _taste_score(j), reverse=True)
@@ -1020,15 +1169,19 @@ def _render_report(
             "deployment reality has recently shifted.", "",
         ]
 
+    dedup_by_id = {str(c.get("idea_id")): c for c in dedup_checks}
+
     if ideas:
         lines += [
             "## Verdicts", "",
-            "| id | novelty | incr.risk | arrow-first | so-what | decisive | verdict | reason |",
-            "|---|---|---|---|---|---|---|---|",
+            "| id | dedup | novelty | incr.risk | arrow-first | so-what | decisive | verdict | reason |",
+            "|---|---|---|---|---|---|---|---|---|",
         ]
     for j in judgments:
+        dedup = dedup_by_id.get(str(j.get("id")), {})
         lines.append(
-            f"| {j.get('id', '?')} | {j.get('problem_novelty', '?')} | "
+            f"| {j.get('id', '?')} | {dedup.get('novelty_verdict', '-')} | "
+            f"{j.get('problem_novelty', '?')} | "
             f"{j.get('incremental_risk', '?')} | {j.get('arrow_before_target', '?')} | "
             f"{j.get('so_what', '?')} | {j.get('decisiveness', '?')} | "
             f"**{str(j.get('verdict', '?')).upper()}** | {_clip(str(j.get('reason', '')), 90)} |")
@@ -1039,6 +1192,10 @@ def _render_report(
         lines.append(f"### #{rank} — {idea.get('one_sentence_problem', '')}")
         lines.append("")
         lines.append(f"- **id**: {j.get('id')} | taste score: {_taste_score(j):.1f}")
+        dedup = dedup_by_id.get(str(j.get("id")), {})
+        if dedup:
+            lines.append(f"- **dedup verdict**: {dedup.get('novelty_verdict', '?')} | "
+                         f"delta: {_clip(str(dedup.get('differentiation', '')), 300)}")
         lines.append(f"- **gap evidence**: {idea.get('gap_evidence', '')}")
         lines.append(f"- **who needs it**: {idea.get('who_needs_it', '')}")
         lines.append(f"- **why now**: {idea.get('why_now', '')}")
@@ -1089,6 +1246,7 @@ def _write_output_index(run_dir: Path, state: DiscoverState) -> None:
         ("GAP_ANALYSIS.md / gaps.json", "Mined problem-level gaps"),
         ("SATURATION_AUDIT.md / audits.json", "Pain saturation audit per gap"),
         ("IDEA_PORTFOLIO.md / ideas.json", "New problem statements"),
+        ("DUPLICATE_CHECK.md / duplicate_checks.json", "Targeted novelty forensics per candidate"),
         ("judgments.json", "Taste-gate verdicts"),
         ("DISCOVERY_REPORT.md", "Final ranked report"),
         ("STRESS_TESTS.json", "Stress-test run manifest (optional)"),

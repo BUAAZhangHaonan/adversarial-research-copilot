@@ -176,6 +176,15 @@ class FakeDiscoverLLM:
                 "    minimal_falsifiable_test: run Z on 100 cases\n"
                 "    anti_scope: not a new benchmark\n```\n"
             )
+        if "Check this candidate" in user_prompt:
+            return (
+                "```yaml\nchecks:\n"
+                "  - idea_id: echo\n    closest_works:\n"
+                "      - 'Closest Prior Work — same question under narrower conditions'\n"
+                "    differentiation: prior work covered C; candidate examines D; delta is Y\n"
+                "    novelty_verdict: DISTINCT\n    unchecked: adjacent-field phrasings\n"
+                "    reason: substantive delta named\n```\n"
+            )
         if "Judge each" in user_prompt:
             return (
                 "```yaml\njudgments:\n"
@@ -267,7 +276,8 @@ def test_run_discover_resume_skips_completed_stages(
     dr.run_discover(topic="fake topic", generator_model="flash", judge_model="pro",
                     output_dir=str(reports))
     first = dict(calls)
-    assert first["query"] == 1 and first["analyze"] == 3
+    # 1 wide retrieval + 1 duplicate-check query per candidate (1 idea)
+    assert first["query"] == 2 and first["analyze"] == 3
 
     # Simulate an interrupted rerun: mark stages incomplete but keep artifacts.
     marker = reports / "LATEST_RUN"
@@ -280,7 +290,7 @@ def test_run_discover_resume_skips_completed_stages(
     report_file, _ = dr.run_discover(
         topic="fake topic", generator_model="flash", judge_model="pro",
         output_dir=str(reports), resume=True)
-    assert calls["query"] == 1  # no re-retrieval
+    assert calls["query"] == 2  # no re-retrieval (1 retrieval + 1 dedup, unchanged)
     assert calls["analyze"] == 3  # no re-reading
     assert calls["llm"] == first["llm"]  # no re-generation
     assert "When and why does X fail under Y?" in report_file.read_text(encoding="utf-8")
@@ -605,3 +615,58 @@ def test_deep_read_restores_cached_notes_without_repaying(
     by_id = {n["arxiv_id"]: n for n in notes}
     assert by_id["2401.00001"]["analysis"] == "cached extraction from previous run"
     assert analyze_calls["count"] == 1, "only the uncached paper should be re-analyzed"
+
+
+def test_duplicate_check_incremental_and_feeds_taste_gate(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Dedup persists per-idea (interrupted rerun skips done ids) and its
+    material reaches the taste-gate prompt (review D2)."""
+    taste_prompts: list[str] = []
+    dedup_llm_calls = {"count": 0}
+
+    class DedupCountingLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Check this candidate" in user_prompt:
+                dedup_llm_calls["count"] += 1
+                idea_id = "I1" if "I1" in user_prompt else "I2"
+                return (
+                    f"```yaml\nchecks:\n  - idea_id: echo\n"
+                    f"    closest_works:\n      - 'Prior W{idea_id}'\n"
+                    f"    differentiation: delta {idea_id}\n"
+                    f"    novelty_verdict: DISTINCT\n    unchecked: x\n    reason: r\n```\n"
+                )
+            if "Judge each" in user_prompt:
+                taste_prompts.append(user_prompt)
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: DedupCountingLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, _ = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+    run_dir = report_file.parent
+
+    checks = json.loads((run_dir / "duplicate_checks.json").read_text(encoding="utf-8"))
+    assert {c["idea_id"] for c in checks} == {"I1"}  # the fake composer emits one idea
+    assert dedup_llm_calls["count"] == 1
+    report = (run_dir / "DISCOVERY_REPORT.md").read_text(encoding="utf-8")
+    assert "delta I1" in report, "dedup delta must surface in the kept-problem section"
+    dedup_doc = (run_dir / "DUPLICATE_CHECK.md").read_text(encoding="utf-8")
+    assert "Prior WI1" in dedup_doc, "closest prior work must be recorded in DUPLICATE_CHECK.md"
+
+    # Simulate interruption after the dedup stage and rerun: no re-checking.
+    state_path = run_dir / "discover_state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["status"] = "in_progress"
+    state["stage_statuses"] = {k: v for k, v in state["stage_statuses"].items()
+                               if k not in ("taste-gate",)}
+    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    marker = reports = tmp_path / "reports"
+    dr.run_discover(topic="t", generator_model="flash", judge_model="pro",
+                    output_dir=str(marker), resume=True)
+    assert dedup_llm_calls["count"] == 1, "already-checked candidates must be skipped"

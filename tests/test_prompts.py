@@ -89,6 +89,13 @@ PROMPT_MARKERS = {
         "missing_evidence:",
         "verdict:",
     ],
+    "prompts/latest/discover/duplicate_checker.md": [
+        "Cognitive task",
+        "checks:",
+        "novelty_verdict:",
+        "POSSIBLY_DUPLICATE",
+        "differentiation:",
+    ],
     "prompts/latest/discover/idea_generator.md": [
         "Cognitive task",
         "ideas:",

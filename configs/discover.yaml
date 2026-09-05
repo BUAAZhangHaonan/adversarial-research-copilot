@@ -9,6 +9,11 @@ discover:
   ideas: 8
   # Saturation audit: web results per gap dossier.
   webresearch_max_results: 6
+  # Duplicate check: web queries per candidate (synonymous phrasing + mechanism terms).
+  dedup_web_queries: 2
+  # Duplicate check: small scholartrace query per candidate (slower but substantive).
+  dedup_scholartrace_enabled: true
+  dedup_scholartrace_limit: 5
   # Optional stress test after the report.
   stress_test: false
   stress_rounds: 10
