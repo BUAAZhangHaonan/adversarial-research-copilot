@@ -786,7 +786,7 @@ def test_llm_client_records_usage(tmp_path: Path) -> None:
     monkey = None
     import arc.llm_client as lc
 
-    def fake_post(url, headers, payload, timeout=60.0):
+    def fake_post(url, headers=None, json=None, payload=None, timeout=60.0, **kwargs):
         class R:
             status_code = 200
 
