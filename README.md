@@ -382,6 +382,40 @@ Chat mode 主要产物（默认 `reports/<timestamp>/`）：
        - chat mode 产物（`CHAT_TRANSCRIPT.md` / `BEST_CONSENSUS.md` 等）
 
 
+### 3.3) Run Discover Mode（从文献中挖掘新问题）
+
+与 chat-mode 的方向相反：不是带着 idea 来辩护，而是**先宽检索、深阅读，从文献的矛盾与空白中挖出值得做的新问题**。适合"想找个有意义的方向但不知道做什么"的场景。
+
+```bash
+arc discover "multimodal LLM hallucination: where is the remaining real pain" \
+       --papers 60 --deep-read 12 --ideas 8 \
+       --output-dir reports
+```
+
+流程（7 个 stage，每个 stage 落盘、支持 `--resume`）：
+
+1. **theme-framing**（flash）：把粗糙主题结构化为检索任务书
+2. **wide-retrieval**（ScholarTrace MCP）：宽检索 + 服务端重排，产出 60 篇候选池
+3. **deep-read**（ScholarAnalysis MCP）：对 top 12 篇做全文抽取——核心结论/自述局限/未来工作/关键假设
+4. **gap-mining**（pro）：跨论文挖四类空白——互相矛盾的结论、≥2 篇反复提及无人解决的局限、活跃方向的无人交叉点、前提已过时的机会
+5. **saturation-audit**（webresearch MCP + pro）：对每个 gap 查社区讨论与基准水位，杀掉痛点已饱和（如指标 98%+）或无人真实受苦的方向
+6. **idea-portfolio**（flash）：从幸存 gap 组合新问题陈述——问题必须新，实现允许简单
+7. **taste-gate**（pro）：品味门——问题新颖度 / A+B 增量风险 / 先箭后靶检测 / so-what / 可证伪性，硬规则：方法重组无新问题直接 KILL
+
+产物（`reports/<timestamp>_flash_pro/`）：
+- `DISCOVERY_REPORT.md`（最终排名报告，先读这个）
+- `THEME.md` / `CANDIDATE_POOL.md` / `DEEP_READ/` / `GAP_ANALYSIS.md` / `SATURATION_AUDIT.md` / `IDEA_PORTFOLIO.md`
+- `OUTPUT_INDEX.md`（全部产物索引）
+
+加 `--stress-test` 会把 top KEEP 的 idea 自动送入 chat-mode 辩论做压力测试（`--stress-rounds` 控制轮数）。
+
+**依赖**：三个 MCP 服务必须可用（任一不可用直接报错停止，不降级）：
+- ScholarTrace（SSE `http://127.0.0.1:8001/sse`）：`bash /home/g203/zhanghaonan/ScholarTrace/run_scholartrace_mcp_sse.sh`
+- ScholarAnalysis（SSE `http://127.0.0.1:8005/sse`）：`bash /home/g203/zhanghaonan/ScholarAnalysis/run.sh`
+- webresearch-mcp（stdio）：`/home/g203/zhanghaonan/webresearch-mcp/.venv/bin/python -m webresearch_mcp.server`
+
+配置见 `.env` 的 `ARC_MCP_*` 变量。检索/深读/网页调研消耗三个服务自带的 key；你的 DeepSeek key 只付 ARC 自身的 LLM 调用（单次约 15-30 次，flash 为主）。
+
 ### 4) Test
 
 ```bash

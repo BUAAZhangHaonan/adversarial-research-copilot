@@ -269,6 +269,56 @@ def chat_mode(
         console.print(f"[bold green]Best consensus:[/bold green] {consensus_file}")
 
 
+@app.command("discover")
+def discover(
+    topic: str = typer.Argument(..., help="Research field or rough topic to mine for novel problems"),
+    proposer: Optional[str] = typer.Option(
+        None, help="Generator model (default: proposer role, deepseek-v4-flash)"),
+    moderator: Optional[str] = typer.Option(
+        None, help="Judge model (default: moderator role, deepseek-v4-pro)"),
+    output_dir: str = typer.Option("reports", help="Output directory"),
+    resume: bool = typer.Option(False, help="Resume from latest discover run if in progress"),
+    papers: Optional[int] = typer.Option(
+        None, help="Reranked paper pool size (default: configs/discover.yaml)"),
+    deep_read: Optional[int] = typer.Option(
+        None, help="Top papers to deep-read (default: configs/discover.yaml)"),
+    ideas: Optional[int] = typer.Option(
+        None, help="Candidate ideas to compose (default: configs/discover.yaml)"),
+    stress_test: bool = typer.Option(
+        False, "--stress-test/--no-stress-test",
+        help="Run chat-mode stress tests on top KEEP ideas after the report"),
+    stress_rounds: Optional[int] = typer.Option(
+        None, help="Max rounds per stress-test debate (default: configs/discover.yaml)"),
+    prompt_language: str = typer.Option("en", help="Prompt language: en|zh"),
+) -> None:
+    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
+
+    registry = load_registry()
+    runtime = load_runtime_roles(registry)
+    generator_model = resolve_role_model("proposer", registry, runtime, proposer)
+    judge_model = resolve_role_model("moderator", registry, runtime, moderator)
+    generator_model = _ensure_known_model("proposer", generator_model, registry)
+    judge_model = _ensure_known_model("moderator", judge_model, registry)
+
+    from arc.runners.discover_runner import run_discover
+
+    report_file, state_file = run_discover(
+        topic=topic,
+        generator_model=generator_model,
+        judge_model=judge_model,
+        output_dir=output_dir,
+        resume=resume,
+        papers=papers,
+        deep_read=deep_read,
+        ideas=ideas,
+        stress_test=stress_test,
+        stress_rounds=stress_rounds,
+        prompt_language=prompt_language,
+    )
+    console.print(f"[bold green]Discovery report:[/bold green] {report_file}")
+    console.print(f"[bold green]Discover state:[/bold green] {state_file}")
+
+
 @app.command("refine-topic")
 def refine_topic_cmd(
     topic: str = typer.Argument(..., help="Raw research problem statement"),

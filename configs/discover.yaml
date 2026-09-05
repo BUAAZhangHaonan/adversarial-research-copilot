@@ -1,0 +1,20 @@
+discover:
+  # Stage 2: final reranked paper pool size from scholartrace.
+  papers: 60
+  # Stage 3: how many top papers get a full-text deep read (arXiv-only records).
+  deep_read: 12
+  # Minimum usable deep-read notes required to continue (hard floor).
+  min_deep_read_ok: 3
+  # Stage 5: candidate ideas to compose from surviving gaps.
+  ideas: 8
+  # Saturation audit: web results per gap dossier.
+  webresearch_max_results: 6
+  # Optional stress test after the report.
+  stress_test: false
+  stress_rounds: 10
+  stress_top_k: 3
+  prompt_language: en
+  # Per-MCP-call timeout (scholartrace.query and scholaranalysis.analyze_paper
+  # run full server-side pipelines and can take minutes).
+  mcp_call_timeout: 900
+  stale_resume_hours: 24
