@@ -1,15 +1,52 @@
 # Adversarial-Research-Copilot (ARC)
 
-An adversarial multi-agent framework for iterative research idea critique, refinement, and convergence.
+**从文献中勘探新问题，用对抗辩论压力测试你的 idea。**
 
-ARC 不是“自动做科研”的黑箱流水线，而是一个受控对抗式论证引擎：
-- Proposer：把方案推到最强版本。
-- Skeptic：系统性找漏洞并要求可验证证据。
-- Moderator：只做结构化裁决和收敛判定。
+ARC (v0.1.0) 是一台双引擎的科研论证机器，而不是"自动做科研"的黑箱流水线：
+
+- **discover（勘探引擎）**：不带着 idea 来，而是先宽检索、深阅读，从文献的矛盾与空白中挖出**问题本身是新的**研究方向——痛点已饱和的方向会被审计杀掉，A+B 式增量创新过不了品味门。
+- **debate / chat-mode（压力测试引擎）**：Proposer 把方案推到最强，Skeptic 系统性找漏洞，Moderator 只做结构化裁决——把一个已有 idea 打磨成可落地的 Research Decision Memo。
+
+核心信念：单模型自审容易陷入盲点，单方向精修只能把烂想法打磨光亮。先勘探，再对抗，输出才可能是"别人没做过、且值得做"的问题。
 
 ## Why ARC
 
-单模型自审容易陷入盲点。ARC 强制跨角色、跨模型对抗评审，让输出从“聊天记录”变成可落地的 Research Decision Memo。
+1. **方向优先于方案。** 好的切入点在调研文献时就能找到——互相矛盾的结论、被反复提及却无人解决的局限、活跃方向的无人交叉点。discover 模式就是把这个过程工程化。
+2. **反增量护栏。** 品味门显式检测三类坏味道：A+B 方法重组、"先箭后靶"（先有方法再找问题）、痛点饱和（基准已 98%+ 还在刷分）。硬规则：方法重组而无新问题，直接 KILL。
+3. **跨模型对抗。** 默认 deepseek-v4-flash 负责生成、deepseek-v4-pro 负责裁决，避免同一个大脑自我博弈。
+4. **可恢复、可审计。** 每轮/每个 stage 落盘状态，`--resume` 从中断点继续；所有产物有 OUTPUT_INDEX 索引。
+
+## Two Engines
+
+```text
+[discover: 勘探引擎]                          [debate/chat: 压力测试引擎]
+
+ 粗糙领域描述                                  User Research Idea
+      |                                             |
+      v                                             v
+ theme-framing (flash)                        Problem Framer
+      |                                             |
+      v                                             v
+ ScholarTrace 宽检索+重排 (MCP)               Shared Research State
+      |                                        +-------------+
+      v                                        v             |
+ ScholarAnalysis 全文深读 (MCP)           Proposer        Skeptic
+      |                                        |             |
+      v                                        +------+------+
+ gap-mining 四类空白 (pro)                          v
+      |                                        Moderator
+      v                                   (scorecard/blockers/
+ webresearch 痛点审计 (MCP + pro)           revisions/stop)
+      |                                        |
+      v                              Continue Loop <--> Converged Memo
+ idea-portfolio (flash)
+      |
+      v
+ taste-gate 品味门 (pro)
+      |
+      v
+ DISCOVERY_REPORT.md --[--stress-test]--> chat-mode 辩论
+```
 
 ## What We Borrowed (And Why)
 
@@ -19,21 +56,15 @@ ARC 不是“自动做科研”的黑箱流水线，而是一个受控对抗式�
 - 结构化裁决协议：Moderator 追加 machine-readable YAML，提升解析稳定性。
 
 取舍：
-- 借鉴 ARIS 的“轻量、可恢复、流程严控”。
-- 吸收 EvoScientist 的“记忆与多阶段理念”。
+- 借鉴 ARIS 的"轻量、可恢复、流程严控"。
+- 吸收 EvoScientist 的"记忆与多阶段理念"。
 - 暂不引入重框架编排，先把对抗收敛引擎打磨到可复用。
 
 ## Local References (Visible In Repo)
 
-为便于对照学习，项目内提供两类参考资源：
-
-1) 本地参考仓库同步目录（可随时更新）：
+为便于对照学习，项目内提供本地参考仓库同步目录（可随时更新）：
 - `references/ARIS`
 - `references/EvoScientist`
-
-2) 已纳入版本库的主题参考文献目录（当前包含 RLHF 相关 PDF）：
-
-说明：`references/*` 主要用于本地对照审阅；`docs/reference/*` 作为项目文献资产可随仓库版本管理。
 
 ```bash
 bash references/sync_references.sh
@@ -43,123 +74,72 @@ bash references/sync_references.sh
 
 ## Skills Library
 
-ARC 已提供一套技能化工作流（见 `skills/`）：
-- `research-lit`
-- `idea-creator`
-- `novelty-check`
-- `research-refine`
-- `experiment-bridge`
-- `debate-runner`
-- `auto-review-loop`
-- `memo-synthesis`
-- `evidence-grounding`
-- `recovery-resume`
-- `pipeline-arc`
+ARC 已提供一套技能化工作流（见 `skills/`），供 pipeline 模式使用：
+`research-lit` / `idea-creator` / `novelty-check` / `research-refine` / `experiment-bridge` / `debate-runner` / `auto-review-loop` / `memo-synthesis` / `evidence-grounding` / `recovery-resume` / `pipeline-arc`
 
 这套库借鉴 ARIS 的轻量技能组织方式，但围绕 ARC 的 Proposer/Skeptic/Moderator 对抗收敛逻辑重写。
 
-## Architecture
+## Prompt Contracts
 
-```text
-User Research Idea
-        |
-        v
- Problem Framer
-        |
-        v
- Shared Research State
-        |
-        +------------------------------+
-        v                              v
-    Proposer                       Skeptic
-        |                              |
-        +--------------+---------------+
-                       v
-                   Moderator
-      (scorecard / blockers / revisions / stop)
-                       |
-         +-------------+-------------+
-         v                           v
-   Continue Loop               Converged Memo
-```
+所有角色提示词采用"人类可读分析 + 固定 YAML 尾部"协议：人类可读部分允许灵活组织，但机器可读字段名是**运行时与提示词之间的稳定契约**（如 Moderator 的 `scorecard`/`continue_or_stop`，chat mode 的 `[JUDGE_DECISION]:` 标记，discover 的 `gaps`/`judgments` 等）。改提示词必须同步改契约测试，详见 `docs/prompt-contracts.md` 与 `tests/test_prompts.py`。
 
 ## Debate Protocol
 
-当前 debate prompt 采用“人类可读分析 + 固定 YAML 尾部”协议：
-
-- Proposer：主张一个首选方案，回应上一轮 blocker / revision，并在结尾输出 `proposal_quality`、`top_next_actions`、`open_questions`。
-- Skeptic：聚焦最致命风险、证据缺口与必须回答的问题，并在结尾输出 `risk_summary`、`next_round_focus`、`evidence_to_collect`。
+- Proposer：主张一个首选方案，回应上一轮 blocker / revision，结尾输出 `proposal_quality`、`top_next_actions`、`open_questions`。
+- Skeptic：聚焦最致命风险、证据缺口与必须回答的问题，结尾输出 `risk_summary`、`next_round_focus`、`evidence_to_collect`。
 - Moderator：给出整体裁决、`scorecard`、`unresolved_blockers`、`required_revisions` 与 `continue_or_stop`。
-
-说明：人类可读部分允许灵活组织，但机器可读字段名是稳定契约，详见 `docs/prompt-contracts.md`。
 
 ## Convergence Rules
 
-默认停止条件：
+默认停止条件（debate 模式）：
 - 连续 2 轮无未解决 blocker。
 - 平均分 >= 4.0。
 - 至少完成 2 轮。
 - 或 Moderator 显式给出 STOP。
 
+chat mode 的收敛更口语化：moderator 输出 `[JUDGE_DECISION]: CONTINUE | STOP_CONVERGED | STOP_PROPOSER_SUFFICIENT`，未达最少轮数时强制继续；`max_rounds` 只是软目标。
+
 ## Project Structure
 
 ```text
 adversarial-research-copilot/
-├─ README.md
-├─ LICENSE
-├─ pyproject.toml
-├─ .env.example
+├─ README.md / LICENSE / pyproject.toml / .env.example
 ├─ configs/
-│  ├─ chat_mode.yaml
-│  ├─ references.yaml
-│  ├─ models.yaml
-│  ├─ runtime_models.yaml
-│  └─ debate.yaml
-├─ prompts/
-│  ├─ proposer.md
-│  ├─ skeptic.md
-│  ├─ moderator.md
-│  └─ chat_mode/
-│     ├─ proposer_chat.md
-│     ├─ skeptic_chat.md
-│     └─ moderator_chat.md
+│  ├─ chat_mode.yaml          # chat 模式参数（轮数/评审周期/上下文滑窗）
+│  ├─ discover.yaml           # discover 模式参数（池深/深读数/idea 数）
+│  ├─ models.yaml             # 模型注册表 + 角色默认
+│  ├─ runtime_models.yaml     # 当前角色绑定（arc models set 持久化于此）
+│  ├─ references.yaml         # 内置文献检索（chat/pipeline 用）
+│  └─ debate.yaml             # 辩论收敛参数
+├─ prompts/latest/
+│  ├─ default/                # 严肃辩论角色（en/zh + 无后缀）
+│  ├─ chat/                   # chat 模式角色 + reviewer + drift monitor
+│  └─ discover/               # discover 五角色（theme_framer/gap_miner/
+│  │                          #   saturation_auditor/idea_generator/taste_judge）
 ├─ src/arc/
-│  ├─ cli.py
-│  ├─ orchestrator.py
-│  ├─ state.py
-│  ├─ schemas.py
-│  ├─ memory.py
-│  ├─ llm_client.py
-│  ├─ model_registry.py
+│  ├─ cli.py                  # arc 入口（run/pipeline/chat-mode/discover/...）
+│  ├─ orchestrator.py         # 辩论主循环
+│  ├─ llm_client.py           # 双端点 LLM 客户端（重试/流式降级）
+│  ├─ model_registry.py       # 角色-模型绑定
+│  ├─ skill_engine.py         # SKILL.md 加载与 stage chain 解析
+│  ├─ state.py / schemas.py / memory.py / run_paths.py / prompting.py / topic_refiner.py
+│  ├─ agents/                 # proposer / skeptic / moderator / reviewer / drift_monitor
 │  ├─ providers/
-│  │  └─ literature.py
-│  ├─ agents/
-│  │  ├─ proposer.py
-│  │  ├─ skeptic.py
-│  │  └─ moderator.py
-│  ├─ scoring/
-│  │  └─ rubric.py
+│  │  ├─ literature.py        # 内置文献 provider（arXiv→S2→DeepXiv）
+│  │  └─ mcp_bridge.py        # MCP 桥接（stdio + SSE 客户端 + 硬失败健康检查）
 │  ├─ runners/
-│  │  ├─ debate_runner.py
-│  │  ├─ pipeline_runner.py
-│  │  └─ chat_mode_runner.py
-│  └─ exporters/
-│     └─ markdown_report.py
-├─ skills/
-│  └─ ...
-├─ examples/
-│  ├─ multimodal_research_idea.md
-│  ├─ robotics_research_idea.md
-│  ├─ wavelet_llm_manifold_idea.md
-│  └─ sycophancy_affective_hallucination_research_brief.md
+│  │  ├─ debate_runner.py     # arc run
+│  │  ├─ pipeline_runner.py   # arc pipeline（9 阶段 skill-first）
+│  │  ├─ chat_mode_runner.py  # arc chat-mode（嵌套评审周期）
+│  │  └─ discover_runner.py   # arc discover（7 阶段文献勘探）
+│  ├─ scoring/rubric.py       # YAML 解析 + 收敛判定
+│  └─ exporters/markdown_report.py
+├─ skills/                    # 技能库（pipeline stage 定义）
+├─ examples/                  # 示例研究 brief
 ├─ docs/
-│  ├─ prompt-contracts.md
-│  ├─ reference/
-│  │  └─ RLHF/
-│  └─ plans/
-│     └─ ...
-└─ tests/
-   └─ ...
+│  ├─ prompt-contracts.md     # 提示词契约文档
+│  └─ plans/                  # 历史修复计划
+└─ tests/                     # 65 个测试（含 prompt 契约 / MCP 桥 / runner）
 ```
 
 ## Quick Start
@@ -181,240 +161,107 @@ cp .env.example .env
 set -a && source .env && set +a
 ```
 
-支持两类接口：
-- GPT 兼容 responses：`$GPT_BASE_URL/responses`
-- GLM 兼容 chat completions：`$GLM_BASE_URL`（支持根路径或完整端点）
+默认模型（DeepSeek 分工：flash 生成 / pro 裁决，OpenAI 兼容端点）：
+- Proposer / Skeptic / pipeline_writer: `deepseek-v4-flash`
+- Moderator / pipeline_reviewer / pipeline_moderator: `deepseek-v4-pro`
 
-GLM 官方文档接口：`https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
-
-`GLM_BASE_URL` 支持两种写法：
-- 根路径：`https://open.bigmodel.cn/api/coding/paas/v4`
-- 完整端点：`https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
-
-默认模型（DeepSeek 分工：flash 负责生成类角色，pro 负责裁决类角色）：
-- Proposer: deepseek-v4-flash
-- Skeptic: deepseek-v4-flash
-- Moderator: deepseek-v4-pro
-
-可选模型（已内置到 `configs/models.yaml`）：
-- deepseek-v4-flash
-- deepseek-v4-pro
-- gpt-5.4（保留条目，需自备有效 key）
-- glm-5.1（保留条目，需自备有效 key）
-
-DeepSeek 官方接口（OpenAI 兼容）：`https://api.deepseek.com`，配置 `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_API_KEY`。
-
-### 2.1) Configure Literature Retrieval (Unified Internal Provider)
-
-ARC 的文献检索已统一为**单一路径**（pipeline/chat 共用）：
-- Primary: arXiv（免费全文来源优先）
-- Secondary: Semantic Scholar（免费元数据与 citation 排序增强）
-- Supplement: DeepXiv web search（仅在前两者覆盖不足时补充，且限制在免费额度内）
-
-关键配置文件：`configs/references.yaml`
-- `search_pool_size` 默认 50（目标检索池）
-- `final_reference_count` 默认 20（最终注入 prompts + 报告）
-
-可选环境变量（见 `.env.example`）：
-- `SEMANTIC_SCHOLAR_API_KEY`（可选，建议配置以提高稳定性）
-- `DEEPXIV_TOKEN`（可选，建议配置）
-- `ARC_DEEPXIV_ENABLED`（可选，默认 true）
-
-DeepXiv 官方正常获取 token 流程（不绕过任何验证机制）：
-1. 安装：`pip install deepxiv-sdk`
-2. 触发官方注册/初始化：`deepxiv search "agentic memory" --limit 1`
-3. 若出现邮箱验证、验证码或网页人工步骤，请在官方页面完成后，将 token 写入 `.env` 的 `DEEPXIV_TOKEN=...`
-
-说明：ARC 不引入独立 MCP 编排路径；DeepXiv 仅作为 ARC 内部 provider 的第三优先补充源。
-
-## Model Switcher (Terminal)
-
-```bash
-# 查看所有可用模型 + 当前角色绑定 + 配置就绪状态
-arc models list
-
-# 设置角色模型
-arc models set proposer gpt-5.4
-arc models set skeptic glm-5.1
-arc models set moderator gpt-5.4
-arc models set pipeline_writer gpt-5.4
-arc models set pipeline_reviewer glm-5.1
-arc models set pipeline_moderator gpt-5.4
-
-# 诊断配置（离线）：检查 env 是否齐全
-arc models doctor
-
-# 在线烟雾测试：对当前角色模型逐个发起最小请求
-arc models doctor --online
-
-# 可选：提高慢模型稳定性
-export ARC_LLM_TIMEOUT_SECONDS=180
-export ARC_LLM_RETRY_ATTEMPTS=4
-
-# GPT 思考深度（Responses API）
-export ARC_GPT_REASONING_EFFORT=high
-export ARC_GPT_VERBOSITY=medium
+```dotenv
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_API_KEY=your_key
 ```
+
+可选模型（保留条目，需自备有效 key）：`gpt-5.4`、`glm-5.1`（GPT 兼容 responses / GLM 兼容 chat completions，详见 `.env.example`）。
+
+### 2.1) Configure Literature Retrieval（chat/pipeline 内置路径）
+
+chat-mode 与 pipeline 使用内置统一 provider（与 discover 的 MCP 路径相互独立）：
+- Primary: arXiv → Secondary: Semantic Scholar → Supplement: DeepXiv web（限额内）
+
+关键配置：`configs/references.yaml`（`search_pool_size` 50 / `final_reference_count` 20）。可选环境变量见 `.env.example`（`SEMANTIC_SCHOLAR_API_KEY`、`DEEPXIV_TOKEN` 等）。
+
+### 2.2) Configure MCP Services（discover 模式必需）
+
+discover 依赖三个本地 MCP 服务，**任一不可用直接报错停止，不降级**（服务端各自使用自己的 API key，不消耗你的 DeepSeek 配额）：
+
+| 服务 | 传输 | 启动 |
+|---|---|---|
+| ScholarTrace | SSE `http://127.0.0.1:8001/sse` | `bash /home/g203/zhanghaonan/ScholarTrace/run_scholartrace_mcp_sse.sh` |
+| ScholarAnalysis | SSE `http://127.0.0.1:8005/sse` | `bash /home/g203/zhanghaonan/ScholarAnalysis/run.sh` |
+| webresearch-mcp | stdio 子进程 | `/home/g203/zhanghaonan/webresearch-mcp/.venv/bin/python -m webresearch_mcp.server` |
+
+在 `.env` 中配置（token 为本地文件，绝不入库）：
+
+```dotenv
+ARC_MCP_WEBRESEARCH_CMD="/home/g203/zhanghaonan/webresearch-mcp/.venv/bin/python -m webresearch_mcp.server"
+ARC_SCHOLARTRACE_URL=http://127.0.0.1:8001/sse
+ARC_SCHOLARTRACE_TOKEN=...
+ARC_SCHOLARANALYSIS_URL=http://127.0.0.1:8005/sse
+ARC_SCHOLARANALYSIS_TOKEN=...
+```
+
+注意：服务监听 `0.0.0.0`，但本机请用 `127.0.0.1` 连接（访问自身外部 IP 会挂起）。
 
 ### 3) Run
 
-```bash
-arc run examples/multimodal_research_idea.md \
-       --proposer gpt-5.4 \
-         --skeptic glm-5.1 \
-  --moderator gpt-5.4 \
-       --gpt-effort high \
-  --output-dir reports
+#### 3.0) arc discover —— 从文献中挖新问题（先跑这个）
 
-# 若上次运行中断，可恢复
-arc run examples/multimodal_research_idea.md \
-       --proposer gpt-5.4 \
-       --skeptic glm-5.1 \
-       --moderator gpt-5.4 \
-       --gpt-effort high \
-       --output-dir reports \
-       --resume
+```bash
+arc discover "memory architectures for LLM agents: what breaks after 100 turns" \
+       --papers 60 --deep-read 12 --ideas 8 \
+       --output-dir reports
+# 中断后可 --resume；加 --stress-test 自动把 top KEEP 送入 chat-mode 辩论
 ```
 
-输出：
-- `reports/<timestamp>/debate_log.jsonl`
-- `reports/<timestamp>/final_state.json`
-- `reports/<timestamp>/run_state.json`
-- `reports/<timestamp>/research_decision_memo.md`
+七阶段：theme-framing → ScholarTrace 宽检索 → ScholarAnalysis 深读 → gap-mining（矛盾/反复局限/无人交叉点/过时前提）→ webresearch 痛点审计（杀饱和方向）→ idea-portfolio（问题必须新，实现允许简单）→ taste-gate 品味门。
 
-说明：每次运行都会创建新的时间戳目录，并更新 `reports/LATEST_RUN` 指向最近一次运行目录；`--resume` 会优先从该目录恢复。
+产物（`reports/<ts>_flash_pro/`）：`DISCOVERY_REPORT.md`（先读）、`THEME.md`、`CANDIDATE_POOL.md`、`DEEP_READ/`、`GAP_ANALYSIS.md`、`SATURATION_AUDIT.md`、`IDEA_PORTFOLIO.md`、`OUTPUT_INDEX.md`。
 
-### 3.1) Run Skill-First Pipeline (ARIS-style)
+审计全灭是合法结果：报告会解释每个方向为何被杀，并建议放宽 `--papers`/`--deep-read` 或换领域。
+
+#### 3.1) arc run —— 严肃辩论
+
+```bash
+arc run examples/multimodal_research_idea.md \
+       --proposer deepseek-v4-flash \
+       --skeptic deepseek-v4-flash \
+       --moderator deepseek-v4-pro \
+       --output-dir reports [--resume]
+```
+
+输出：`debate_log.jsonl` / `final_state.json` / `run_state.json` / `research_decision_memo.md`。每次运行创建时间戳目录并更新 `reports/LATEST_RUN`；`--resume` 优先从该目录恢复。
+
+#### 3.2) arc pipeline —— ARIS 风格九阶段流水线
 
 ```bash
 arc pipeline "multimodal agent safety benchmark" \
-       --proposer gpt-5.4 \
-       --skeptic glm-5.1 \
-       --moderator gpt-5.4 \
-       --gpt-effort high \
-       --output-dir reports \
-       --strict-gates
-
-# 若上次 pipeline 中断，可恢复
-arc pipeline "multimodal agent safety benchmark" \
-       --proposer gpt-5.4 \
-       --skeptic glm-5.1 \
-       --moderator gpt-5.4 \
-       --gpt-effort high \
-       --output-dir reports \
-       --checkpoint \
-       --resume
+       --proposer deepseek-v4-flash \
+       --skeptic deepseek-v4-flash \
+       --moderator deepseek-v4-pro \
+       --output-dir reports --strict-gates [--checkpoint] [--resume]
 ```
 
-Pipeline 主要产物（默认 `reports/<timestamp>/`）：
-- `OUTPUT_INDEX.md`（统一解释每个输出文件，建议优先阅读）
-- `pipeline_state.json`
-- `TOPIC.txt`
-- `REFERENCES.md`（统一 provider 输出：arXiv → Semantic Scholar → DeepXiv 补充）
-- `LITERATURE_MAP.md`
-- `IDEA_REPORT.md`
-- `FINAL_PROPOSAL.md`
-- `EVIDENCE_TABLE.md`
-- `EXPERIMENT_PLAN.md`
-- `RESEARCH_DECISION_MEMO.md`
-- `AUTO_REVIEW.md`（当 stage chain 包含 `auto-review-loop` 时）
+产物：`OUTPUT_INDEX.md`（建议优先阅读）、`REFERENCES.md`、`LITERATURE_MAP.md`、`IDEA_REPORT.md`、`FINAL_PROPOSAL.md`、`EVIDENCE_TABLE.md`、`EXPERIMENT_PLAN.md`、`RESEARCH_DECISION_MEMO.md`、`AUTO_REVIEW.md`。安全版：不自动执行外部实验脚本；`--strict-gates`（默认）要求 stage chain 包含 `novelty-check` 与 `debate-runner`。
 
-说明：当前 pipeline 为安全版，不会自动执行外部实验脚本；`experiment-bridge` 仅生成计划和脚本草案。
-当启用 `--strict-gates`（默认）时，stage chain 必须包含 `novelty-check` 与 `debate-runner`。
-
-可用以下命令快速解释某次运行目录中的文件用途：
-
-```bash
-arc explain-outputs --run-dir reports/<timestamp>
-# 或默认解释 reports/LATEST_RUN 指向的最新一次运行
-arc explain-outputs
-```
-
-### 3.2) Run Chat Mode (轻量头脑风暴)
-
-如果你想做更轻松的角色扮演式讨论（不走严肃证明模板），可以使用独立的 chat mode：
+#### 3.3) arc chat-mode —— 轻量头脑风暴（嵌套评审周期）
 
 ```bash
 arc chat-mode "multimodal hallucination mitigation for editing agents" \
-       --proposer gpt-5.4 \
-       --skeptic glm-5.1 \
-       --moderator gpt-5.4 \
-       --min-rounds-before-stop 20 \
-       --max-rounds 0 \
+       --proposer deepseek-v4-flash \
+       --skeptic deepseek-v4-flash \
+       --moderator deepseek-v4-pro \
+       --min-rounds-before-stop 20 --max-rounds 0 \
        --export-best-consensus \
-       --output-dir reports
+       --output-dir reports [--resume]
 ```
 
-特点：
-- 至少进行 20 轮后，才允许裁判根据收敛/方案充分性判定停止
-- `--max-rounds` 作为轮次数建议值（soft target），若裁判持续给出 `CONTINUE`，不会被该值强制截断
-- 每轮三位 AI 都按聊天语气输出重点思路（创新 + 可行性）
-- 每位 AI 单轮输出采用提示词建议长度（建议字数/段落），运行时不再强制截断
-- 每次运行至少尝试检索 20 篇参考文献（含摘要）
-- 裁判输出带结构化停机标记（CONTINUE / STOP_CONVERGED / STOP_PROPOSER_SUFFICIENT），并在未达到最少轮数时强制继续
-- 一键导出 `BEST_CONSENSUS.md`（精简最优共识方案）
-- 每轮写入详细时间戳（开始/三角色完成/轮次完成）
-- 运行过程中实时更新 `CHAT_TRANSCRIPT.md`、`CHAT_MODE_INDEX.md`、`BEST_CONSENSUS.md`（interim 草稿），避免中断后无可读结论
-- 每轮发言单独保存，便于阅读
+特点：外层 Reviewer 评审周期 × 内层三角色聊天辩论；Drift Monitor 防跑题；轮次级重试（单次瞬时故障不再杀死数小时运行）；上下文滑窗控制 prompt 增长；`CHAT_TRANSCRIPT.md` / `BEST_CONSENSUS.md` 实时更新。循环上限等参数以 `configs/chat_mode.yaml` 为准（CLI 未传时）。
 
-恢复运行建议：
-- 可使用 `--resume` 从 `chat_mode_state.json` 继续。
-- `--resume` 要求 topic 与三角色模型映射一致；状态超过 24 小时会按新 run 处理。
-
-Chat mode 主要产物（默认 `reports/<timestamp>/`）：
-- `TOPIC_CHAT.txt`
-- `REFERENCES.md`
-- `CHAT_TRANSCRIPT.md`
-- `BEST_CONSENSUS.md`
-- `chat_mode_state.json`
-- `CHAT_MODE_INDEX.md`
-- `chat_rounds/round_01_proposer.md`
-- `chat_rounds/round_01_skeptic.md`
-- `chat_rounds/round_01_moderator.md`
-- `chat_rounds/round_01.md`
-
-文献流转说明（pipeline 与 chat 共用）：
-- 统一 provider 先产出规范化引用对象：`source/id/year/citation_count/title/abstract/url`
-- 这些对象会写入 `REFERENCES.md`（格式保持兼容）
-- 下游 stage/chat 再消费同一份 `REFERENCES.md`，并继续生成：
-       - `LITERATURE_MAP.md`
-       - `FINAL_PROPOSAL.md`
-       - chat mode 产物（`CHAT_TRANSCRIPT.md` / `BEST_CONSENSUS.md` 等）
-
-
-### 3.3) Run Discover Mode（从文献中挖掘新问题）
-
-与 chat-mode 的方向相反：不是带着 idea 来辩护，而是**先宽检索、深阅读，从文献的矛盾与空白中挖出值得做的新问题**。适合"想找个有意义的方向但不知道做什么"的场景。
+#### 3.4) 辅助命令
 
 ```bash
-arc discover "multimodal LLM hallucination: where is the remaining real pain" \
-       --papers 60 --deep-read 12 --ideas 8 \
-       --output-dir reports
+arc refine-topic "raw problem"          # writer/reviewer 迭代打磨选题，可 --run-pipeline-after
+arc explain-outputs [--run-dir DIR]     # 解释某次运行目录中每个产物的用途
 ```
-
-流程（7 个 stage，每个 stage 落盘、支持 `--resume`）：
-
-1. **theme-framing**（flash）：把粗糙主题结构化为检索任务书
-2. **wide-retrieval**（ScholarTrace MCP）：宽检索 + 服务端重排，产出 60 篇候选池
-3. **deep-read**（ScholarAnalysis MCP）：对 top 12 篇做全文抽取——核心结论/自述局限/未来工作/关键假设
-4. **gap-mining**（pro）：跨论文挖四类空白——互相矛盾的结论、≥2 篇反复提及无人解决的局限、活跃方向的无人交叉点、前提已过时的机会
-5. **saturation-audit**（webresearch MCP + pro）：对每个 gap 查社区讨论与基准水位，杀掉痛点已饱和（如指标 98%+）或无人真实受苦的方向
-6. **idea-portfolio**（flash）：从幸存 gap 组合新问题陈述——问题必须新，实现允许简单
-7. **taste-gate**（pro）：品味门——问题新颖度 / A+B 增量风险 / 先箭后靶检测 / so-what / 可证伪性，硬规则：方法重组无新问题直接 KILL
-
-产物（`reports/<timestamp>_flash_pro/`）：
-- `DISCOVERY_REPORT.md`（最终排名报告，先读这个）
-- `THEME.md` / `CANDIDATE_POOL.md` / `DEEP_READ/` / `GAP_ANALYSIS.md` / `SATURATION_AUDIT.md` / `IDEA_PORTFOLIO.md`
-- `OUTPUT_INDEX.md`（全部产物索引）
-
-加 `--stress-test` 会把 top KEEP 的 idea 自动送入 chat-mode 辩论做压力测试（`--stress-rounds` 控制轮数）。
-
-**依赖**：三个 MCP 服务必须可用（任一不可用直接报错停止，不降级）：
-- ScholarTrace（SSE `http://127.0.0.1:8001/sse`）：`bash /home/g203/zhanghaonan/ScholarTrace/run_scholartrace_mcp_sse.sh`
-- ScholarAnalysis（SSE `http://127.0.0.1:8005/sse`）：`bash /home/g203/zhanghaonan/ScholarAnalysis/run.sh`
-- webresearch-mcp（stdio）：`/home/g203/zhanghaonan/webresearch-mcp/.venv/bin/python -m webresearch_mcp.server`
-
-配置见 `.env` 的 `ARC_MCP_*` 变量。检索/深读/网页调研消耗三个服务自带的 key；你的 DeepSeek key 只付 ARC 自身的 LLM 调用（单次约 15-30 次，flash 为主）。
 
 ### 4) Test
 
@@ -422,22 +269,38 @@ arc discover "multimodal LLM hallucination: where is the remaining real pain" \
 pytest -q
 ```
 
-## Remote Repository Setup
-
-如果你本地尚未关联远程仓库：
+## Model Switcher (Terminal)
 
 ```bash
-git init
-git add .
-git commit -m "feat: bootstrap ARC v0.1 debate engine"
+arc models list                          # 模型注册表 + 角色绑定 + 就绪状态
+arc models set skeptic deepseek-v4-pro   # 例：把 Skeptic 升级为 pro
+arc models doctor                        # 离线诊断 env
+arc models doctor --online               # 在线冒烟（逐角色最小请求）
+
+# 可选：稳定性与生成控制
+export ARC_LLM_TIMEOUT_SECONDS=180
+export ARC_LLM_RETRY_ATTEMPTS=4
+export ARC_MCP_CALL_TIMEOUT_SECONDS=900  # scholartrace.query 可能要几分钟
+```
+
+## Remote Repository Setup
+
+```bash
+git init && git add . && git commit -m "feat: bootstrap ARC v0.1 debate engine"
 git branch -M master
-git remote add origin https://github.com/BUAAZhangHaonan/adversarial-research-copilot.git
+git remote add origin git@github.com:BUAAZhangHaonan/adversarial-research-copilot.git
 git push -u origin master
 ```
 
+本机注意：22 端口不通且 HTTPS 凭证属于其他账号时，走 SSH over 443：
+`git remote set-url origin ssh://git@ssh.github.com:443/BUAAZhangHaonan/adversarial-research-copilot.git`
+
+`.env` 已被 `.gitignore` 忽略——**API key 只存在于本地**。
+
 ## Roadmap
 
-- Phase 1: Debate Engine (当前)
-- Phase 2: Evidence Grounding (检索证据约束 Skeptic)
-- Phase 3: Persistent Memory (跨任务复用经验)
-- Phase 4: Minimal Experiment Planning
+- Phase 1: Debate Engine（已完成）——辩论收敛 + chat mode + pipeline
+- Phase 2: Discovery Engine（当前）——discover 模式已上线：文献勘探 + 痛点审计 + 品味门；下一步：提示词打磨模块（`arc prompts optimize`，用 LLM 迭代优化各角色提示词）
+- Phase 3: Evidence Grounding（检索证据直接约束 Skeptic 的攻击面）
+- Phase 4: Persistent Memory（跨任务复用勘探与辩论经验）
+- Phase 5: Minimal Experiment Planning（实验桥接到执行）
