@@ -674,3 +674,50 @@ def test_duplicate_check_incremental_and_feeds_taste_gate(
     dr.run_discover(topic="t", generator_model="flash", judge_model="pro",
                     output_dir=str(marker), resume=True)
     assert dedup_llm_calls["count"] == 1, "already-checked candidates must be skipped"
+
+
+def test_rejection_log_records_conditional_kills_with_reopen(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class KillerJudgeLLM(FakeDiscoverLLM):
+        def chat(self, model, system_prompt, user_prompt, temperature=0.3):
+            if "Audit this gap" in user_prompt:
+                gap_id = "G1" if "G1" in user_prompt else "G2"
+                if gap_id == "G1":
+                    return (f"```yaml\naudits:\n  - gap_id: echo\n"
+                            f"    verdict: INSUFFICIENT_EVIDENCE\n"
+                            f"    evidence_basis: none\n    evidence: none\n"
+                            f"    missing_evidence: deployment failure reports\n"
+                            f"    reason: dossier too thin\n```\n")
+                return (f"```yaml\naudits:\n  - gap_id: echo\n    verdict: KEEP\n"
+                        f"    evidence_basis: scientific_deficit\n"
+                        f"    evidence: documented contradiction\n"
+                        f"    reason: unresolved contradiction worth probing\n```\n")
+            if "Judge each" in user_prompt:
+                return ("```yaml\njudgments:\n  - id: I1\n    delta_type: rewording\n"
+                        "    incremental_risk: 4\n    priority: 1\n    verdict: KILL\n"
+                        "    kill_evidence_type: duplicate\n"
+                        "    reason: prior work covers it\n```\n")
+            return super().chat(model, system_prompt, user_prompt, temperature)
+
+    monkeypatch.setattr(dr, "connect_services", lambda: FakeServices())
+    monkeypatch.setattr(dr, "LLMClient", lambda: KillerJudgeLLM())
+    monkeypatch.setattr(dr, "_load_config", lambda: dr.DiscoverConfig(
+        papers=6, deep_read=3, ideas=2, min_deep_read_ok=1))
+
+    report_file, _ = dr.run_discover(
+        topic="t", generator_model="flash", judge_model="pro",
+        output_dir=str(tmp_path / "reports"))
+    run_dir = report_file.parent
+    log = json.loads((run_dir / "rejection_log.json").read_text(encoding="utf-8"))
+    by_key = {(e["object_type"], e["object_id"]): e for e in log}
+    insuff = by_key[("gap", "G1")]
+    assert insuff["verdict"] == "INSUFFICIENT_EVIDENCE"
+    assert "webresearch reachable" in insuff["reopen_condition"]
+    # G2 was audited KEEP, so its idea survived to the taste gate, where I1
+    # is killed with duplicate evidence -> logged with a reopen condition.
+    idea_kill = by_key[("idea", "I1")]
+    assert idea_kill["kill_evidence_type"] == "duplicate"
+    assert "does not cover the candidate's conditions" in idea_kill["reopen_condition"]
+    assert "reopen" in (run_dir / "REJECTION_LOG.md").read_text(encoding="utf-8").lower()

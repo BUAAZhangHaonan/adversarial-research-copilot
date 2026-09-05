@@ -245,6 +245,7 @@ def _run_stages(
         ideas: list[dict[str, Any]] = []
         judgments: list[dict[str, Any]] = []
         dedup_checks: list[dict[str, Any]] = []
+        _write_rejection_log(run_dir, state, gaps, audits, ideas, judgments, dedup_checks)
         (run_dir / "DISCOVERY_REPORT.md").write_text(
             _render_report(state, theme, notes, gaps, audits, ideas, judgments, dedup_checks),
             encoding="utf-8")
@@ -272,6 +273,7 @@ def _run_stages(
         state.stage_statuses["taste-gate"] = "completed"
         judgments: list[dict[str, Any]] = []
         dedup_checks = _as_list_of_dicts(_load_json(run_dir / "duplicate_checks.json"))
+        _write_rejection_log(run_dir, state, gaps, audits, ideas, judgments, dedup_checks)
         (run_dir / "DISCOVERY_REPORT.md").write_text(
             _render_report(state, theme, notes, gaps, audits, ideas, judgments, dedup_checks),
             encoding="utf-8")
@@ -295,6 +297,9 @@ def _run_stages(
         mark("taste-gate")
 
     judgments: list[dict[str, Any]] = json.loads(_read_text(run_dir / "judgments.json"))
+
+    _write_rejection_log(run_dir, state, gaps, audits, ideas, judgments, dedup_checks)
+
     (run_dir / "DISCOVERY_REPORT.md").write_text(
         _render_report(state, theme, notes, gaps, audits, ideas, judgments, dedup_checks),
         encoding="utf-8")
@@ -1140,6 +1145,109 @@ def _render_ideas(ideas: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _write_rejection_log(
+    run_dir: Path,
+    state: DiscoverState,
+    gaps: list[dict[str, Any]],
+    audits: list[dict[str, Any]],
+    ideas: list[dict[str, Any]],
+    judgments: list[dict[str, Any]],
+    dedup_checks: list[dict[str, Any]],
+) -> None:
+    rejection_log = _build_rejection_log(state, gaps, audits, ideas, judgments, dedup_checks)
+    (run_dir / "rejection_log.json").write_text(
+        json.dumps(rejection_log, ensure_ascii=False, indent=2), encoding="utf-8")
+    (run_dir / "REJECTION_LOG.md").write_text(
+        _render_rejection_log(rejection_log), encoding="utf-8")
+
+
+def _build_rejection_log(
+    state: DiscoverState,
+    gaps: list[dict[str, Any]],
+    audits: list[dict[str, Any]],
+    ideas: list[dict[str, Any]],
+    judgments: list[dict[str, Any]],
+    dedup_checks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Conditional rejection records: object, applicable conditions, evidence,
+    and what would reopen the decision (review 三.5)."""
+    cfg = state.config
+    run_conditions = (
+        f"pool={cfg.papers} papers, deep-read={cfg.deep_read}, "
+        f"audit budget={_MAX_GAPS_TO_AUDIT}, models={state.models}")
+    ideas_by_id = {str(i.get("id")): i for i in ideas}
+    dedup_by_id = {str(c.get("idea_id")): c for c in dedup_checks}
+
+    entries: list[dict[str, Any]] = []
+    audits_by_gap = {str(a.get("gap_id")): a for a in audits}
+    for gap in gaps:
+        audit = audits_by_gap.get(str(gap.get("id", "")), {})
+        verdict = str(audit.get("verdict", "NOT_AUDITED")).upper()
+        if verdict not in {"KILL", "INSUFFICIENT_EVIDENCE", "NOT_AUDITED"}:
+            continue
+        if verdict == "INSUFFICIENT_EVIDENCE":
+            reopen = "re-run the audit with webresearch reachable and the missing evidence collected"
+        elif verdict == "NOT_AUDITED":
+            reopen = f"raise the audit budget above {_MAX_GAPS_TO_AUDIT} gaps per run"
+        else:
+            reopen = "new evidence that the disqualifying basis no longer holds"
+        entries.append({
+            "object_type": "gap",
+            "object_id": str(gap.get("id", "")),
+            "object": _clip(str(gap.get("question", "")), 200),
+            "conditions": run_conditions,
+            "verdict": verdict,
+            "evidence": _clip(str(audit.get("reason", "")), 300),
+            "reopen_condition": reopen,
+        })
+
+    judgments_by_id = {str(j.get("id")): j for j in judgments}
+    for j in judgments:
+        if str(j.get("verdict", "")).upper() != "KILL":
+            continue
+        kill_type = str(j.get("kill_evidence_type", "")).strip().lower()
+        if kill_type == "duplicate":
+            dedup = dedup_by_id.get(str(j.get("id")), {})
+            reopen = (f"evidence that the cited prior work "
+                      f"({_clip(str(dedup.get('duplicate_of', 'see DUPLICATE_CHECK.md')), 120)}) "
+                      f"does not cover the candidate's conditions")
+        elif kill_type == "resource_infeasible":
+            reopen = "obtain the missing access/resource stated in the reason"
+        elif kill_type == "logical_contradiction":
+            reopen = "revised statement that removes the internal contradiction"
+        else:
+            reopen = "none recorded (judge KILL without evidence type was downgraded)"
+        idea = ideas_by_id.get(str(j.get("id")), {})
+        entries.append({
+            "object_type": "idea",
+            "object_id": str(j.get("id", "")),
+            "object": _clip(str(idea.get("one_sentence_problem", "")), 200),
+            "conditions": run_conditions,
+            "verdict": "KILL",
+            "kill_evidence_type": kill_type,
+            "evidence": _clip(str(j.get("reason", "")), 300),
+            "reopen_condition": reopen,
+        })
+    return entries
+
+
+def _render_rejection_log(entries: list[dict[str, Any]]) -> str:
+    lines = ["# REJECTION_LOG", "",
+             "Conditional rejections: each entry names its object, the conditions",
+             "under which it was rejected, the evidence, and what would reopen it.",
+             "These are not permanent bans on a direction.", "",
+             f"entries: {len(entries)}", ""]
+    for e in entries:
+        lines.append(f"## [{e['object_type']}] {e['object_id']} — {e['verdict']}")
+        lines.append("")
+        lines.append(f"- object: {e['object']}")
+        lines.append(f"- conditions: {e['conditions']}")
+        lines.append(f"- evidence: {e['evidence']}")
+        lines.append(f"- reopen when: {e['reopen_condition']}")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def _render_report(
     state: DiscoverState,
     theme: dict[str, Any],
@@ -1270,6 +1378,7 @@ def _write_output_index(run_dir: Path, state: DiscoverState) -> None:
         ("IDEA_PORTFOLIO.md / ideas.json", "New problem statements"),
         ("DUPLICATE_CHECK.md / duplicate_checks.json", "Targeted novelty forensics per candidate"),
         ("judgments.json", "Taste-gate verdicts"),
+        ("REJECTION_LOG.md / rejection_log.json", "Conditional rejections with reopen conditions"),
         ("DISCOVERY_REPORT.md", "Final ranked report"),
         ("STRESS_TESTS.json", "Stress-test run manifest (optional)"),
         ("discover_state.json", "Pipeline state (resume support)"),
