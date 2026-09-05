@@ -266,62 +266,80 @@ def run_chat_mode(
                 _ROUND_MAX_RETRIES = 4
                 _ROUND_RETRY_BASE_DELAY = 15.0
                 round_record: dict[str, Any] | None = None
+                # Within one round, already-successful prefix steps (drift
+                # check, proposer, skeptic) are reused across retry attempts:
+                # a moderator failure must not re-pay for its siblings.
+                round_cache: dict[str, Any] = {}
 
                 for _round_attempt in range(1, _ROUND_MAX_RETRIES + 1):
                     try:
                         # Drift monitor check
-                        drift_correction = ""
                         if inner_round > 1 and inner_round % cfg.drift_check_interval == 0:
-                            drift_out = drift_monitor.run(
-                                original_topic=topic,
-                                current_summary=prior_summary,
-                                round_id=global_round_id,
-                            )
-                            drift_data = _parse_yaml_block(drift_out)
-                            if drift_data.get("drift_detected") is True and drift_data.get("correction"):
-                                drift_correction = str(drift_data["correction"])
+                            if "drift_correction" not in round_cache:
+                                drift_out = drift_monitor.run(
+                                    original_topic=topic,
+                                    current_summary=prior_summary,
+                                    round_id=global_round_id,
+                                )
+                                drift_data = _parse_yaml_block(drift_out)
+                                round_cache["drift_correction"] = (
+                                    str(drift_data["correction"])
+                                    if drift_data.get("drift_detected") is True and drift_data.get("correction")
+                                    else ""
+                                )
+                            drift_correction = round_cache["drift_correction"]
+                        else:
+                            drift_correction = ""
 
                         # Proposer
-                        proposer_prompt_path = str(resolve_prompt_path("chat", "proposer_chat", cfg.prompt_language))
-                        proposer_extra = ""
-                        if cycle_reviewer_feedback:
-                            proposer_extra += f"\n[REVIEWER FEEDBACK FROM PREVIOUS CYCLE]\n{cycle_reviewer_feedback}\n"
-                        if drift_correction:
-                            proposer_extra += f"\n[DRIFT CORRECTION]\n{drift_correction}\n"
-                        cycle_context = _build_cycle_context_window(
-                            rounds, review_cycle_id, cfg.context_window_cycles,
-                        )
-                        proposer_output = _chat_generate(
-                            client=client, model=models["proposer"],
-                            role_prompt_path=proposer_prompt_path,
-                            user_prompt=_build_proposer_user_prompt(
-                                round_id=global_round_id, topic=topic, reference_brief=reference_brief,
-                                prior_summary=prior_summary, min_references=cfg.min_references,
-                                language=cfg.prompt_language, cycle_context=cycle_context,
-                                review_cycle=review_cycle_id, inner_round=inner_round,
-                                min_rounds_before_stop=cfg.min_rounds_before_stop,
-                            ) + proposer_extra,
-                            max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
-                            language=cfg.prompt_language,
-                        )
-                        proposer_completed_at = datetime.now(UTC).isoformat()
+                        if "proposer" not in round_cache:
+                            proposer_prompt_path = str(resolve_prompt_path("chat", "proposer_chat", cfg.prompt_language))
+                            proposer_extra = ""
+                            if cycle_reviewer_feedback:
+                                proposer_extra += f"\n[REVIEWER FEEDBACK FROM PREVIOUS CYCLE]\n{cycle_reviewer_feedback}\n"
+                            if drift_correction:
+                                proposer_extra += f"\n[DRIFT CORRECTION]\n{drift_correction}\n"
+                            cycle_context = _build_cycle_context_window(
+                                rounds, review_cycle_id, cfg.context_window_cycles,
+                            )
+                            round_cache["proposer"] = (
+                                _chat_generate(
+                                    client=client, model=models["proposer"],
+                                    role_prompt_path=proposer_prompt_path,
+                                    user_prompt=_build_proposer_user_prompt(
+                                        round_id=global_round_id, topic=topic, reference_brief=reference_brief,
+                                        prior_summary=prior_summary, min_references=cfg.min_references,
+                                        language=cfg.prompt_language, cycle_context=cycle_context,
+                                        review_cycle=review_cycle_id, inner_round=inner_round,
+                                        min_rounds_before_stop=cfg.min_rounds_before_stop,
+                                    ) + proposer_extra,
+                                    max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
+                                    language=cfg.prompt_language,
+                                ),
+                                datetime.now(UTC).isoformat(),
+                            )
+                        proposer_output, proposer_completed_at = round_cache["proposer"]
 
                         # Skeptic
-                        skeptic_prompt_path = str(resolve_prompt_path("chat", "skeptic_chat", cfg.prompt_language))
-                        skeptic_output = _chat_generate(
-                            client=client, model=models["skeptic"],
-                            role_prompt_path=skeptic_prompt_path,
-                            user_prompt=_build_skeptic_user_prompt(
-                                round_id=global_round_id, topic=topic, reference_brief=reference_brief,
-                                proposer_output=proposer_output, min_references=cfg.min_references,
-                                language=cfg.prompt_language,
-                                review_cycle=review_cycle_id, inner_round=inner_round,
-                                min_rounds_before_stop=cfg.min_rounds_before_stop,
-                            ),
-                            max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
-                            language=cfg.prompt_language,
-                        )
-                        skeptic_completed_at = datetime.now(UTC).isoformat()
+                        if "skeptic" not in round_cache:
+                            skeptic_prompt_path = str(resolve_prompt_path("chat", "skeptic_chat", cfg.prompt_language))
+                            round_cache["skeptic"] = (
+                                _chat_generate(
+                                    client=client, model=models["skeptic"],
+                                    role_prompt_path=skeptic_prompt_path,
+                                    user_prompt=_build_skeptic_user_prompt(
+                                        round_id=global_round_id, topic=topic, reference_brief=reference_brief,
+                                        proposer_output=proposer_output, min_references=cfg.min_references,
+                                        language=cfg.prompt_language,
+                                        review_cycle=review_cycle_id, inner_round=inner_round,
+                                        min_rounds_before_stop=cfg.min_rounds_before_stop,
+                                    ),
+                                    max_chars=cfg.max_response_chars, max_paragraphs=cfg.max_paragraphs,
+                                    language=cfg.prompt_language,
+                                ),
+                                datetime.now(UTC).isoformat(),
+                            )
+                        skeptic_output, skeptic_completed_at = round_cache["skeptic"]
 
                         # Moderator
                         moderator_prompt_path = str(resolve_prompt_path("chat", "moderator_chat", cfg.prompt_language))

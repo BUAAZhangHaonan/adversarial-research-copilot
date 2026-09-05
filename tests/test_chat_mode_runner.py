@@ -432,3 +432,52 @@ def test_max_rounds_is_a_hard_cap(
     assert len(state["rounds"]) == 3, "hard cap must bound total rounds"
     assert state["stop_reason"] == "max_rounds_hard_cap_3"
     assert reviewer_calls["count"] == 0, "no reviewer call after the hard cap fires"
+
+
+def test_round_retry_reuses_successful_role_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A moderator failure on attempt 1 must not re-run proposer/skeptic (review R7a)."""
+    reports_dir = tmp_path / "reports"
+
+    _setup_common_mocks(
+        monkeypatch, tmp_path,
+        config_overrides={
+            "max_rounds": 1,
+            "min_rounds_before_stop": 1,
+            "max_review_cycles": 1,
+            "max_inner_debate_rounds": 1,
+        },
+    )
+    # No real sleeps in the retry backoff.
+    monkeypatch.setattr(cmr.time, "sleep", lambda s: None)
+
+    calls = {"proposer": 0, "skeptic": 0, "moderator": 0}
+
+    def flaky_moderator_generate(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        role = Path(role_prompt_path).stem
+        if "proposer" in role:
+            calls["proposer"] += 1
+            return "proposer output"
+        if "skeptic" in role:
+            calls["skeptic"] += 1
+            return "skeptic output"
+        calls["moderator"] += 1
+        if calls["moderator"] == 1:
+            raise RuntimeError("gateway 503")
+        return "Moderator summary\n[JUDGE_DECISION]: STOP_CONVERGED"
+
+    monkeypatch.setattr(cmr, "_chat_generate", flaky_moderator_generate)
+
+    transcript_file, state_file = cmr.run_chat_mode(
+        topic="retry topic",
+        proposer_model="p", skeptic_model="s", moderator_model="m",
+        output_dir=str(reports_dir), resume=False,
+    )
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert len(state["rounds"]) == 1
+    assert calls["moderator"] == 2, "moderator retried once"
+    assert calls["proposer"] == 1, "successful proposer output must be reused"
+    assert calls["skeptic"] == 1, "successful skeptic output must be reused"
