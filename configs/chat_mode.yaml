@@ -1,8 +1,8 @@
 chat_mode:
   # At least this many rounds must be completed before judge can stop.
-  min_rounds_before_stop: 20
-  # Advisory target rounds for planning/monitoring; runner will keep going if judge decides CONTINUE.
-  max_rounds: 99
+  min_rounds_before_stop: 2
+  # HARD cap on total debate rounds across all review cycles (0 = unlimited).
+  max_rounds: 60
   # At least 20 references are required for each chat-mode run.
   min_references: 20
   # Suggested response length hint only (no hard truncation).

@@ -214,7 +214,7 @@ def chat_mode(
     ),
     max_rounds: Optional[int] = typer.Option(
         None,
-        help="Advisory round target; judge decision still controls stop. 0 disables the hint. (default: configs/chat_mode.yaml)",
+        help="Hard cap on total debate rounds across review cycles. 0 = unlimited. (default: configs/chat_mode.yaml)",
     ),
     export_best_consensus: Optional[bool] = typer.Option(
         None,

@@ -97,7 +97,7 @@ ARC 已提供一套技能化工作流（见 `skills/`），供 pipeline 模式�
 - 至少完成 2 轮。
 - 或 Moderator 显式给出 STOP。
 
-chat mode 的收敛更口语化：moderator 输出 `[JUDGE_DECISION]: CONTINUE | STOP_CONVERGED | STOP_PROPOSER_SUFFICIENT`，未达最少轮数时强制继续；`max_rounds` 只是软目标。
+chat mode 的收敛：moderator 输出 `[JUDGE_DECISION]: CONTINUE | STOP_CONVERGED | STOP_PROPOSER_SUFFICIENT`，未达最少轮数时强制继续；`max_rounds` 是跨评审周期的**总轮数硬上限**（默认 60，0 = 不限）。
 
 ## Project Structure
 
@@ -249,7 +249,7 @@ arc chat-mode "multimodal hallucination mitigation for editing agents" \
        --proposer deepseek-v4-flash \
        --skeptic deepseek-v4-flash \
        --moderator deepseek-v4-pro \
-       --min-rounds-before-stop 20 --max-rounds 0 \
+       --min-rounds-before-stop 2 --max-rounds 60 \
        --export-best-consensus \
        --output-dir reports [--resume]
 ```

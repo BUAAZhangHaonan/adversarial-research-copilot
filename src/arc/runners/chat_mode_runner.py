@@ -69,8 +69,8 @@ _STAGE_MODEL_ROLE: dict[str, str] = {
 
 @dataclass
 class ChatModeConfig:
-    min_rounds_before_stop: int = 20
-    max_rounds: int = 99  # advisory soft target only; NOT a hard cap
+    min_rounds_before_stop: int = 2
+    max_rounds: int = 60  # hard cap on total rounds; 0 = unlimited
     min_references: int = 20
     max_response_chars: int = 4000
     max_paragraphs: int = 3
@@ -421,21 +421,15 @@ def run_chat_mode(
                 if global_round_id >= cfg.min_rounds_before_stop and effective_decision.startswith("STOP"):
                     break
 
-                # Advisory logging only: max_rounds is a soft monitoring hint,
-                # NOT a hard cap.  The per-segment hard limit is
-                # max_inner_debate_rounds (the range bound above).
-                # Total rounds can reach max_review_cycles × max_inner_debate_rounds.
+                # Hard budget cap: max_rounds is a true upper bound on total
+                # debate rounds across all review cycles (0 = unlimited).
                 if cfg.max_rounds > 0 and global_round_id >= cfg.max_rounds:
-                    logger.info(
-                        "Advisory target %d reached (global round %d, cycle %d, "
-                        "inner round %d). Continuing — per-segment limit is %d.",
-                        cfg.max_rounds, global_round_id, review_cycle_id,
-                        inner_round, cfg.max_inner_debate_rounds,
-                    )
+                    stop_reason = f"max_rounds_hard_cap_{cfg.max_rounds}"
+                    break
 
             # --- Reviewer evaluation after inner loop convergence ---
-            # If all rounds failed, skip reviewer and exit
-            if stop_reason.startswith("round_failed"):
+            # If all rounds failed or the hard cap fired, skip reviewer and exit
+            if stop_reason.startswith(("round_failed", "max_rounds")):
                 break
 
             consensus_file = target_run_dir / "BEST_CONSENSUS.md"

@@ -384,3 +384,51 @@ def test_reviewer_feedback_reaches_next_cycle_proposer(
     assert marker in proposer_prompts[1], "cycle 2 proposer must receive cycle 1 reviewer feedback"
     assert marker in reviewer_calls["prior_feedback_seen"], (
         "reviewer must see its own prior feedback when re-reviewing")
+
+
+def test_max_rounds_is_a_hard_cap(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """max_rounds must bound total rounds even when the judge always CONTINUEs
+    and the reviewer always UNRESOLVEDs (review R9)."""
+    reports_dir = tmp_path / "reports"
+
+    _setup_common_mocks(
+        monkeypatch, tmp_path,
+        config_overrides={
+            "max_rounds": 3,
+            "min_rounds_before_stop": 1,
+            "max_review_cycles": 5,
+            "max_inner_debate_rounds": 10,
+        },
+    )
+
+    reviewer_calls = {"count": 0}
+
+    def unresolving_reviewer_factory(*a, **kw):
+        class AlwaysUnresolved:
+            def run(self, **kwargs):
+                reviewer_calls["count"] += 1
+                return "```yaml\nreview_decision: UNRESOLVED\nunresolved_issues:\n  - keep going\n```"
+        return AlwaysUnresolved()
+
+    monkeypatch.setattr(cmr, "ReviewerAgent", unresolving_reviewer_factory)
+
+    def always_continue(client, model, role_prompt_path, user_prompt, max_chars, max_paragraphs, language):
+        if "moderator" in Path(role_prompt_path).stem:
+            return "Moderator summary\n[JUDGE_DECISION]: CONTINUE"
+        return "role output"
+
+    monkeypatch.setattr(cmr, "_chat_generate", always_continue)
+
+    transcript_file, state_file = cmr.run_chat_mode(
+        topic="cap topic",
+        proposer_model="p", skeptic_model="s", moderator_model="m",
+        output_dir=str(reports_dir), resume=False,
+    )
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert len(state["rounds"]) == 3, "hard cap must bound total rounds"
+    assert state["stop_reason"] == "max_rounds_hard_cap_3"
+    assert reviewer_calls["count"] == 0, "no reviewer call after the hard cap fires"
