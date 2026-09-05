@@ -32,36 +32,31 @@ def test_taste_score_orders_by_quality() -> None:
     assert dr._taste_score(good) > dr._taste_score(bad)
 
 
-def test_stage_taste_gate_enforces_hard_rules() -> None:
+def test_stage_taste_gate_enforces_evidence_bound_rules() -> None:
     class FakeClient:
         def chat(self, model, system_prompt, user_prompt, temperature=0.3):
             return (
                 "```yaml\n"
                 "judgments:\n"
                 "  - id: I1\n"
-                "    problem_novelty: 1\n"
-                "    incremental_risk: 3\n"
-                "    arrow_before_target: false\n"
-                "    so_what: 3\n"
-                "    decisiveness: 3\n"
-                "    verdict: KEEP\n"
-                "    reason: llm wrongly keeps it\n"
+                "    delta_type: rewording\n"
+                "    incremental_risk: 4\n"
+                "    priority: 1\n"
+                "    verdict: KILL\n"
+                "    reason: taste-based kill without evidence\n"
                 "  - id: I2\n"
-                "    problem_novelty: 4\n"
+                "    delta_type: new_problem\n"
                 "    incremental_risk: 2\n"
-                "    arrow_before_target: true\n"
-                "    so_what: 4\n"
-                "    decisiveness: 4\n"
+                "    priority: 4\n"
                 "    verdict: KEEP\n"
-                "    reason: arrow-first offender\n"
+                "    reason: genuinely new question\n"
                 "  - id: I3\n"
-                "    problem_novelty: 5\n"
-                "    incremental_risk: 1\n"
-                "    arrow_before_target: false\n"
-                "    so_what: 5\n"
-                "    decisiveness: 5\n"
-                "    verdict: KEEP\n"
-                "    reason: genuine new problem\n"
+                "    delta_type: new_mechanism\n"
+                "    incremental_risk: 2\n"
+                "    priority: 3\n"
+                "    verdict: KILL\n"
+                "    kill_evidence_type: duplicate\n"
+                "    reason: same question answered in prior work\n"
                 "```\n"
             )
 
@@ -71,12 +66,19 @@ def test_stage_taste_gate_enforces_hard_rules() -> None:
         config=dr.DiscoverConfig(),
     )
     ideas = [{"id": "I1"}, {"id": "I2"}, {"id": "I3"}]
-    judgments = dr._stage_taste_gate(FakeClient(), state, ideas)
+    dedup = [{"idea_id": "I2", "novelty_verdict": "DUPLICATE",
+              "duplicate_of": "Prior Work X", "differentiation": ""}]
+    judgments = dr._stage_taste_gate(FakeClient(), state, ideas, dedup)
     by_id = {j["id"]: j for j in judgments}
-    assert "[hard rule] problem_novelty" in by_id["I1"]["reason"]
-    assert by_id["I1"]["verdict"] == "KILL"
+    # Taste-only KILL (no evidence type) is downgraded, never executed.
+    assert by_id["I1"]["verdict"] == "PIVOT"
+    assert "[hard rule] KILL without valid kill_evidence_type" in by_id["I1"]["reason"]
+    # Duplicate-check evidence forces a KILL even when the judge kept it.
     assert by_id["I2"]["verdict"] == "KILL"
-    assert by_id["I3"]["verdict"] == "KEEP"
+    assert by_id["I2"]["kill_evidence_type"] == "duplicate"
+    assert "Prior Work X" in by_id["I2"]["reason"]
+    # An evidence-backed KILL stands.
+    assert by_id["I3"]["verdict"] == "KILL"
 
 
 # ---------------------------------------------------------------------------
@@ -188,9 +190,11 @@ class FakeDiscoverLLM:
         if "Judge each" in user_prompt:
             return (
                 "```yaml\njudgments:\n"
-                "  - id: I1\n    problem_novelty: 5\n    incremental_risk: 1\n"
-                "    arrow_before_target: false\n    so_what: 5\n"
-                "    decisiveness: 4\n    verdict: KEEP\n"
+                "  - id: I1\n    delta_type: new_problem\n    incremental_risk: 1\n"
+                "    knowledge_gain: first separation of failure loci\n"
+                "    decision_changed: memory-system investment decisions\n"
+                "    distinguishes_alternatives: true\n    priority: 5\n"
+                "    verdict: KEEP\n"
                 "    reason: genuinely new question\n```\n"
             )
         raise AssertionError(f"unexpected user prompt: {user_prompt[:80]}")

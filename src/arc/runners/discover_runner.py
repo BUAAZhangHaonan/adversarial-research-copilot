@@ -806,20 +806,31 @@ def _stage_taste_gate(
     payload = _structured_call(
         client, state.models["judge"], system, user, temperature=0.15, key="judgments")
     judgments = _as_list_of_dicts(payload.get("judgments"))
-    # Enforce the hard rules in code, independent of LLM compliance.
+    dedup_by_id = {str(c.get("idea_id")): c for c in (dedup_checks or [])}
+    # Hard rules in code, evidence-bound (review 二.3):
+    # 1. A KILL is valid only with one of the three evidence types; otherwise
+    #    it is downgraded to PIVOT — an uncalibrated taste score must never
+    #    perform irreversible actions.
+    # 2. A duplicate-check verdict of DUPLICATE is explicit checkable
+    #    evidence: force KILL even if the judge tried to KEEP.
+    _valid_kill_types = {"duplicate", "logical_contradiction", "resource_infeasible"}
     for j in judgments:
-        try:
-            novelty = int(j.get("problem_novelty", 3))
-        except (TypeError, ValueError):
-            novelty = 3
-        j["problem_novelty"] = novelty
-        if novelty <= 2 and str(j.get("verdict", "KEEP")).upper() == "KEEP":
-            j["verdict"] = "KILL"
-            j["reason"] = f"[hard rule] problem_novelty={novelty} <= 2; " + str(j.get("reason", ""))
-        if str(j.get("arrow_before_target", "false")).strip().lower() == "true" \
-                and str(j.get("verdict", "KEEP")).upper() == "KEEP":
-            j["verdict"] = "KILL"
-            j["reason"] = "[hard rule] arrow_before_target=true; " + str(j.get("reason", ""))
+        verdict = str(j.get("verdict", "KEEP")).upper()
+        if verdict not in {"KEEP", "PIVOT", "KILL"}:
+            j["verdict"] = "PIVOT"
+            j["reason"] = f"unknown verdict; {j.get('reason', '')}"
+            verdict = "PIVOT"
+        if verdict == "KILL" and str(j.get("kill_evidence_type", "")).strip().lower() not in _valid_kill_types:
+            j["verdict"] = "PIVOT"
+            j["reason"] = "[hard rule] KILL without valid kill_evidence_type downgraded to PIVOT; " + str(j.get("reason", ""))
+            verdict = "PIVOT"
+        if verdict in {"KEEP", "PIVOT"}:
+            dedup = dedup_by_id.get(str(j.get("id")))
+            if dedup and str(dedup.get("novelty_verdict", "")).upper() == "DUPLICATE":
+                j["verdict"] = "KILL"
+                j["kill_evidence_type"] = "duplicate"
+                j["reason"] = (f"[hard rule] duplicate-check found prior work covering this "
+                               f"question ({_clip(str(dedup.get('duplicate_of', 'see DUPLICATE_CHECK.md')), 120)})")
     return judgments
 
 
@@ -1174,24 +1185,28 @@ def _render_report(
     if ideas:
         lines += [
             "## Verdicts", "",
-            "| id | dedup | novelty | incr.risk | arrow-first | so-what | decisive | verdict | reason |",
+            "| id | dedup | delta type | incr.risk | separates alt.? | priority | verdict | kill evidence | reason |",
             "|---|---|---|---|---|---|---|---|---|",
         ]
     for j in judgments:
         dedup = dedup_by_id.get(str(j.get("id")), {})
         lines.append(
             f"| {j.get('id', '?')} | {dedup.get('novelty_verdict', '-')} | "
-            f"{j.get('problem_novelty', '?')} | "
-            f"{j.get('incremental_risk', '?')} | {j.get('arrow_before_target', '?')} | "
-            f"{j.get('so_what', '?')} | {j.get('decisiveness', '?')} | "
-            f"**{str(j.get('verdict', '?')).upper()}** | {_clip(str(j.get('reason', '')), 90)} |")
+            f"{j.get('delta_type', '?')} | "
+            f"{j.get('incremental_risk', '?')} | {j.get('distinguishes_alternatives', '?')} | "
+            f"{j.get('priority', '-')} | "
+            f"**{str(j.get('verdict', '?')).upper()}** | "
+            f"{j.get('kill_evidence_type', '-')} | {_clip(str(j.get('reason', '')), 90)} |")
 
     lines += ["", f"## Kept problems (ranked, {len(keeps)})", ""]
     for rank, j in enumerate(keeps, 1):
         idea = by_id.get(j.get("id"), {})
         lines.append(f"### #{rank} — {idea.get('one_sentence_problem', '')}")
         lines.append("")
-        lines.append(f"- **id**: {j.get('id')} | taste score: {_taste_score(j):.1f}")
+        lines.append(f"- **id**: {j.get('id')} | taste score: {_taste_score(j):.1f} | "
+                     f"delta type: {j.get('delta_type', '?')}")
+        lines.append(f"- **knowledge gain**: {j.get('knowledge_gain', '')}")
+        lines.append(f"- **decision changed**: {j.get('decision_changed', '')}")
         dedup = dedup_by_id.get(str(j.get("id")), {})
         if dedup:
             lines.append(f"- **dedup verdict**: {dedup.get('novelty_verdict', '?')} | "
@@ -1223,17 +1238,16 @@ def _render_report(
 
 
 def _taste_score(j: dict[str, Any]) -> float:
+    """Ranking score only (never a kill trigger): judge priority first,
+    falling back to inverse incremental risk."""
     def _num(key: str, default: float) -> float:
         try:
             return float(j.get(key, default))
         except (TypeError, ValueError):
             return default
-    return (
-        _num("problem_novelty", 3.0)
-        + _num("so_what", 3.0)
-        + _num("decisiveness", 3.0)
-        - _num("incremental_risk", 3.0)
-    )
+    if j.get("priority") is not None:
+        return _num("priority", 3.0)
+    return 6.0 - _num("incremental_risk", 3.0)
 
 
 def _write_output_index(run_dir: Path, state: DiscoverState) -> None:

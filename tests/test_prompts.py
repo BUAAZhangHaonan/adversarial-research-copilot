@@ -104,10 +104,11 @@ PROMPT_MARKERS = {
         "anti_scope:",
     ],
     "prompts/latest/discover/taste_judge.md": [
-        "Hard rules",
+        "Knowledge gain",
+        "kill_evidence_type",
+        "delta_type:",
         "judgments:",
-        "problem_novelty:",
-        "arrow_before_target:",
+        "priority:",
         "verdict:",
     ],
 }
