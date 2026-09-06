@@ -62,15 +62,15 @@ ARC (v0.1.0) 是一台双引擎的科研论证机器，而不是"自动做科研
 
 ## Local References (Visible In Repo)
 
-为便于对照学习，项目内提供本地参考仓库同步目录（可随时更新）：
-- `references/ARIS`
-- `references/EvoScientist`
+为便于对照学习，两个主要架构参考项目以快照形式**随仓库提交**（流水线重构的主要参照）：
+- `references/ARIS` — 轻量 skill 组织、可恢复循环
+- `references/EvoScientist` — 记忆与多阶段理念
 
 ```bash
-bash references/sync_references.sh
+bash references/sync_references.sh   # 刷新快照（目录已被跟踪，需按提示强制覆盖）
 ```
 
-说明：`references/*` 主要用于本地对照审阅；`docs/reference/*` 作为项目文献资产可随仓库版本管理。
+三个端到端验证运行的典型分析案例见 `reports/CASE_STUDIES.md`（暂存，后续撤回）。
 
 ## Skills Library
 
