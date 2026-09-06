@@ -72,6 +72,43 @@ PROMPT_MARKERS = {
         "next_action: REASON | RETRIEVE | EXPERIMENT | STOP",
         "停止讨论不等于观点成立",
     ],
+    "prompts/latest/debate/problem_framer_en.md": [
+        "Input idea: {raw_idea}",
+        "falsifiable",
+    ],
+    "prompts/latest/debate/problem_framer_zh.md": [
+        "输入设想：{raw_idea}",
+        "可证伪",
+    ],
+    "prompts/latest/develop/consensus_synthesizer_en.md": [
+        "research lead",
+    ],
+    "prompts/latest/develop/consensus_task_en.md": [
+        "Topic: {topic}",
+        "first 3 execution steps",
+    ],
+    "prompts/latest/develop/consensus_task_zh.md": [
+        "主题: {topic}",
+        "最先执行的3步",
+    ],
+    "prompts/latest/refine/writer_task_en.md": [
+        "{topic}",
+        "{critique}",
+        "# Refined Topic",
+    ],
+    "prompts/latest/refine/reviewer_task_zh.md": [
+        "{refined}",
+        "可证伪性检查",
+    ],
+    "prompts/latest/pipeline/auto_review_task.md": [
+        "{threshold}/10",
+        "{rid}/{max_rounds}",
+        "REVISED_MEMO",
+    ],
+    "prompts/latest/discover/deep_read_question.md": [
+        "VERIFIED CLAIMS",
+        "LOAD-BEARING ASSUMPTIONS",
+    ],
     "prompts/latest/discover/theme_framer.md": [
         "Cognitive task",
         "Anti-patterns",

@@ -375,20 +375,9 @@ def _run_stages(
 # Stage implementations
 # ---------------------------------------------------------------------------
 
-_DEEP_READ_QUESTION = (
-    "For this paper, extract four sections. Label author-stated content vs your "
-    "own inference explicitly.\n"
-    "(1) VERIFIED CLAIMS: what was actually demonstrated, under which conditions "
-    "(data distribution, scale/compute budget, evaluation protocol), with which "
-    "variables controlled — and which alternative explanations the evaluation "
-    "does NOT rule out. Cite section/figure where possible.\n"
-    "(2) AUTHOR-STATED LIMITATIONS: the limitations the authors themselves write "
-    "(quote or paraphrase closely, with location).\n"
-    "(3) OPENED QUESTIONS: the future work they call for, and — separately — "
-    "questions their verified claims leave unanswered but they do not mention.\n"
-    "(4) LOAD-BEARING ASSUMPTIONS: assumptions the method or conclusions rely on "
-    "that newer evidence could invalidate."
-)
+def _deep_read_question() -> str:
+    return Path(resolve_prompt_path(
+        "discover", "deep_read_question", "en")).read_text(encoding="utf-8").strip()
 
 
 def _stage_theme_framing(client: LLMClient, state: DiscoverState) -> dict[str, Any]:
@@ -514,7 +503,7 @@ def _stage_deep_read(
         try:
             raw = services.scholaranalysis.call_tool("analyze_paper", {
                 "query": arxiv_id,
-                "question": _DEEP_READ_QUESTION,
+                "question": _deep_read_question(),
                 "language": "en",
             }, timeout=cfg.mcp_call_timeout)
             data = json.loads(raw)

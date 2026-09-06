@@ -63,6 +63,20 @@ Runtime-owned contract fields (must not drift without updating
 - `idea_generator`: `ideas` → `id`, `from_gaps`, `one_sentence_problem`, `gap_evidence`, `who_needs_it`, `why_now`, `minimal_falsifiable_test`, `anti_scope`
 - `taste_judge`: `judgments` → `id`, `knowledge_gain`, `decision_changed`, `delta_type` (new_problem | new_mechanism | new_boundary | rewording), `incremental_risk`, `distinguishes_alternatives`, `priority`, `verdict` (KEEP | PIVOT | KILL), `kill_evidence_type` (duplicate | logical_contradiction | resource_infeasible; required for KILL), `reason`, `pivot_to`
 
+## Extracted Inline Prompts
+
+Formerly inline code prompts now live as files (loaded via `resolve_prompt_path`;
+placeholder names are part of the contract):
+
+- `debate/problem_framer_{en,zh}.md` — `{raw_idea}` (loaded by `arc.state.frame_problem`)
+- `develop/consensus_synthesizer_{en,zh}.md` + `consensus_task_{en,zh}.md` — `{topic}`
+- `discover/deep_read_question.md` — no placeholders (sent to scholaranalysis)
+- `refine/writer*`, `refine/reviewer*` — `{topic}`, `{critique}`, `{refined}`
+- `pipeline/auto_review_task.md` — `{threshold}`, `{rid}`, `{max_rounds}`, `{memo}`
+
+See `docs/prompt-inventory.md` for the full map including skills-as-prompts and
+runtime-owned templates intentionally left in code.
+
 ## Runtime-Owned Contract Fields
 
 These fields are owned by runtime code and must not drift without updating both prompt and parser:

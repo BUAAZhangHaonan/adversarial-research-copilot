@@ -13,6 +13,7 @@ from arc.providers.literature import (
     collect_references as collect_references_from_provider,
     load_reference_config as load_reference_config_from_provider,
 )
+from arc.prompting import resolve_prompt_path
 from arc.run_paths import resolve_run_dir, sanitize_model_suffix
 from arc.runners.debate_runner import run_debate
 from arc.schemas import DebateConfig, PipelineStageRecord, PipelineState
@@ -352,15 +353,9 @@ def _run_stage(
                 client,
                 model=skeptic_model,
                 system_prompt=_skill_body(skills, stage_name),
-                user_prompt=(
-                    "你是严格审稿人。请输出如下结构：\n"
-                    "1) 一个 YAML 代码块，键必须包含：score_10, top_blockers, required_changes, decision(仅 CONTINUE/STOP)\n"
-                    "2) 紧接一个标题 '# REVISED_MEMO'，其后给出完整修订版 memo。\n"
-                    "判停规则：若 score_10 >= 7 且关键 blocker 已清空，可给 STOP。\n\n"
-                    f"当前阈值：{threshold}/10\n"
-                    f"当前轮次：{rid}/{max_rounds}\n\n"
-                    f"原始 memo：\n{memo}\n"
-                ),
+                user_prompt=_load_prompt_template(
+                    "pipeline", "auto_review_task"
+                ).format(threshold=threshold, rid=rid, max_rounds=max_rounds, memo=memo),
             )
 
             parsed = _parse_auto_review_payload(review)
@@ -442,6 +437,11 @@ def _run_stage(
         return
 
     raise PipelineError(f"Unknown pipeline stage: {stage_name}")
+
+
+def _load_prompt_template(mode: str, name: str) -> str:
+    path = resolve_prompt_path(mode, name, "en")
+    return Path(path).read_text(encoding="utf-8")
 
 
 def _llm_generate(client: LLMClient, model: str, system_prompt: str, user_prompt: str) -> str:

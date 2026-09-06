@@ -1472,32 +1472,13 @@ def _export_best_consensus(
             f"D: {item.get('judge_decision', 'CONTINUE')}"
         )
 
-    system_prompt = localized_text(
-        language,
-        "You are the research lead. Distill the debate into one executable and falsifiable consensus plan. "
-        "Keep it concise, evidence-bound, and decision-oriented.",
-        "你是研究负责人。基于完整辩论提炼一个可执行、可验证、可落地的最优共识方案。保持精炼、证据绑定与决策导向。",
-    )
-    user_prompt = localized_text(
-        language,
-        (
-            f"Topic: {topic}\n\n"
-            "Output a concise consensus with requirements:\n"
-            "1) No more than 3 paragraphs.\n"
-            "2) State final primary path, key risk, and first 3 execution steps.\n"
-            "3) Anchor core claims to references using citation tags like [1][2].\n"
-            "4) Avoid formal-proof style and long preambles.\n\n"
-            f"Debate digest:\n{chr(10).join(digest_lines)}"
-        ),
-        (
-            f"主题: {topic}\n\n"
-            "请输出精简版共识方案，要求：\n"
-            "1) 不超过3段，表达尽量精炼。\n"
-            "2) 明确最终主方案、关键风险、最先执行的3步。\n"
-            "3) 每个核心判断都要能被文献线索支撑（可用[1][2]引用标记）。\n"
-            "4) 避免形式化证明和冗长铺垫。\n\n"
-            f"辩论摘要:\n{chr(10).join(digest_lines)}"
-        ),
+    system_prompt = Path(resolve_prompt_path(
+        "develop", "consensus_synthesizer", language)).read_text(encoding="utf-8")
+    task_template = Path(resolve_prompt_path(
+        "develop", "consensus_task", language)).read_text(encoding="utf-8")
+    user_prompt = (
+        task_template.replace("{topic}", topic).rstrip()
+        + f"\n\nDebate digest:\n{chr(10).join(digest_lines)}"
     )
     text = client.chat(model=model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.35)
     content = "# BEST_CONSENSUS\n\n" + text.strip() + "\n"
