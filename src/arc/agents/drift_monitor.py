@@ -13,11 +13,11 @@ class DriftMonitorAgent:
     topic and emits a short YAML verdict so the runner can inject corrections.
     """
 
-    def __init__(self, client: LLMClient, model: str, prompt_language: str | None = None, *, mode: str = "chat") -> None:
+    def __init__(self, client: LLMClient, model: str, prompt_language: str | None = None, *, mode: str = "develop") -> None:
         self.client = client
         self.model = model
         self.prompt_language = normalize_prompt_language(prompt_language)
-        prompt_name = "drift_monitor_chat" if mode == "chat" else "drift_monitor"
+        prompt_name = "drift_monitor"
         prompt_path = resolve_prompt_path(mode, prompt_name, self.prompt_language)
         self.system_prompt = Path(prompt_path).read_text(encoding="utf-8")
 

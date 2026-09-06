@@ -11,7 +11,7 @@ class SkepticAgent:
         self.client = client
         self.model = model
         self.prompt_language = normalize_prompt_language(prompt_language)
-        prompt_path = resolve_prompt_path("default", "skeptic", self.prompt_language)
+        prompt_path = resolve_prompt_path("debate", "skeptic", self.prompt_language)
         self.system_prompt = Path(prompt_path).read_text(encoding="utf-8")
 
     def run(

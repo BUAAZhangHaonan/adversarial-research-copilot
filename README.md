@@ -5,7 +5,7 @@
 ARC (v0.1.0) 是一台双引擎的科研论证机器，而不是"自动做科研"的黑箱流水线：
 
 - **discover（勘探引擎）**：不带着 idea 来，而是先宽检索、深阅读，从文献的矛盾与空白中挖出**问题本身是新的**研究方向——痛点已饱和的方向会被审计杀掉，A+B 式增量创新过不了品味门。
-- **debate / chat-mode（压力测试引擎）**：Proposer 把方案推到最强，Skeptic 系统性找漏洞，Moderator 只做结构化裁决——把一个已有 idea 打磨成可落地的 Research Decision Memo。
+- **develop / debate（方案引擎）**：Proposer 把方案推到最强，Skeptic 系统性找漏洞，Moderator 只做结构化裁决——把一个已有 idea 打磨成可落地的 Research Decision Memo。
 
 核心信念：单模型自审容易陷入盲点，单方向精修只能把烂想法打磨光亮。先勘探，再对抗，输出才可能是"别人没做过、且值得做"的问题。
 
@@ -45,7 +45,7 @@ ARC (v0.1.0) 是一台双引擎的科研论证机器，而不是"自动做科研
  taste-gate 品味门 (pro)
       |
       v
- DISCOVERY_REPORT.md --[--stress-test]--> chat-mode 辩论
+ DISCOVERY_REPORT.md --[--stress-test]--> develop 辩论
 ```
 
 ## What We Borrowed (And Why)
@@ -81,7 +81,7 @@ ARC 已提供一套技能化工作流（见 `skills/`），供 pipeline 模式�
 
 ## Prompt Contracts
 
-所有角色提示词采用"人类可读分析 + 固定 YAML 尾部"协议：人类可读部分允许灵活组织，但机器可读字段名是**运行时与提示词之间的稳定契约**（如 Moderator 的 `scorecard`/`continue_or_stop`，chat mode 的 `[JUDGE_DECISION]:` 标记，discover 的 `gaps`/`judgments` 等）。改提示词必须同步改契约测试，详见 `docs/prompt-contracts.md` 与 `tests/test_prompts.py`。
+所有角色提示词采用"人类可读分析 + 固定 YAML 尾部"协议：人类可读部分允许灵活组织，但机器可读字段名是**运行时与提示词之间的稳定契约**（如 Moderator 的 `scorecard`/`continue_or_stop`，develop 的 `[JUDGE_DECISION]:` 标记，discover 的 `gaps`/`judgments` 等）。改提示词必须同步改契约测试，详见 `docs/prompt-contracts.md` 与 `tests/test_prompts.py`。
 
 ## Debate Protocol
 
@@ -97,7 +97,7 @@ ARC 已提供一套技能化工作流（见 `skills/`），供 pipeline 模式�
 - 至少完成 2 轮。
 - 或 Moderator 显式给出 STOP。
 
-chat mode 的收敛：moderator 输出 `[JUDGE_DECISION]: CONTINUE | STOP_CONVERGED | STOP_PROPOSER_SUFFICIENT`，未达最少轮数时强制继续；`max_rounds` 是跨评审周期的**总轮数硬上限**（默认 60，0 = 不限）。
+develop 模式的收敛：moderator 输出 `[JUDGE_DECISION]: CONTINUE | STOP_CONVERGED | STOP_PROPOSER_SUFFICIENT`，未达最少轮数时强制继续；`max_rounds` 是跨评审周期的**总轮数硬上限**（默认 60，0 = 不限）。
 
 ## Project Structure
 
@@ -105,7 +105,7 @@ chat mode 的收敛：moderator 输出 `[JUDGE_DECISION]: CONTINUE | STOP_CONVER
 adversarial-research-copilot/
 ├─ README.md / LICENSE / pyproject.toml / .env.example
 ├─ configs/
-│  ├─ chat_mode.yaml          # chat 模式参数（轮数/评审周期/上下文滑窗）
+│  ├─ develop.yaml            # develop 模式参数（轮数/评审周期/上下文滑窗）
 │  ├─ discover.yaml           # discover 模式参数（池深/深读数/idea 数）
 │  ├─ models.yaml             # 模型注册表 + 角色默认
 │  ├─ runtime_models.yaml     # 当前角色绑定（arc models set 持久化于此）
@@ -117,7 +117,7 @@ adversarial-research-copilot/
 │  └─ discover/               # discover 五角色（theme_framer/gap_miner/
 │  │                          #   saturation_auditor/idea_generator/taste_judge）
 ├─ src/arc/
-│  ├─ cli.py                  # arc 入口（run/pipeline/chat-mode/discover/...）
+│  ├─ cli.py                  # arc 入口（run=pipeline=develop/discover/...）
 │  ├─ orchestrator.py         # 辩论主循环
 │  ├─ llm_client.py           # 双端点 LLM 客户端（重试/流式降级）
 │  ├─ model_registry.py       # 角色-模型绑定
@@ -130,7 +130,7 @@ adversarial-research-copilot/
 │  ├─ runners/
 │  │  ├─ debate_runner.py     # arc run
 │  │  ├─ pipeline_runner.py   # arc pipeline（9 阶段 skill-first）
-│  │  ├─ chat_mode_runner.py  # arc chat-mode（嵌套评审周期）
+│  │  ├─ develop_runner.py    # arc develop（嵌套评审周期）
 │  │  └─ discover_runner.py   # arc discover（7 阶段文献勘探）
 │  ├─ scoring/rubric.py       # YAML 解析 + 收敛判定
 │  └─ exporters/markdown_report.py
@@ -174,7 +174,7 @@ DEEPSEEK_API_KEY=your_key
 
 ### 2.1) Configure Literature Retrieval（chat/pipeline 内置路径）
 
-chat-mode 与 pipeline 使用内置统一 provider（与 discover 的 MCP 路径相互独立）：
+develop 与 pipeline 使用内置统一 provider（与 discover 的 MCP 路径相互独立）：
 - Primary: arXiv → Secondary: Semantic Scholar → Supplement: DeepXiv web（限额内）
 
 关键配置：`configs/references.yaml`（`search_pool_size` 50 / `final_reference_count` 20）。可选环境变量见 `.env.example`（`SEMANTIC_SCHOLAR_API_KEY`、`DEEPXIV_TOKEN` 等）。
@@ -209,7 +209,7 @@ ARC_SCHOLARANALYSIS_TOKEN=...
 arc discover "memory architectures for LLM agents: what breaks after 100 turns" \
        --papers 60 --deep-read 12 --ideas 8 \
        --output-dir reports
-# 中断后可 --resume；加 --stress-test 自动把 top KEEP 送入 chat-mode 辩论
+# 中断后可 --resume；加 --stress-test 自动把 top KEEP 送入 develop 辩论
 ```
 
 七阶段：theme-framing → ScholarTrace 宽检索 → ScholarAnalysis 深读 → gap-mining（矛盾/反复局限/无人交叉点/过时前提）→ webresearch 痛点审计（杀饱和方向）→ idea-portfolio（问题必须新，实现允许简单）→ taste-gate 品味门。
@@ -242,7 +242,7 @@ arc pipeline "multimodal agent safety benchmark" \
 
 产物：`OUTPUT_INDEX.md`（建议优先阅读）、`REFERENCES.md`、`LITERATURE_MAP.md`、`IDEA_REPORT.md`、`FINAL_PROPOSAL.md`、`EVIDENCE_TABLE.md`、`EXPERIMENT_PLAN.md`、`RESEARCH_DECISION_MEMO.md`、`AUTO_REVIEW.md`。安全版：不自动执行外部实验脚本；`--strict-gates`（默认）要求 stage chain 包含 `novelty-check` 与 `debate-runner`。
 
-#### 3.3) arc chat-mode —— 轻量头脑风暴（嵌套评审周期）
+#### 3.3) arc develop —— 快速发展（嵌套评审周期，原 chat-mode）
 
 ```bash
 arc chat-mode "multimodal hallucination mitigation for editing agents" \
@@ -254,7 +254,7 @@ arc chat-mode "multimodal hallucination mitigation for editing agents" \
        --output-dir reports [--resume]
 ```
 
-特点：外层 Reviewer 评审周期 × 内层三角色聊天辩论；Drift Monitor 防跑题；轮次级重试（单次瞬时故障不再杀死数小时运行）；上下文滑窗控制 prompt 增长；`CHAT_TRANSCRIPT.md` / `BEST_CONSENSUS.md` 实时更新。循环上限等参数以 `configs/chat_mode.yaml` 为准（CLI 未传时）。
+特点：外层 Reviewer 评审周期 × 内层三角色聊天辩论；Drift Monitor 防跑题；轮次级重试（单次瞬时故障不再杀死数小时运行）；上下文滑窗控制 prompt 增长；`DEVELOP_TRANSCRIPT.md` / `BEST_CONSENSUS.md` 实时更新。循环上限等参数以 `configs/chat_mode.yaml` 为准（CLI 未传时）。
 
 #### 3.4) 辅助命令
 

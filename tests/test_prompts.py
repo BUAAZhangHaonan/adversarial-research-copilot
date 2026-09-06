@@ -4,37 +4,37 @@ from tests.helpers.text_contracts import assert_contains_all, read_text
 
 
 PROMPT_MARKERS = {
-    "prompts/latest/default/proposer_en.md": [
+    "prompts/latest/debate/proposer_en.md": [
         "Input Context You Will Receive",
         "Response to Prior Blockers / Revisions",
         "Machine-Readable Output",
         "proposal_quality:",
     ],
-    "prompts/latest/default/skeptic_en.md": [
+    "prompts/latest/debate/skeptic_en.md": [
         "Input Context You Will Receive",
         "Must-Answer Questions (Gate Conditions)",
         "Machine-Readable Output",
         "risk_summary:",
     ],
-    "prompts/latest/default/moderator_en.md": [
+    "prompts/latest/debate/moderator_en.md": [
         "Input Context You Will Receive",
         "Verdict Logic",
         "Machine-Readable Output",
         "scorecard:",
     ],
-    "prompts/latest/chat/proposer_chat_en.md": [
+    "prompts/latest/develop/proposer_en.md": [
         "Language policy:",
         "Length guidance:",
         "Commit to **one best path**",
         "Citations:",
     ],
-    "prompts/latest/chat/skeptic_chat_en.md": [
+    "prompts/latest/develop/skeptic_en.md": [
         "Language policy:",
         "Length guidance:",
         "at most 2 specific, concrete failure scenarios",
         "Evidence binding:",
     ],
-    "prompts/latest/chat/moderator_chat_en.md": [
+    "prompts/latest/develop/moderator_en.md": [
         "Language policy:",
         "Length guidance:",
         "Mandatory final line",
@@ -43,30 +43,30 @@ PROMPT_MARKERS = {
         "open_issues:",
         "stopping the discussion is NOT an endorsement",
     ],
-    "prompts/latest/default/proposer_zh.md": [
+    "prompts/latest/debate/proposer_zh.md": [
         "输入上下文",
         "机器可读 YAML",
         "proposal_quality:",
     ],
-    "prompts/latest/default/skeptic_zh.md": [
+    "prompts/latest/debate/skeptic_zh.md": [
         "输入上下文",
         "机器可读 YAML",
         "risk_summary:",
     ],
-    "prompts/latest/default/moderator_zh.md": [
+    "prompts/latest/debate/moderator_zh.md": [
         "输入上下文",
         "机器可读 YAML",
         "scorecard:",
     ],
-    "prompts/latest/chat/proposer_chat_zh.md": [
+    "prompts/latest/develop/proposer_zh.md": [
         "必须使用中文自然表达",
         "最多 3 段",
     ],
-    "prompts/latest/chat/skeptic_chat_zh.md": [
+    "prompts/latest/develop/skeptic_zh.md": [
         "必须使用中文自然表达",
         "2 个具体失败场景",
     ],
-    "prompts/latest/chat/moderator_chat_zh.md": [
+    "prompts/latest/develop/moderator_zh.md": [
         "必须使用中文自然表达",
         "[JUDGE_DECISION]:",
         "next_action: REASON | RETRIEVE | EXPERIMENT | STOP",

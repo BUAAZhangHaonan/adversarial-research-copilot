@@ -22,7 +22,7 @@ from arc.llm_client import LLMClient
 from arc.model_registry import load_registry, load_runtime_roles, resolve_role_model, role_api_ready, set_role_model
 from arc.run_paths import resolve_run_dir, sanitize_model_suffix
 from arc.runners.debate_runner import run_debate
-from arc.runners.chat_mode_runner import run_chat_mode
+from arc.runners.develop_runner import run_develop
 from arc.runners.pipeline_runner import run_pipeline
 from arc.topic_refiner import build_topic_refine_report, refine_research_topic
 
@@ -200,9 +200,9 @@ def explain_outputs(
     console.print(table)
 
 
-@app.command("chat-mode")
-def chat_mode(
-    topic: str = typer.Argument(..., help="Brainstorm topic"),
+@app.command("develop")
+def develop(
+    topic: str = typer.Argument(..., help="Problem statement to develop into a plan"),
     proposer: Optional[str] = typer.Option(None, help="Model for Proposer"),
     skeptic: Optional[str] = typer.Option(None, help="Model for Skeptic"),
     moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
@@ -210,29 +210,29 @@ def chat_mode(
     resume: bool = typer.Option(False, help="Resume from latest run directory"),
     min_rounds_before_stop: Optional[int] = typer.Option(
         None,
-        help="Minimum rounds before judge is allowed to stop (default: configs/chat_mode.yaml)",
+        help="Minimum rounds before judge is allowed to stop (default: configs/develop.yaml)",
     ),
     max_rounds: Optional[int] = typer.Option(
         None,
-        help="Hard cap on total debate rounds across review cycles. 0 = unlimited. (default: configs/chat_mode.yaml)",
+        help="Hard cap on total debate rounds across review cycles. 0 = unlimited. (default: configs/develop.yaml)",
     ),
     export_best_consensus: Optional[bool] = typer.Option(
         None,
         "--export-best-consensus/--no-export-best-consensus",
-        help="Generate BEST_CONSENSUS.md automatically (default: configs/chat_mode.yaml)",
+        help="Generate BEST_CONSENSUS.md automatically (default: configs/develop.yaml)",
     ),
     gpt_effort: str = typer.Option(
         "medium", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
     gpt_verbosity: str = typer.Option(
         "high", help="GPT output verbosity: low|medium|high"),
     prompt_language: str = typer.Option(
-        "en", help="Prompt language for chat iteration: en|zh"),
+        "en", help="Prompt language for develop iteration: en|zh"),
     max_review_cycles: Optional[int] = typer.Option(
-        None, help="Maximum review cycles (outer loop). 0 = unlimited. (default: configs/chat_mode.yaml)"),
+        None, help="Maximum review cycles (outer loop). 0 = unlimited. (default: configs/develop.yaml)"),
     max_inner_rounds: Optional[int] = typer.Option(
-        None, help="Maximum inner debate rounds per review cycle. 0 = unlimited. (default: configs/chat_mode.yaml)"),
+        None, help="Maximum inner debate rounds per review cycle. 0 = unlimited. (default: configs/develop.yaml)"),
     drift_interval: Optional[int] = typer.Option(
-        None, help="Run drift monitor every N inner rounds. (default: configs/chat_mode.yaml)"),
+        None, help="Run drift monitor every N inner rounds. (default: configs/develop.yaml)"),
 ) -> None:
     os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
     os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
@@ -247,7 +247,7 @@ def chat_mode(
     skeptic_model = _ensure_known_model("skeptic", skeptic_model, registry)
     moderator_model = _ensure_known_model("moderator", moderator_model, registry)
 
-    transcript_file, state_file = run_chat_mode(
+    transcript_file, state_file = run_develop(
         topic=topic,
         proposer_model=proposer_model,
         skeptic_model=skeptic_model,
@@ -269,6 +269,13 @@ def chat_mode(
         console.print(f"[bold green]Best consensus:[/bold green] {consensus_file}")
 
 
+@app.command("chat-mode", hidden=True)
+def chat_mode_deprecated(**kwargs) -> None:
+    """Deprecated alias for `arc develop`."""
+    console.print("[yellow]`arc chat-mode` is deprecated; use `arc develop`.[/yellow]")
+    develop(**kwargs)
+
+
 @app.command("discover")
 def discover(
     topic: str = typer.Argument(..., help="Research field or rough topic to mine for novel problems"),
@@ -286,7 +293,7 @@ def discover(
         None, help="Candidate ideas to compose (default: configs/discover.yaml)"),
     stress_test: bool = typer.Option(
         False, "--stress-test/--no-stress-test",
-        help="Run chat-mode stress tests on top KEEP ideas after the report"),
+        help="Run develop-mode stress tests on top KEEP ideas after the report"),
     stress_rounds: Optional[int] = typer.Option(
         None, help="Max rounds per stress-test debate (default: configs/discover.yaml)"),
     prompt_language: str = typer.Option("en", help="Prompt language: en|zh"),

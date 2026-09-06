@@ -68,7 +68,7 @@ _STAGE_MODEL_ROLE: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ChatModeConfig:
+class DevelopConfig:
     min_rounds_before_stop: int = 2
     max_rounds: int = 60  # hard cap on total rounds; 0 = unlimited
     min_references: int = 20
@@ -87,7 +87,7 @@ class ChatModeConfig:
 _UNLIMITED_ROUNDS = 10**6
 
 
-def _effective_round_bounds(cfg: ChatModeConfig) -> tuple[int, int]:
+def _effective_round_bounds(cfg: DevelopConfig) -> tuple[int, int]:
     """Resolve (max_review_cycles, max_inner_debate_rounds), treating 0 as unlimited."""
     max_cycles = cfg.max_review_cycles if cfg.max_review_cycles > 0 else _UNLIMITED_ROUNDS
     max_inner = cfg.max_inner_debate_rounds if cfg.max_inner_debate_rounds > 0 else _UNLIMITED_ROUNDS
@@ -98,7 +98,7 @@ def _effective_round_bounds(cfg: ChatModeConfig) -> tuple[int, int]:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_chat_mode(
+def run_develop(
     topic: str,
     proposer_model: str,
     skeptic_model: str,
@@ -115,7 +115,7 @@ def run_chat_mode(
     drift_check_interval: int | None = None,
 ) -> tuple[Path, Path]:
     """Run the full chat-mode pipeline (9 stages with nested review loops)."""
-    cfg = _load_chat_mode_config()
+    cfg = _load_develop_config()
     if min_rounds_before_stop is not None:
         cfg.min_rounds_before_stop = max(1, min_rounds_before_stop)
     if max_rounds is not None:
@@ -143,33 +143,33 @@ def run_chat_mode(
     target_run_dir = (
         ensure_run_dir_within_reports(Path(run_dir), output_dir)
         if run_dir
-        else resolve_run_dir(output_dir, resume, "chat_mode_state.json", model_suffix=msuffix)
+        else resolve_run_dir(output_dir, resume, "develop_state.json", model_suffix=msuffix)
     )
-    state_file = target_run_dir / "chat_mode_state.json"
+    state_file = target_run_dir / "develop_state.json"
 
     # Resume handling
     resume_state, resumed = _load_chat_resume_state(
         target_run_dir, topic=topic, models=models, resume=resume, max_stale_hours=24,
     )
     if resume and run_dir is None and not resumed and state_file.exists():
-        target_run_dir = resolve_run_dir(output_dir, False, "chat_mode_state.json", model_suffix=msuffix)
-        state_file = target_run_dir / "chat_mode_state.json"
+        target_run_dir = resolve_run_dir(output_dir, False, "develop_state.json", model_suffix=msuffix)
+        state_file = target_run_dir / "develop_state.json"
         resume_state, resumed = _load_chat_resume_state(
             target_run_dir, topic=topic, models=models, resume=False, max_stale_hours=24,
         )
 
     target_run_dir.mkdir(parents=True, exist_ok=True)
-    chat_dir = target_run_dir / "chat_rounds"
+    chat_dir = target_run_dir / "develop_rounds"
     chat_dir.mkdir(parents=True, exist_ok=True)
 
     if resumed:
-        existing_topic = (target_run_dir / "TOPIC_CHAT.txt").read_text(
-            encoding="utf-8").strip() if (target_run_dir / "TOPIC_CHAT.txt").exists() else ""
+        existing_topic = (target_run_dir / "TOPIC_DEVELOP.txt").read_text(
+            encoding="utf-8").strip() if (target_run_dir / "TOPIC_DEVELOP.txt").exists() else ""
         if existing_topic and existing_topic != topic.strip():
             raise RuntimeError(
                 "Resume requested with a different topic than the in-progress chat run.")
 
-    (target_run_dir / "TOPIC_CHAT.txt").write_text(topic.strip() + "\n", encoding="utf-8")
+    (target_run_dir / "TOPIC_DEVELOP.txt").write_text(topic.strip() + "\n", encoding="utf-8")
 
     client = LLMClient()
     skills = load_skills_dir("skills")
@@ -300,7 +300,7 @@ def run_chat_mode(
 
                         # Proposer
                         if "proposer" not in round_cache:
-                            proposer_prompt_path = str(resolve_prompt_path("chat", "proposer_chat", cfg.prompt_language))
+                            proposer_prompt_path = str(resolve_prompt_path("develop", "proposer", cfg.prompt_language))
                             proposer_extra = ""
                             if cycle_reviewer_feedback:
                                 proposer_extra += f"\n[REVIEWER FEEDBACK FROM PREVIOUS CYCLE]\n{cycle_reviewer_feedback}\n"
@@ -331,7 +331,7 @@ def run_chat_mode(
 
                         # Skeptic
                         if "skeptic" not in round_cache:
-                            skeptic_prompt_path = str(resolve_prompt_path("chat", "skeptic_chat", cfg.prompt_language))
+                            skeptic_prompt_path = str(resolve_prompt_path("develop", "skeptic", cfg.prompt_language))
                             round_cache["skeptic"] = (
                                 _chat_generate(
                                     client=client, model=models["skeptic"],
@@ -353,7 +353,7 @@ def run_chat_mode(
                         skeptic_output, skeptic_completed_at = round_cache["skeptic"]
 
                         # Moderator
-                        moderator_prompt_path = str(resolve_prompt_path("chat", "moderator_chat", cfg.prompt_language))
+                        moderator_prompt_path = str(resolve_prompt_path("develop", "moderator", cfg.prompt_language))
                         moderator_output = _chat_generate(
                             client=client, model=models["moderator"],
                             role_prompt_path=moderator_prompt_path,
@@ -580,7 +580,7 @@ def run_chat_mode(
             refs = []
 
     transcript = _build_transcript(topic, rounds)
-    transcript_file = target_run_dir / "CHAT_TRANSCRIPT.md"
+    transcript_file = target_run_dir / "DEVELOP_TRANSCRIPT.md"
     transcript_file.write_text(transcript, encoding="utf-8")
 
     consensus_file: Path | None = None
@@ -640,7 +640,7 @@ def run_chat_mode(
             ]
         (target_run_dir / "PENDING_ACTIONS.md").write_text("\n".join(lines), encoding="utf-8")
 
-    index_file = target_run_dir / "CHAT_MODE_INDEX.md"
+    index_file = target_run_dir / "DEVELOP_INDEX.md"
     index_file.write_text(
         _build_index(target_run_dir, cfg, len(refs), rounds, stop_reason, consensus_file, review_cycles_data),
         encoding="utf-8",
@@ -680,7 +680,7 @@ def _run_pre_debate_stage(
     models: dict[str, str],
     skills: dict,
     topic: str,
-    cfg: ChatModeConfig,
+    cfg: DevelopConfig,
 ) -> None:
     """Execute a single pipeline stage (stages 1-6, 8-9)."""
     skill_key = _STAGE_SKILL_MAP.get(stage_name)
@@ -766,7 +766,7 @@ def _save_state(
     topic: str,
     rounds: list[dict[str, Any]],
     models: dict[str, str],
-    cfg: ChatModeConfig,
+    cfg: DevelopConfig,
     reference_count: int,
     stop_reason: str,
     status: str,
@@ -823,7 +823,7 @@ def _load_chat_resume_state(
     if not resume:
         return None, False
 
-    state_file = run_dir / "chat_mode_state.json"
+    state_file = run_dir / "develop_state.json"
     if not state_file.exists():
         return None, False
     try:
@@ -865,15 +865,15 @@ def _load_chat_resume_state(
 # Config loading
 # ---------------------------------------------------------------------------
 
-def _load_chat_mode_config(config_path: str | Path = "configs/chat_mode.yaml") -> ChatModeConfig:
-    defaults = ChatModeConfig()
+def _load_develop_config(config_path: str | Path = "configs/develop.yaml") -> DevelopConfig:
+    defaults = DevelopConfig()
     p = Path(config_path)
     if not p.exists():
         return defaults
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-        cfg = data.get("chat_mode", {}) if isinstance(data, dict) else {}
-        return ChatModeConfig(
+        cfg = data.get("develop", {}) if isinstance(data, dict) else {}
+        return DevelopConfig(
             min_rounds_before_stop=max(1, int(cfg.get("min_rounds_before_stop", defaults.min_rounds_before_stop))),
             max_rounds=max(0, int(cfg.get("max_rounds", defaults.max_rounds))),
             min_references=max(20, int(cfg.get("min_references", defaults.min_references))),
@@ -1342,10 +1342,10 @@ def _write_round_artifacts(chat_dir: Path, record: dict[str, Any]) -> None:
 
 
 def _write_interim_outputs(
-    run_dir: Path, topic: str, cfg: ChatModeConfig,
+    run_dir: Path, topic: str, cfg: DevelopConfig,
     refs: list[dict[str, Any]], rounds: list[dict[str, Any]], stop_reason: str,
 ) -> None:
-    (run_dir / "CHAT_TRANSCRIPT.md").write_text(_build_transcript(topic, rounds), encoding="utf-8")
+    (run_dir / "DEVELOP_TRANSCRIPT.md").write_text(_build_transcript(topic, rounds), encoding="utf-8")
     _write_interim_consensus(topic=topic, rounds=rounds, output_file=run_dir / "BEST_CONSENSUS.md")
 
 
@@ -1421,7 +1421,7 @@ def _write_review_cycles_report(
 
 
 def _build_index(
-    run_dir: Path, cfg: ChatModeConfig, reference_count: int,
+    run_dir: Path, cfg: DevelopConfig, reference_count: int,
     rounds: list[dict[str, Any]], stop_reason: str,
     consensus_file: Path | None, review_cycles: list[dict[str, Any]] | None = None,
 ) -> str:
@@ -1450,7 +1450,7 @@ def _build_index(
         "| AUTO_REVIEW.md | Auto-review logs |",
         "| REVIEW_CYCLES.md | Review cycles report |",
         "| PENDING_ACTIONS.md | External work (retrieve/experiment) requested by the judge |",
-        "| chat_mode_state.json | Structured state with timestamps |",
+        "| develop_state.json | Structured state with timestamps |",
         "| chat_rounds/ | Per-cycle folders (review_cycle_XX/) with per-round artifacts and reviewer output |", "",
         f"completed_debate_rounds: {len(rounds)}",
         f"completed_review_cycles: {len(review_cycles or [])}",

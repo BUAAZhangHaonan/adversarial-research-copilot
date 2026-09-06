@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from arc.runners import chat_mode_runner as cmr
+from arc.runners import develop_runner as cmr
 
 
-def _base_config(**overrides) -> cmr.ChatModeConfig:
+def _base_config(**overrides) -> cmr.DevelopConfig:
     defaults = dict(
         min_rounds_before_stop=1,
         max_rounds=2,
@@ -24,14 +24,14 @@ def _base_config(**overrides) -> cmr.ChatModeConfig:
         max_inner_debate_rounds=2,
     )
     defaults.update(overrides)
-    return cmr.ChatModeConfig(**defaults)
+    return cmr.DevelopConfig(**defaults)
 
 
 def _setup_common_mocks(monkeypatch, tmp_path, *, resume=False, config_overrides=None):
     """Common mock setup for chat mode tests."""
     cfg = _base_config(**(config_overrides or {}))
 
-    monkeypatch.setattr(cmr, "_load_chat_mode_config", lambda: cfg)
+    monkeypatch.setattr(cmr, "_load_develop_config", lambda: cfg)
     monkeypatch.setattr(cmr, "LLMClient", lambda: object())
     monkeypatch.setattr(
         cmr,
@@ -93,7 +93,7 @@ def test_chat_mode_resume_preserves_existing_rounds(
         "moderator": "old moderator round 1",
         "judge_decision": "CONTINUE",
     }
-    (run_dir / "chat_mode_state.json").write_text(
+    (run_dir / "develop_state.json").write_text(
         json.dumps(
             {
                 "topic": "topic",
@@ -134,7 +134,7 @@ def test_chat_mode_resume_preserves_existing_rounds(
 
     monkeypatch.setattr(cmr, "_chat_generate", fake_chat_generate)
 
-    transcript_file, state_file = cmr.run_chat_mode(
+    transcript_file, state_file = cmr.run_develop(
         topic="topic",
         proposer_model="p",
         skeptic_model="s",
@@ -153,7 +153,7 @@ def test_chat_mode_resume_preserves_existing_rounds(
 def test_chat_mode_resume_rejects_stale_in_progress_state(tmp_path: Path) -> None:
     run_dir = tmp_path / "reports" / "chat-run"
     run_dir.mkdir(parents=True)
-    (run_dir / "chat_mode_state.json").write_text(
+    (run_dir / "develop_state.json").write_text(
         json.dumps(
             {
                 "topic": "topic",
@@ -273,7 +273,7 @@ def test_chat_mode_survives_final_consensus_export_failure(
 
     monkeypatch.setattr(cmr, "_export_best_consensus", exploding)
 
-    transcript_file, state_file = cmr.run_chat_mode(
+    transcript_file, state_file = cmr.run_develop(
         topic="smoke topic",
         proposer_model="p",
         skeptic_model="s",
@@ -304,7 +304,7 @@ def test_chat_mode_smoke_generates_references_file(
 
     monkeypatch.setattr(cmr, "_chat_generate", fake_chat_generate)
 
-    transcript_file, state_file = cmr.run_chat_mode(
+    transcript_file, state_file = cmr.run_develop(
         topic="smoke topic",
         proposer_model="p",
         skeptic_model="s",
@@ -370,7 +370,7 @@ def test_reviewer_feedback_reaches_next_cycle_proposer(
 
     monkeypatch.setattr(cmr, "_chat_generate", fake_chat_generate)
 
-    cmr.run_chat_mode(
+    cmr.run_develop(
         topic="feedback topic",
         proposer_model="p",
         skeptic_model="s",
@@ -422,7 +422,7 @@ def test_max_rounds_is_a_hard_cap(
 
     monkeypatch.setattr(cmr, "_chat_generate", always_continue)
 
-    transcript_file, state_file = cmr.run_chat_mode(
+    transcript_file, state_file = cmr.run_develop(
         topic="cap topic",
         proposer_model="p", skeptic_model="s", moderator_model="m",
         output_dir=str(reports_dir), resume=False,
@@ -470,7 +470,7 @@ def test_round_retry_reuses_successful_role_outputs(
 
     monkeypatch.setattr(cmr, "_chat_generate", flaky_moderator_generate)
 
-    transcript_file, state_file = cmr.run_chat_mode(
+    transcript_file, state_file = cmr.run_develop(
         topic="retry topic",
         proposer_model="p", skeptic_model="s", moderator_model="m",
         output_dir=str(reports_dir), resume=False,
@@ -546,7 +546,7 @@ def test_next_action_experiment_stops_debate_and_records_pending(
 
     monkeypatch.setattr(cmr, "_chat_generate", gen)
 
-    _, state_file = cmr.run_chat_mode(
+    _, state_file = cmr.run_develop(
         topic="exp topic", proposer_model="p", skeptic_model="s", moderator_model="m",
         output_dir=str(reports_dir), resume=False)
 
@@ -593,7 +593,7 @@ def test_open_issues_ledger_flows_to_next_round(
         return "role output"
 
     monkeypatch.setattr(cmr, "_chat_generate", gen)
-    cmr.run_chat_mode(
+    cmr.run_develop(
         topic="ledger topic", proposer_model="p", skeptic_model="s", moderator_model="m",
         output_dir=str(reports_dir), resume=False)
 
@@ -629,7 +629,7 @@ def test_research_object_grounds_first_round(
         return "role output"
 
     monkeypatch.setattr(cmr, "_chat_generate", gen)
-    cmr.run_chat_mode(
+    cmr.run_develop(
         topic="grounded topic", proposer_model="p", skeptic_model="s", moderator_model="m",
         output_dir=str(reports_dir), resume=False)
 

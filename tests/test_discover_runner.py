@@ -731,16 +731,16 @@ def test_stress_test_passes_full_brief_and_cross_models(
     different model than the proposer (review 一.5)."""
     captured: dict[str, Any] = {}
 
-    import arc.runners.chat_mode_runner as cmr
+    import arc.runners.develop_runner as cmr
 
-    def fake_run_chat_mode(**kwargs):
+    def fake_run_develop(**kwargs):
         captured.update(kwargs)
         run_dir = Path(kwargs["run_dir"])
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "chat_mode_state.json").write_text("{}", encoding="utf-8")
         return run_dir / "CHAT_TRANSCRIPT.md", run_dir / "chat_mode_state.json"
 
-    monkeypatch.setattr("arc.runners.chat_mode_runner.run_chat_mode", fake_run_chat_mode)
+    monkeypatch.setattr("arc.runners.develop_runner.run_develop", fake_run_develop)
 
     run_dir = tmp_path / "run"
     run_dir.mkdir(parents=True)

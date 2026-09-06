@@ -914,7 +914,7 @@ def _stage_taste_gate(
 
 
 def _run_stress_test(run_dir: Path, state: DiscoverState) -> None:
-    from arc.runners.chat_mode_runner import run_chat_mode
+    from arc.runners.develop_runner import run_develop
 
     cfg = state.config
     judgments = json.loads(_read_text(run_dir / "judgments.json"))
@@ -958,7 +958,7 @@ def _run_stress_test(run_dir: Path, state: DiscoverState) -> None:
         target = stress_dir / slug
         target.mkdir(parents=True, exist_ok=True)
         try:
-            run_chat_mode(
+            run_develop(
                 topic=brief,
                 proposer_model=state.models["generator"],
                 # Cross-model adversarial setup (review 一.5): the skeptic is

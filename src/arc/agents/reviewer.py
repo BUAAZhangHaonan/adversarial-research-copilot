@@ -11,16 +11,16 @@ from arc.prompting import normalize_prompt_language, resolve_prompt_path
 class ReviewerAgent:
     """Post-debate reviewer that evaluates the consensus document.
 
-    In chat mode the reviewer produces a compact 3-paragraph response with a
+    In develop mode the reviewer produces a compact 3-paragraph response with a
     trailing YAML block containing ``review_decision``. In default mode the
     reviewer follows the full Pass 1 / Pass 2 structure with YAML output.
     """
 
-    def __init__(self, client: LLMClient, model: str, prompt_language: str | None = None, *, mode: str = "chat") -> None:
+    def __init__(self, client: LLMClient, model: str, prompt_language: str | None = None, *, mode: str = "develop") -> None:
         self.client = client
         self.model = model
         self.prompt_language = normalize_prompt_language(prompt_language)
-        prompt_name = "reviewer_chat" if mode == "chat" else "reviewer"
+        prompt_name = "reviewer"
         prompt_path = resolve_prompt_path(mode, prompt_name, self.prompt_language)
         self.system_prompt = Path(prompt_path).read_text(encoding="utf-8")
 
