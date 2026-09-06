@@ -58,8 +58,10 @@ prompts/latest/
 |---|---|---|
 | ARIS（references/ARIS） | 轻量 skill 组织、可恢复循环 | skills/ 结构、run_state 恢复 |
 | EvoScientist（references/EvoScientist） | 记忆与多阶段理念 | pipeline 多阶段 |
-| Stanford AI-Researcher（NoviScl） | 围绕 idea 定向重检索再逐篇比较 | discover/duplicate_checker |
-| Sakana AI Scientist v2 | 分阶段端到端流程 | pipeline stage chain |
+| Stanford AI-Researcher（references/AI-Researcher） | 围绕 idea 定向重检索再逐篇比较 | discover/duplicate_checker |
+| Sakana AI Scientist（references/AI-Scientist） | 分阶段端到端流程 | pipeline stage chain |
+| Google Co-Scientist（references/Co-Scientist，非官方复刻） | 多假设生成-锦标赛-演进 | 争点表（claim 版本化、可重开） |
+| PaperQA2（references/paper-qa） | 检索/证据/引用分层 | 审计 INSUFFICIENT_EVIDENCE |
 | Google Co-Scientist | 多假设保留、改进产生新候选 | 争点表（claim 版本化、可重开） |
 | PaperQA2 | 缺证据 vs 证据矛盾的区分 | 审计 INSUFFICIENT_EVIDENCE 状态 |
 

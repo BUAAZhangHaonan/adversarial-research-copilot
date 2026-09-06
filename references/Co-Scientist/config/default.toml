@@ -1,0 +1,276 @@
+# AI Co-Scientist — default configuration
+# User overrides: ~/.co-scientist/config.toml or ./co-scientist.toml
+# Secrets: env vars only, and none of them are for an LLM. Reasoning runs on
+# the Claude Code / Codex CLIs under your existing subscription; the only keys
+# are OPENAI_API_KEY (embeddings) and TAVILY/BRAVE/NCBI (data sources).
+
+[run]
+concurrency = 4
+max_ideas = 60
+max_matches_per_idea = 12
+wall_clock_seconds = 7200            # 2h default
+budget_tokens = 5_000_000
+# Not a spend gate: a subscription has no marginal per-call price. The CLI
+# reports an equivalent API cost per call and this caps that gauge, which is
+# still useful for spotting a runaway session. Real limits are
+# wall_clock_seconds and max_ideas.
+budget_usd = 25.0
+
+[storage]
+data_dir = "./data"
+
+[science_skills]
+path = "./vendor/science-skills"
+pinned_commit = ""                   # set after first clone
+
+# Chosen independently of [llm]. No agent CLI exposes an embedding endpoint, so
+# under claude_cli / codex_cli this is the one place a hosted key still helps.
+# With neither VOYAGE_API_KEY nor OPENAI_API_KEY this degrades to a local hash
+# embedder, which keeps dedup running but only catches literal token overlap.
+# Changing `dim` invalidates existing FAISS indices under data/vectors/; the
+# store detects the mismatch and rebuilds rather than corrupting the index.
+[embeddings]
+provider = "voyage"                  # voyage | openai | hash
+model = "voyage-3-large"
+dim = 1024
+
+[vectors]
+backend = "faiss"
+dedup_cosine_threshold = 0.92
+cluster_threshold = 0.15
+full_recluster_every_matches = 20
+
+[ranking]
+k_factor_new = 32
+k_factor_warm = 16
+elo_initial = 1200
+debate_when_matches_lt = 2
+debate_when_elo_delta_lt = 50
+batch_below_decile = true
+batch_submit_every_seconds = 1800    # 30 min
+p_new = 0.4
+p_close = 0.4
+p_random = 0.2
+
+[termination]
+elo_stability_k = 5                  # top-K tracked
+elo_stability_n = 3                  # snapshots compared
+elo_stability_eps = 25.0
+match_snapshot_every = 10
+# Guards: elo_stable cannot fire until these thresholds are met.
+# Default 0 = disabled (preserves original behaviour).
+# Deep runs should set min_ideas_before_stable >= max_ideas / 2.
+min_ideas_before_stable = 0
+min_matches_before_stable = 0
+
+[evolution]
+# Minimum number of *mature* hypotheses (>= 3 matches played) before the
+# supervisor schedules an evolution pass.  Lower this for deep runs where
+# the pool size is larger than the default 60-idea session.
+min_mature = 20
+# How many top hypotheses to evolve per idle pass.
+top_k = 5
+
+[budget_shares]
+generation = 0.20
+reflection = 0.20
+ranking    = 0.25
+evolution  = 0.15
+metareview = 0.10
+proximity  = 0.02
+reserve    = 0.08
+
+# Passed verbatim to the configured backend, so these must match the family in
+# [llm]. Below are OpenRouter ids for the default provider. Two tiers is the
+# whole design: a stronger model for the reasoning-heavy agents, a cheaper one
+# for the rest. Any agent can point at any vendor — OpenRouter dispatches
+# upstream — so mixing "openai/gpt-5" and "google/gemini-3-pro" in here works.
+#
+# Switching family means replacing ALL of these. Config is deep-merged, so a key
+# you leave out keeps its OpenRouter default and gets sent to the new endpoint,
+# which will reject it. Equivalents:
+#   anthropic    "claude-opus-4-7" / "claude-sonnet-4-6" / "claude-haiku-4-5-20251001"
+#   gemini       "gemini-3-pro" / "gemini-3-flash"
+#   claude_cli   either the anthropic ids above, or "opus" / "sonnet" / "haiku"
+#   codex_cli    Codex model ids your ChatGPT account is entitled to
+[models]
+parse_goal          = "anthropic/claude-sonnet-4-6"
+generation          = "anthropic/claude-opus-4-7"
+reflection          = "anthropic/claude-opus-4-7"
+evolution           = "anthropic/claude-opus-4-7"
+ranking_pairwise    = "anthropic/claude-sonnet-4-6"
+ranking_debate      = "anthropic/claude-sonnet-4-6"
+ranking_priority    = "anthropic/claude-opus-4-7"
+metareview_feedback = "anthropic/claude-sonnet-4-6"
+metareview_final    = "anthropic/claude-opus-4-7"
+classifier          = "anthropic/claude-haiku-4.5"
+judge               = "anthropic/claude-sonnet-4-6"
+
+# Extended-reasoning budgets, in tokens. Only `provider = "anthropic"` sends
+# these as a real thinking budget. Under the default OpenRouter provider they
+# are dropped before the request: routing zeroes them for any model without
+# "opus" in its name, and the OpenAI-compatible adapter only translates a budget
+# into `reasoning_effort` for o-series ids. They are kept at these values so
+# switching to `anthropic` needs no other edit. `gemini` has its own semantic
+# levels under [llm.gemini]; `claude_cli` maps these onto --effort tiers.
+[thinking]
+# Per agent.mode reasoning budgets; 0 = disabled. The CLIs take discrete
+# effort tiers rather than token budgets, so these map onto
+# --effort low/medium/high/xhigh/max (see cli_backend/claude_code.py).
+generation_literature   = 4000
+generation_debate       = 8000
+reflection_full         = 0
+reflection_verification = 12000
+reflection_observation  = 6000
+ranking_pairwise        = 4000
+ranking_debate          = 8000
+evolution_combine       = 6000
+evolution_out_of_box    = 6000
+evolution_feasibility   = 0
+evolution_simplify      = 0
+metareview_feedback     = 8000
+metareview_final        = 16000
+
+# The CLI backends run their own agentic loop, so *_max_iters no longer
+# counts turns we drive — it caps how many times we re-ask for a structured
+# record when the agent finishes without one. parallel_cap and
+# tool_timeout_seconds are enforced inside the MCP tool server.
+[tool_loop]
+generation_max_iters = 8
+reflection_max_iters = 8
+ranking_max_iters    = 3
+evolution_max_iters  = 6
+metareview_max_iters = 12
+parallel_cap         = 4
+tool_timeout_seconds = 30
+
+# Subprocess retry. max_attempts_429 is the attempt budget; rate-limit
+# backoff is floored at 30s and allowed to reach 10min, because a
+# subscription limit clears over hours, not seconds.
+[retry]
+max_attempts_429 = 6
+max_attempts_529 = 8
+max_attempts_5xx = 5
+max_attempts_timeout = 3
+base_ms = 1000
+cap_ms = 60_000
+per_call_timeout_seconds = 120
+per_call_timeout_thinking_seconds = 300
+
+[lease]
+default_seconds      = 300
+reflection_seconds   = 600
+metareview_final_seconds = 1800
+heartbeat_seconds    = 60
+max_attempts         = 3
+
+[web_search]
+provider = "tavily"                  # tavily | brave
+max_results = 8
+
+[web_fetch]
+max_bytes = 5_000_000
+timeout_seconds = 30
+user_agent = "co-scientist/0.1 (+research; contact via project README)"
+
+[code_exec]
+provider = "local"
+local_cpu_seconds = 30
+local_mem_mb = 512
+
+[safety]
+enable_classifier = true
+enable_citation_verifier = true
+classifier_block_categories = ["cbrn", "csam", "weapons", "illicit_synthesis"]
+classifier_warn_categories = ["dual_use_bio"]
+
+# Backend selection. Two families, and [models] is interpreted by whichever
+# one you pick — switching families usually means revisiting it.
+#
+# Subscription CLI: drives a locally-installed agent CLI over its own login.
+# No API key is used, and any in the environment are stripped from the
+# subprocess so a call cannot fall back to metered billing.
+#   "claude_cli" — `claude -p` (Claude Code). [models] values go to --model,
+#                  so aliases ("opus", "sonnet", "haiku") and full ids
+#                  ("claude-sonnet-4-6") both work.
+#   "codex_cli"  — `codex exec` (Codex). [models] are Codex model ids; your
+#                  ChatGPT account must be entitled to the one you pick.
+#
+# Metered API: a vendor SDK with a per-token bill.
+#   "openrouter" — the default. 200+ models from every vendor behind one key,
+#                  so [models] can mix vendors per agent in one session. Set
+#                  OPENROUTER_API_KEY. Models: "anthropic/claude-opus-4-7",
+#                  "openai/gpt-5", "google/gemini-3-pro".
+#   "anthropic"  — Claude via the Anthropic SDK. The only backend with prompt
+#                  cache breakpoints and the Batch API. Set ANTHROPIC_API_KEY.
+#                  Models: "claude-opus-4-7", "claude-sonnet-4-6".
+#   "openai"     — OpenAI Chat Completions. Set OPENAI_API_KEY.
+#   "gemini"     — Google Gemini via OpenAI-compat endpoint. Set
+#                  GEMINI_API_KEY. Models: "gemini-3-flash", "gemini-3-pro",
+#                  "gemini-2.5-pro".
+#   "groq"       — Groq (fast Llama / Mixtral). Set GROQ_API_KEY.
+#   "together"   — Together AI. Set TOGETHER_API_KEY.
+#   "mistral"    — Mistral la-plateforme. Set MISTRAL_API_KEY.
+#   "ollama"     — local Ollama at localhost:11434. No key needed.
+#   "openai_compatible" — any other OpenAI-compatible endpoint; set
+#                  [llm.openai] base_url.
+#
+# NOTE: OPENAI_API_KEY takes precedence over every OpenAI-compatible preset's
+# own key, including OPENROUTER_API_KEY. A stray one in your environment gets
+# sent to OpenRouter and rejected — unset it, or set only the preset's key.
+[llm]
+provider = "openrouter"
+
+[llm.claude_cli]
+binary = "claude"
+permission_mode = "dontAsk"
+timeout_seconds = 900
+# Concurrent CLI processes. Bounded by the subscription rate limit rather
+# than by CPU, so keep it below [run] concurrency.
+max_parallel = 3
+# Replace Claude Code's default system prompt instead of appending to it.
+# Appending costs ~19k cache-creation + ~24k cache-read tokens per call in
+# harness scaffolding the agents do not need.
+replace_system_prompt = true
+
+[llm.codex_cli]
+binary = "codex"
+sandbox = "read-only"
+timeout_seconds = 900
+max_parallel = 3
+
+# --- metered API providers ------------------------------------------------- #
+
+[llm.openai]
+# Point at any OpenAI-compatible endpoint. Only needed for
+# provider = "openai_compatible", or to override a named preset's base_url.
+# base_url = ""
+
+# Gemini reasoning control for provider = "gemini" / "google".
+# "default" omits reasoning_effort and uses the selected model's default.
+# For multi-step agent/tool work, "medium" is a sensible starting point.
+[llm.gemini]
+thinking_level = "default"  # default | minimal | low | medium | high
+
+# Optional per-mode overrides. Keys match agent routing modes.
+# [llm.gemini.thinking_by_mode]
+# "parse_goal" = "minimal"
+# "generation.literature" = "medium"
+# "reflection.full" = "high"
+# "ranking.pairwise" = "medium"
+# "ranking.debate" = "high"
+# "evolution.combine" = "high"
+# "evolution.out_of_box" = "high"
+# "evolution.feasibility" = "medium"
+# "evolution.simplify" = "medium"
+# "metareview.system" = "medium"
+# "metareview.final" = "high"
+
+# OpenRouter attribution (optional; for catalog ranking).
+[llm.openrouter]
+# referer = "https://your-app.example.com"
+# title = "co-scientist"
+
+[web_ui]
+host = "127.0.0.1"
+port = 7878

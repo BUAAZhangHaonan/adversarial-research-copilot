@@ -1,0 +1,5 @@
+# Heavy non-architecture assets kept locally but excluded from the repo
+AI-Scientist/review_iclr_bench/
+AI-Scientist/templates/
+AI-Scientist/example_papers/
+paper-qa/tests/
