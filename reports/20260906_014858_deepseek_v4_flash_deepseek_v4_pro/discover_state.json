@@ -1,0 +1,28 @@
+{
+  "topic": "memory architectures for LLM agents over long horizons: what breaks after 100 turns",
+  "models": {
+    "generator": "deepseek-v4-flash",
+    "judge": "deepseek-v4-pro"
+  },
+  "config": {
+    "papers": 60,
+    "deep_read": 12,
+    "ideas": 8,
+    "stress_test": false,
+    "stress_rounds": 10,
+    "prompt_language": "en"
+  },
+  "stage_statuses": {
+    "theme-framing": "completed",
+    "wide-retrieval": "completed",
+    "deep-read": "completed",
+    "gap-mining": "completed",
+    "saturation-audit": "completed",
+    "idea-portfolio": "completed",
+    "duplicate-check": "completed",
+    "taste-gate": "completed"
+  },
+  "status": "completed",
+  "stop_reason": "completed",
+  "timestamp": "2026-09-05T18:50:44.221511+00:00"
+}

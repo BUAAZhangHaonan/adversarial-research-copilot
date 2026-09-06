@@ -1,0 +1,16 @@
+[
+  {
+    "id": "G4",
+    "type": "stale_premise",
+    "question": "For which long-horizon agent failures is memory architecture change actually the right intervention, given that planning and instruction errors dominate end-to-end trajectory failures?",
+    "evidence_ids": [
+      "2604.11978",
+      "2608.15008",
+      "2606.24775"
+    ],
+    "evidence_summary": "[2604.11978] attributes most long-horizon failures to planning errors, with memory limitation a minority; [2608.15008] finds memory retrieval quality does not transfer to ALFWorld planning success; [2606.24775] finds a no-memory Long Context baseline wins DB-Bench EM.",
+    "why_unexplored": "Memory research has its own benchmarks and momentum, while end-to-end failure attribution is expensive and newer.",
+    "who_needs_it": "Research agenda setters deciding whether to invest in memory architectures, planning/reasoning, or instruction-following.",
+    "confidence": 0.72
+  }
+]

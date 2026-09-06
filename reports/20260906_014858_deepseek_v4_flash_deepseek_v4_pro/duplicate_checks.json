@@ -1,0 +1,98 @@
+[
+  {
+    "idea_id": "I1",
+    "closest_works": [
+      "TRAJDEBUG: Tracing Error Lifecycle to Identify Critical Failures in Long-Horizon Agent Trajectories (2026) — locates earliest critical error steps but does not inject oracle memory to test attribution.",
+      "Seeing the Whole Elephant: A Benchmark for Failure Attribution in LLM-based Multi-Agent Systems (2026) — attributes failures to agents/steps under natural conditions, not under memory oracle replacement.",
+      "Semantic Cooperative Games for Contribution Attribution in LLM-Based Multi-Agent Systems (2026) — provides contribution attribution methods; no oracle-perfect memory intervention.",
+      "Diagnosis Before Recovery: Turning Agent Failures into Selective Self-Correction (Hugging Face papers) — diagnoses then repairs failures, but does not isolate memory-miss contribution counterfactually."
+    ],
+    "differentiation": "Failure-attribution work such as TRAJDEBUG, Seeing the Whole Elephant, and Semantic Cooperative Games established how to locate responsible steps/agents under the agents' natural memory conditions; the candidate examines whether replacing memory with an oracle at every decision point changes the attributed planning/instruction error mix; the added value is a causal estimate of how much attributed planning failure is downstream of memory misses. No study performing this oracle-memory replay on existing failure-attribution trajectories was found in this search.",
+    "novelty_verdict": "DISTINCT",
+    "unchecked": "The candidate's cited gap-evidence papers (2604.11978, 2608.15008, 2606.24775) were not in the supplied hits, and direct oracle/counterfactual memory ablation studies may exist under other terminology.",
+    "reason": "Retrieved works attribute failures or evaluate memory systems, but none replays attributed failures with oracle-perfect memory to reclassify planning/instruction error causes."
+  },
+  {
+    "idea_id": "I2",
+    "closest_works": [
+      "https://arxiv.org/html/2603.07670v1 — surveys LLM-agent memory mechanisms and evaluation, but lacks subgoal-level recall-vs-next-action decomposition.",
+      "RAGPerf: An End-to-End Benchmarking Framework for Retrieval-Augmented Generation Systems (2026) — profiles RAG pipeline components, but targets RAG QA rather than ALFWorld-style planning checkpoints.",
+      "SegMem-RAG: Adaptive Memory for Retrieval-Augmented ... (AAAI) — uses adaptive retrieval memory for agents, but does not test the conditional correct-recall -> next-action relationship."
+    ],
+    "differentiation": "Existing work established that retrieval quality transfers poorly to ALFWorld planning success and that planning errors dominate end-to-end failures; the candidate examines whether conditioning on correct recall at each subgoal changes next-action correctness, thereby localizing the failure to recall, state update, or action selection. No study covering this checkpoint-level conditional decomposition was found in this search.",
+    "novelty_verdict": "DISTINCT",
+    "unchecked": "Full text of the cited 2608.15008 and 2604.11978, plus any ALFWorld-specific memory-augmented planning papers not surfaced by this search.",
+    "reason": "Closest retrieved works are surveys and RAG benchmarks, none isolating correct recall -> next-action correctness at ALFWorld subgoals."
+  },
+  {
+    "idea_id": "I3",
+    "closest_works": [
+      "arXiv:2604.11978 — reports memory limitation is only a minority of long-horizon failures; candidate isolates which horizon property makes memory necessary",
+      "arXiv:2606.24775 — finds a no-memory long-context baseline wins DB-Bench EM; candidate asks under which horizon conditions that baseline loses"
+    ],
+    "differentiation": "Work in arXiv:2604.11978 established memory limitation is only a minority of long-horizon failures under existing benchmarks; the candidate examines whether factorially varying trajectory length, number of subgoals, and cross-referential distance changes that conclusion; the added value is a controlled decomposition identifying which factor produces a reliable memory-needed crossover. No study covering this orthogonal variation was found in this search.",
+    "novelty_verdict": "DISTINCT",
+    "unchecked": "Full texts of arXiv:2604.11978 and arXiv:2606.24775 were not fully reviewed; literature outside the provided dossier and paper hits was not systematically searched.",
+    "reason": "Closest works diagnose memory-related long-horizon failures but do not factorially vary horizon properties to locate a memory-needed regime."
+  },
+  {
+    "idea_id": "I4",
+    "closest_works": [
+      "MINTEval: Evaluating Memory under Multi-Target Interference in Long-Horizon Agent Systems (2026) — supplies the multi-target interference stressor and likely the 1–8 interleaved-goal manipulation the candidate would adapt.",
+      "Controlled Memory Interference in Continual LLM Agents (2026) — closest mechanistic match on interference, but appears focused on continual memory evolution rather than a memory-vs-full-transcript moderation test.",
+      "MemoryArena: Benchmarking Agent Memory in Interdependent Multi-Session Agentic Tasks (2026) — adjacent multi-session/interdependent memory evaluation, but not explicitly an interference-gradient moderation test."
+    ],
+    "differentiation": "MINTEval established multi-target interference as a memory stressor, while DB-Bench and ALFWorld evidence suggests memory advantage is not universal in long-horizon or planning settings; the candidate examines whether varying the number of interleaved goals from 1 to 8 changes the selective-memory vs full-transcript no-memory comparison; the added value is an interference-gradient moderation test rather than a new benchmark. No study covering this exact ablation was found in this search.",
+    "novelty_verdict": "POSSIBLY_DUPLICATE",
+    "unchecked": "Full text of MINTEval and Controlled Memory Interference to confirm whether either already reports a selective-memory vs full-transcript baseline across an interference gradient.",
+    "reason": "The candidate is a clean moderator test, but the closest hits already manipulate multi-target interference, so novelty depends on an ablation not visible in the snippets."
+  },
+  {
+    "idea_id": "I5",
+    "closest_works": [
+      "Memory-R2: Fair Credit Assignment for Long-Horizon Memory-Augmented LLM Agents — treats long-horizon agent failures as memory-augmented credit assignment, without a stepwise instruction-reminder ablation.",
+      "GitHub ai-boost/awesome-prompts / FLARE: Why Reasoning Fails to Plan — diagnoses long-horizon planning failures as stepwise-reasoning greediness, not a memory-vs-attention instruction adherence test."
+    ],
+    "differentiation": "Memory-R2 and adjacent memory-augmented agent work established that long-horizon instruction adherence can be improved by storing and reusing information in memory; FLARE established that some long-horizon planning failures are non-memory reasoning failures. The candidate examines whether a no-memory-architecture-change, stepwise instruction-reminder condition closes instruction-following errors specifically, thereby separating storage deficits from context-attention deficits. No retrieved work performs that head-to-head comparison.",
+    "novelty_verdict": "DISTINCT",
+    "duplicate_of": null,
+    "unchecked": "Not retrieved: dedicated instruction-reminder/self-reminder baselines, lost-in-the-middle instruction-following studies, and direct memory-vs-reminder ablations outside this search.",
+    "reason": "Closest retrieved works either address memory augmentation or diagnose planning failure, but none runs the candidate's memory-vs-reminder ablation on long-horizon instruction violations."
+  },
+  {
+    "idea_id": "I6",
+    "closest_works": [
+      "CHIME: Credit-Aware Hierarchical Memory Evolution for Long-Horizon Agentic Planning — proposes memory mechanisms for long-horizon planning but does not compare failure attribution before/after upgrading to a reasoning-tuned planner",
+      "The Horizon Gap: Planning, Memory, Execution, Training ... — likely relates planning/memory/execution failure modes, but no controlled planner-strength shift of memory-vs-planning failure share is evident from retrieved snippet",
+      "DeepSeek-R1 — establishes that RL reasoning training improves reasoning/planning; it is the manipulation tool, not the memory-vs-planning failure-share experiment"
+    ],
+    "differentiation": "[2604.11978] established that planning errors dominate long-horizon failures under current planners, and DeepSeek-R1 showed RL reasoning training improves planning; the candidate examines whether upgrading the planner to a reasoning-tuned LLM changes that failure-attribution conclusion; the added value is a controlled bottleneck-shift test with the same memory system and planner strength as the only varied factor. No study performing that paired re-attribution under an RL-reasoning-tuned planner was found in this search.\n",
+    "novelty_verdict": "DISTINCT",
+    "unchecked": "Full text of The Horizon Gap and CHIME; any unpublished or recent work applying LongMemEval-style memory diagnostics under R1-style planners.\n",
+    "reason": "Closest hits address planning and memory separately, but the retrieved evidence does not show the candidate's controlled planner-upgrade failure-share comparison."
+  },
+  {
+    "idea_id": "I7",
+    "closest_works": [
+      "MemBoost: A Memory-Boosted Framework for Cost-Aware LLM Inference — memory reuse cuts serving cost under repeated-query workloads, but does not compare memory/planning/instruction interventions on long-horizon agent success",
+      "Inference-Time Budget Control for LLM Search Agents — allocates token/tool-call budgets inside a search loop, not across intervention clusters at equal cost",
+      "Moving the Mean Toward the Known Good, Not Beyond It — studies inference-time interventions and consolidation in open-ended generation, not matched-cost memory-vs-planning-vs-instruction on long-horizon agents"
+    ],
+    "differentiation": "MemBoost and budget-control work established that memory reuse and explicit budget allocation each affect cost-limited performance under serving/search workloads; the candidate examines whether holding added inference cost equal across a memory substrate, a planning wrapper, and instruction/context engineering changes end-to-end success on the same long-horizon agent suite; the added value is a pre-registered cross-cluster effect-size comparison for research allocation. No study covering this matched-cost three-way comparison was found in this search.",
+    "novelty_verdict": "DISTINCT",
+    "unchecked": "The search was limited to the supplied web dossier and paper-search hits; a systematic arXiv query for an exact matched-cost memory-vs-planning-vs-instruction agent comparison was not performed.",
+    "reason": "Closest works cover cost/memory or single-loop budget allocation, not the proposed equal-budget cross-cluster long-horizon comparison."
+  },
+  {
+    "idea_id": "I8",
+    "closest_works": [
+      "MemDelta: Controlled Baselines and Hidden Confounds in Agent Memory Evaluation — likely overlaps with the candidate's demand for controlled non-learned baselines; unclear if it includes random-truncation and oracle-summary arms under a hard context budget.",
+      "Less Context, More Accuracy: A Bi-Temporal Memory Engine (arXiv:2606.09900) — shows learned memory can beat full-context on LongMemEvalS, but does not isolate random truncation vs. oracle summary.",
+      "RAG vs Long Context (github.com/vlytvynchyk/rag-vs-long-context) — compares retrieval vs. long-context under token/compute constraints, not learned selective memory vs. random truncation on DB-Bench-like tasks."
+    ],
+    "differentiation": "Work MemDelta established that agent-memory evaluation gains often mix memory-method changes with LM/embedding/retrieval changes, and Engram established learned memory can beat full-context under some conditions; the candidate examines whether a hard context budget changes that conclusion by comparing learned selective memory, random truncation, and an oracle one-line summary on DB-Bench-like tasks. The added value is isolating information availability from learned selection. No retrieved study explicitly covers this exact three-way budget-matched ablation, but MemDelta's full text remains to be checked.",
+    "novelty_verdict": "POSSIBLY_DUPLICATE",
+    "unchecked": "Full text of MemDelta and whether it already includes random-truncation and oracle-summary arms under hard context limits on agentic/DB-Bench-like tasks.",
+    "reason": "Distinct from full-context-vs-memory comparisons, but MemDelta may already contain the controlled-baseline ablation the candidate proposes."
+  }
+]

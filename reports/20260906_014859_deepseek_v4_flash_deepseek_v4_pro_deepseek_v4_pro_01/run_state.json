@@ -1,0 +1,15 @@
+{
+  "round": 6,
+  "status": "completed",
+  "last_score": 3.0,
+  "last_decision": "CONTINUE",
+  "blockers": [
+    "{'Target-positive cue-specificity control': 'Must add pre-registered cue-irrelevant matched perturbation and require answer flips only under cue-relevant disruption; otherwise target pool may be generic patch-perturbation.'}",
+    "{'Scene-level leakage': 'Must pre-register disjoint dev/confirmatory scene IDs/seeds and publish hash manifest/overlap check before probe training.'}",
+    "{'E1 success rule consistency': 'Must specify a single pre-registered success rule matching sensitivity ≥0.50, resolving conflict among <56/112, H0≤0.35, and lower CI bound.'}",
+    "{'Image-only artifact control': 'Must pre-register image-only probe TPR/FPR on cue-violated, cue-intact, and confound-patch inputs under same specificity gate and specify fallback if it solves patch artifact.'}",
+    "{'Lead-time verbal-commitment control': 'Must pre-register audit that AR lead-time alarm does not fire solely on generated reasoning tokens that already contain explicit answer semantics.'}"
+  ],
+  "protocol_errors": 0,
+  "timestamp": "2026-09-05T18:23:26.244971+00:00"
+}

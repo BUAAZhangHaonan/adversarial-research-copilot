@@ -1,0 +1,91 @@
+[
+  {
+    "id": "I3",
+    "knowledge_gain": "If only cross-referential distance causes the memory/no-memory crossover, long-horizon is an ill-posed target; if no factor crosses, the no-memory advantage is structural under current baselines.",
+    "decision_changed": "Memory/context teams would target specific task factors instead of treating long-horizon as a coherent regime.",
+    "delta_type": "new_boundary",
+    "incremental_risk": 2,
+    "distinguishes_alternatives": true,
+    "priority": 5,
+    "verdict": "KEEP",
+    "reason": "Factorial design cleanly separates horizon properties that existing work (2604.11978, 2606.24775) conflates."
+  },
+  {
+    "id": "I1",
+    "knowledge_gain": "If oracle memory leaves attributed planning/instruction failures unchanged, memory misses are causally irrelevant to planning-dominant taxonomies; if failures shift, those taxonomies overstate planning and understate memory.",
+    "decision_changed": "Failure-attribution tools would add memory-oracle counterfactuals before quoting planning-dominant shares as evidence against memory investment.",
+    "delta_type": "new_boundary",
+    "incremental_risk": 2,
+    "distinguishes_alternatives": true,
+    "priority": 5,
+    "verdict": "KEEP",
+    "reason": "Adds the missing causal counterfactual to attribution work; TRAJDEBUG/Seeing the Whole Elephant do not inject oracle memory."
+  },
+  {
+    "id": "I5",
+    "knowledge_gain": "If stepwise reminders erase instruction errors, the deficit is attention/context, not storage; if the memory system is necessary, storage remains involved.",
+    "decision_changed": "Memory-architecture pitches would have to distinguish storage deficits from attention deficits before claiming the agent forgot instructions.",
+    "delta_type": "new_boundary",
+    "incremental_risk": 1,
+    "distinguishes_alternatives": true,
+    "priority": 4,
+    "verdict": "KEEP",
+    "reason": "Cheap reminder baseline cleanly separates storage from attention; Memory-R2/FLARE lack this ablation."
+  },
+  {
+    "id": "I6",
+    "knowledge_gain": "If stronger planning does not make memory-error share dominant, memory is not automatically the next bottleneck; if it does, the planning-dominant attribution is planner-dependent.",
+    "decision_changed": "Agenda setters would prioritize memory based on planner strength rather than current failure shares.",
+    "delta_type": "new_boundary",
+    "incremental_risk": 3,
+    "distinguishes_alternatives": true,
+    "priority": 4,
+    "verdict": "KEEP",
+    "reason": "Planner-strength control addresses a hidden variable in 2604.11978's attribution conclusion."
+  },
+  {
+    "id": "I8",
+    "knowledge_gain": "If random truncation matches learned selective memory, learned selection is not the active ingredient; if learned matches oracle summary, the active ingredient is placing right items in context, not the memory mechanism.",
+    "decision_changed": "Selective-memory papers would report random-truncation and oracle-summary arms before claiming learned-policy value.",
+    "delta_type": "new_mechanism",
+    "incremental_risk": 3,
+    "distinguishes_alternatives": true,
+    "priority": 3,
+    "verdict": "KEEP",
+    "reason": "Three-arm budget test separates information availability from learned selection; MemDelta only partially overlaps."
+  },
+  {
+    "id": "I2",
+    "knowledge_gain": "As framed it only separates recall from downstream action; with state-update scoring it would reveal whether correct recall fails during state update or action selection.",
+    "decision_changed": "Retrieval benchmarks would report recall-to-state-to-action checkpoints instead of memory EM as a standalone proxy.",
+    "delta_type": "new_mechanism",
+    "incremental_risk": 3,
+    "distinguishes_alternatives": false,
+    "priority": 3,
+    "verdict": "PIVOT",
+    "reason": "The minimal test omits explicit state-update scoring, so the three-way decomposition is not actually falsified.",
+    "pivot_to": "Score recall-to-state-update-to-action transitions to separate state update from action selection."
+  },
+  {
+    "id": "I4",
+    "knowledge_gain": "If memory advantage is flat across an interference gradient, multi-target interference is not the trigger for memory intervention; if it grows, memory investment can be justified on interference grounds.",
+    "decision_changed": "Benchmark designers would stop citing multi-target interference as a generic memory motivation and condition on interference level.",
+    "delta_type": "new_boundary",
+    "incremental_risk": 4,
+    "distinguishes_alternatives": true,
+    "priority": 2,
+    "verdict": "KEEP",
+    "reason": "Useful moderation but close to MINTEval's existing gradient; risk of collapse into adaptation."
+  },
+  {
+    "id": "I7",
+    "knowledge_gain": "If one intervention cluster dominates at equal cost, allocation gets an empirical effect-size ordering; if none does, no cluster is privileged under current canonical choices.",
+    "decision_changed": "Funders and lab leads would switch from cluster-faith prioritization to cost-matched effect sizes.",
+    "delta_type": "new_problem",
+    "incremental_risk": 5,
+    "distinguishes_alternatives": false,
+    "priority": 1,
+    "verdict": "KEEP",
+    "reason": "Decision-relevant but likely collapses into representative-dependent bake-off; not mechanism-revealing."
+  }
+]

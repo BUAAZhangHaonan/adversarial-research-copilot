@@ -1,0 +1,7 @@
+# BEST_CONSENSUS
+
+Final primary path: a causal sufficiency audit on failure instances, not a trace-reading or temporal first-divergence benchmark [1][2][3]. For each episode, annotate the required atomic facts and the agent’s stored memory. On failure, run two interventions: (a) retrieval-side sufficiency—replace the agent’s retrieval with a permissive top-k/oracle lookup over the agent’s stored memory; if the answer repairs, label retrieval loss. (b) construction-side sufficiency—inject the missing required fact into working context before final retrieval; if this repairs but (a) does not, label construction loss. If neither repairs, mark compound/under-specified and exclude from the clean set. This replaces “had the fact in context” with counterfactual sufficiency [2][3].
+
+Key risk: if the retrieval-side lookup is run over gold memory rather than the agent’s actual stored memory, it will supply facts the agent never encoded and mislabel construction loss as retrieval loss [2][3]. The audit is valid only after a pilot shows stored facts can be separated from gold facts.
+
+First 3 execution steps: 1) build a microbenchmark with annotated gold facts and instrumented agent memory, including single-fact injection/removal cases; 2) run a fault-injection pilot to confirm single missing/injected facts are detected and the two interventions are separable; 3) apply the two-intervention protocol to natural failures, reporting retrieval loss, construction loss, and compound/under-specified rates.
