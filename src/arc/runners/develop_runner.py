@@ -114,7 +114,7 @@ def run_develop(
     max_inner_debate_rounds: int | None = None,
     drift_check_interval: int | None = None,
 ) -> tuple[Path, Path]:
-    """Run the full chat-mode pipeline (9 stages with nested review loops)."""
+    """Run the full develop pipeline (9 stages with nested review loops)."""
     cfg = _load_develop_config()
     if min_rounds_before_stop is not None:
         cfg.min_rounds_before_stop = max(1, min_rounds_before_stop)
@@ -1427,7 +1427,7 @@ def _build_index(
 ) -> str:
     lines = [
         "# CHAT_MODE_INDEX", "",
-        "This run uses the full chat-mode pipeline (9 stages) with nested review cycles.", "",
+        "This run uses the full develop pipeline (9 stages) with nested review cycles.", "",
         f"- min_rounds_before_stop: {cfg.min_rounds_before_stop}",
         f"- max_rounds_soft_target: {'disabled' if cfg.max_rounds == 0 else cfg.max_rounds}",
         f"- drift_check_interval: {cfg.drift_check_interval}",

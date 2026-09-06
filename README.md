@@ -75,7 +75,7 @@ bash references/sync_references.sh
 ## Skills Library
 
 ARC 已提供一套技能化工作流（见 `skills/`），供 pipeline 模式使用：
-`research-lit` / `idea-creator` / `novelty-check` / `research-refine` / `experiment-bridge` / `debate-runner` / `auto-review-loop` / `memo-synthesis` / `evidence-grounding` / `recovery-resume` / `pipeline-arc`
+`research-lit` / `idea-creator` / `novelty-check` / `research-refine` / `experiment-bridge` / `debate-runner` / `auto-review-loop` / `memo-synthesis` / `evidence-grounding` / `pipeline-arc`
 
 这套库借鉴 ARIS 的轻量技能组织方式，但围绕 ARC 的 Proposer/Skeptic/Moderator 对抗收敛逻辑重写。
 

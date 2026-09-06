@@ -15,7 +15,6 @@ Core chain:
 
 Utility skills:
 - evidence-grounding
-- recovery-resume
 - pipeline-arc
 
 Expected artifacts:
