@@ -59,7 +59,9 @@ class FakeStore:
         return [{'proposed_problem_anchor':{'question':'特殊转向'},'original_sources_revisited':['s-1'],'missed_evidence_analysis':'先前忽略条件不同','trigger_evidence_ids':['e-1'],'status':'FROZEN'}]
     def list_tasks(self,run_id): return self.tasks
     def list_capability_requests(self,run_id):
-        return [{'blocked_question':'缺少原始章节','needed_operation':'read_web','cost_visibility_needs':'可核查上界','acceptance_example':'返回原文与定位'}]
+        from .test_capabilities import request_payload
+        return [{**request_payload(),'request_id':'cap-1','run_id':run_id,'task_id':'task-1',
+                 'status':'pending_codex_review','review':None}]
 
 
 def test_report_preserves_state_judgments_versions_and_costs(tmp_path,monkeypatch):

@@ -62,6 +62,28 @@ class CapabilityRequest(StrictModel):
     provenance_needs: str
     cost_visibility_needs: str
     acceptance_example: str
+    current_limitation: str = Field(min_length=1)
+    proposed_change: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    alternatives: list[str] = Field(min_length=1)
+    expected_impact: str = Field(min_length=1)
+
+class CapabilityReview(StrictModel):
+    assessment: Literal["recommended", "needs_information", "not_recommended"]
+    rationale: str = Field(min_length=1)
+    recommended_option: str | None
+    implementation_scope: list[str]
+    validation_plan: list[str]
+
+    @model_validator(mode="after")
+    def actionable_recommendation(self):
+        if self.assessment == "recommended" and not (
+            self.recommended_option and self.recommended_option.strip()
+            and self.implementation_scope and all(x.strip() for x in self.implementation_scope)
+            and self.validation_plan and all(x.strip() for x in self.validation_plan)
+        ):
+            raise ValueError("recommended_capability_requires_scope_and_validation")
+        return self
 
 T = TypeVar("T", bound=BaseModel)
 

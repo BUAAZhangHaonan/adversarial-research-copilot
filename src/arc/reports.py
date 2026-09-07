@@ -35,6 +35,16 @@ SELECTIONS = {'MAIN_REPORT':'值得继续调查','LEAD_ONLY':'待补证线索','
 ASSESSMENTS = {'PROMISING':'值得继续调查','NEEDS_EVIDENCE':'缺少判断所需证据','REJECTED':'已有依据不支持继续','SCOPE_CHANGE_PROPOSED':'建议转向，当前已冻结'}
 
 
+def render_capability_handoff(record, loader=None):
+    """A deterministic review/implementation handoff, never a task dispatch."""
+    from .schemas import CapabilityRequest
+    request={key:record[key] for key in CapabilityRequest.model_fields}
+    return (loader or PromptLoader()).render_report('capability_handoff', {
+        'record':record, 'request_json':json.dumps(request,ensure_ascii=False,indent=2),
+        'review_json':json.dumps(record.get('review'),ensure_ascii=False,indent=2),
+    })
+
+
 def _obj(value: Any) -> Any:
     if hasattr(value, 'model_dump'):
         return value.model_dump(mode='json')
@@ -270,5 +280,5 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     paths['cost'].write_text(loader.render_report('cost',{'run_id':run_id,'summary':cost_text,'entries':cost_entries}),encoding='utf-8')
     if capabilities:
         paths['capabilities']=output_dir/'MCP_REQUIREMENTS.md'
-        paths['capabilities'].write_text(loader.render_report('capabilities',{'run_id':run_id,'requests':[{'blocked_question':_heading(r.get('blocked_question','未完成问题')),'details':_text(r)} for r in capabilities]}),encoding='utf-8')
+        paths['capabilities'].write_text(loader.render_report('capabilities',{'run_id':run_id,'requests':[{'blocked_question':_heading(r['blocked_question']),'details':render_capability_handoff(r,loader)} for r in capabilities]}),encoding='utf-8')
     return paths

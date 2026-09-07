@@ -751,16 +751,45 @@ class Store:
 
     def list_capability_requests(self,run_id):
         with self._connect() as db:
-            rows=db.execute("SELECT id,data FROM capabilities WHERE run_id=?",(run_id,)).fetchall()
-        return [{"request_id":r["id"],**json.loads(r["data"])} for r in rows]
+            rows=db.execute("SELECT id,run_id,data FROM capabilities WHERE run_id=? ORDER BY rowid",(run_id,)).fetchall()
+        return [{"request_id":r["id"],"run_id":r["run_id"],**json.loads(r["data"])} for r in rows]
 
-    def save_capability_request(self,run_id,request):
+    def get_capability_request(self,request_id):
+        with self._connect() as db:
+            row=db.execute("SELECT id,run_id,data FROM capabilities WHERE id=?",(request_id,)).fetchone()
+        if row is None: raise StateError("record_missing")
+        return {"request_id":row["id"],"run_id":row["run_id"],**json.loads(row["data"])}
+
+    def save_capability_request(self,run_id,request,*,task_id=None,request_key=None):
         from .schemas import CapabilityRequest
         record=CapabilityRequest.model_validate(request)
-        identifier=stable_id("cap")
+        identifier=f"cap_{run_id}.{request_key}" if request_key is not None else stable_id("cap")
+        data={**record.model_dump(mode="json"),"status":"pending_codex_review",
+              "created_at":utc_now(),"review":None,"reviewed_at":None,"task_id":task_id}
         with self._transaction() as db:
-            db.execute("INSERT INTO capabilities VALUES (?,?,?)",(identifier,run_id,_dump(record)))
+            existing=db.execute("SELECT run_id,data FROM capabilities WHERE id=?",(identifier,)).fetchone()
+            if existing is not None:
+                previous=json.loads(existing["data"])
+                if existing["run_id"]!=run_id or previous["task_id"]!=task_id or any(previous[k]!=v for k,v in record.model_dump(mode="json").items()):
+                    raise StateError("capability_request_key_conflict")
+                return identifier
+            db.execute("INSERT INTO capabilities VALUES (?,?,?)",(identifier,run_id,_dump(data)))
         return identifier
+
+    def review_capability_request(self,request_id,review):
+        """Record an explicit CodeX assessment; this grants no execution authority."""
+        from .schemas import CapabilityReview
+        review=CapabilityReview.model_validate(review).model_dump(mode="json")
+        with self._transaction() as db:
+            row=db.execute("SELECT data FROM capabilities WHERE id=?",(request_id,)).fetchone()
+            if row is None: raise StateError("record_missing")
+            data=json.loads(row["data"])
+            if data["review"] is not None:
+                if data["review"] != review: raise StateError("capability_review_already_recorded")
+            else:
+                data.update(status="reviewed",review=review,reviewed_at=utc_now())
+                db.execute("UPDATE capabilities SET data=? WHERE id=?",(_dump(data),request_id))
+        return self.get_capability_request(request_id)
 
     def lookup_archive(self,query,limit=8,offset=0):
         if not 1<=limit<=100 or offset<0: raise ValueError("invalid_archive_window")

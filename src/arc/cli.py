@@ -13,6 +13,42 @@ from .config import load_settings, Settings
 from .prompting import PromptLoader
 
 app = typer.Typer(help='ARC：发现研究卡、展开方案、压力测试。每个阶段默认结束即停。', no_args_is_help=True)
+requirements = typer.Typer(help='登记改进需求、记录 CodeX 评估并导出用户支线模板；不执行变更。', no_args_is_help=True)
+app.add_typer(requirements, name='requirements')
+
+
+@requirements.command(name='add')
+def add_requirement(ctx: typer.Context, run_id: str, request: Path = typer.Option(..., exists=True, dir_okay=False)):
+    store, _ = services(ctx.obj)
+    identifier=store.save_capability_request(run_id,json.loads(request.read_text(encoding='utf-8')))
+    typer.echo(identifier)
+
+
+@requirements.command(name='list')
+def list_requirements(ctx: typer.Context, run_id: str):
+    store, _ = services(ctx.obj)
+    typer.echo(json.dumps(store.list_capability_requests(run_id),ensure_ascii=False,indent=2))
+
+
+@requirements.command(name='review')
+def review_requirement(ctx: typer.Context, request_id: str, review: Path = typer.Option(..., exists=True, dir_okay=False)):
+    """记录 CodeX 提供的评估 JSON，不触发模型或授予执行权限。"""
+    store, _ = services(ctx.obj)
+    record=store.review_capability_request(request_id,json.loads(review.read_text(encoding='utf-8')))
+    typer.echo(json.dumps(record,ensure_ascii=False,indent=2))
+
+
+@requirements.command(name='export')
+def export_requirement(ctx: typer.Context, request_id: str, output: Optional[Path] = typer.Option(None)):
+    from .reports import render_capability_handoff
+    store, _ = services(ctx.obj)
+    text=render_capability_handoff(store.get_capability_request(request_id))
+    if output is None:
+        typer.echo(text)
+    else:
+        output.parent.mkdir(parents=True,exist_ok=True)
+        output.write_text(text,encoding='utf-8')
+        typer.echo(str(output))
 
 @app.callback()
 def root(ctx: typer.Context, data_dir: Optional[Path] = typer.Option(None),

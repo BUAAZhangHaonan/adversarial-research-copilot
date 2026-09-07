@@ -54,7 +54,8 @@
       "repair_template": "tasks/repair_structure.md",
       "tools": [
         "lookup_archive",
-        "read_record"
+        "read_record",
+        "request_capability"
       ]
     },
     "discovery.FRAME": {
@@ -74,7 +75,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "discovery.NEXT_DRAW": {
@@ -95,7 +97,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "discovery.COMPOSE": {
@@ -117,7 +120,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "novelty_examiner.INVOKE": {
@@ -136,7 +140,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "selector.INVOKE": {
@@ -157,7 +162,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "developer.INVOKE": {
@@ -197,7 +203,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "skeptic.INVOKE": {
@@ -216,7 +223,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "moderator.INVOKE": {
@@ -235,7 +243,8 @@
         "read_record",
         "read_web",
         "search_literature",
-        "search_web"
+        "search_web",
+        "request_capability"
       ]
     },
     "reporter.INVOKE": {
@@ -302,6 +311,7 @@
     "records": "reports/records.md",
     "trace": "reports/trace.md",
     "cost": "reports/cost.md",
-    "capabilities": "reports/capabilities.md"
+    "capabilities": "reports/capabilities.md",
+    "capability_handoff": "reports/capability_handoff.md"
   }
 }

@@ -84,17 +84,18 @@ class WorkflowEngine:
             role=role, task=task, payload=payload or {},
             result_schema=RESULT_SCHEMAS[schema_key], subject=subject,
             task_id=task_id,
-            tool_profile=[name for name in (RESEARCH_TOOLS if tool_profile is None else tool_profile)
+            tool_profile=[name for name in dict.fromkeys((*(RESEARCH_TOOLS if tool_profile is None else tool_profile), 'request_capability'))
                           if name in self.runtime.tools and name in allowed_tools],
             on_admitted=on_admitted,
         )
+        for index, request in enumerate(envelope.capability_requests):
+            self.store.save_capability_request(run_id, data(request), task_id=task_id,
+                                              request_key=f'{task_id}.envelope.{index}')
         if envelope.result_status != 'complete':
             self.checkpoint(run_id, pending_task=key,
                             pending_evidence_requests=data(envelope.evidence_requests),
                             pending_capability_requests=data(envelope.capability_requests),
                             pending_note=envelope.note)
-            for request in envelope.capability_requests:
-                self.store.save_capability_request(run_id, data(request))
             if envelope.result_status == 'needs_evidence' and role != 'investigator':
                 if request_depth >= self.settings.max_rounds:
                     raise WorkflowPause('PAUSED_EXTERNAL', 'evidence_action_exhausted')

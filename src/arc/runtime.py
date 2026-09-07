@@ -121,7 +121,7 @@ def web_text_representation(body: dict, arguments: dict) -> dict:
 
 def build_tools(store, hub=None) -> dict[str, BoundTool]:
     """Bind audited operations; keep original text in the source registry."""
-    from .schemas import SourceRecord
+    from .schemas import CapabilityRequest, SourceRecord
     tools = {}
 
     async def read_record(arguments, metadata):
@@ -154,13 +154,12 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
         'required': ['record_id'], 'additionalProperties': False}, read_record, Decimal(0), 'LOCAL_SQLITE_READ')
 
     async def request_capability(arguments, metadata):
-        identifier = store.save_capability_request(metadata['run_id'], arguments)
-        return {'recorded': True, 'request_id': identifier, 'capability_available': False}
-    capability_properties = {key: {'type': 'string'} for key in ['blocked_question','needed_operation',
-        'required_output','provenance_needs','cost_visibility_needs','acceptance_example']}
-    capability_properties['input_fields'] = {'type': 'array', 'items': {'type': 'string'}}
-    tools['request_capability'] = BoundTool('request_capability', {'type': 'object',
-        'properties': capability_properties, 'required': list(capability_properties), 'additionalProperties': False},
+        identifier = store.save_capability_request(metadata['run_id'], arguments,
+            task_id=metadata['task_id'],
+            request_key=metadata['parent_call_id'] + ':' + metadata['tool_call_id'])
+        return {'recorded': True, 'request_id': identifier, 'capability_available': False,
+                'status': 'pending_codex_review', 'execution_authorized': False}
+    tools['request_capability'] = BoundTool('request_capability', CapabilityRequest.model_json_schema(),
         request_capability, Decimal(0), 'LOCAL_REQUIREMENTS_ARTIFACT')
 
     async def lookup_archive(arguments, metadata):
@@ -689,7 +688,7 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_ARGUMENTS_INVALID') from exc
         if tool.cost_upper_cny is None or not tool.cost_basis:
             raise RuntimePaused('PAUSED_EXTERNAL', 'COST_UNOBSERVABLE')
-        local_read = tool.service == 'local' and name in {'read_record', 'lookup_archive'} and tool.cost_upper_cny == 0
+        local_read = tool.service == 'local' and name in {'read_record', 'lookup_archive', 'request_capability'} and tool.cost_upper_cny == 0
         if state.get('pending_tool'):
             call_id = state['pending_tool']
             metadata = self.ledger.get_call(call_id)['metadata']

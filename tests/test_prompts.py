@@ -26,7 +26,9 @@ def test_spec_assets_are_exact():
         additions={'prompts/roles/developer.md':'\n## IMPORT: preserve an explicitly supplied user question or proposal\n',
                    'prompts/roles/investigator.md':'\n## Mechanical search trace mapping\n',
                    'prompts/common/output_protocol.md':'\n## Evidence request ownership\n',
-                   'prompts/tools/read_record.md':'\n## Cached source coverage\n'}
+                   'prompts/tools/read_record.md':'\n## Cached source coverage\n',
+                   'prompts/tools/request_capability.md':'\n## Improvements to an existing capability\n',
+                   'prompts/reports/capabilities.md':'\n## 改进需求的处理边界\n'}
         if path in additions:
             assert actual.startswith(body)
             assert actual[len(body):].startswith(additions[path])

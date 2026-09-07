@@ -310,8 +310,9 @@ def test_versioned_arxiv_cache_restores_same_explicit_version(store):
     assert second.source_id==first.source_id and second.version=="2"
 
 def test_capability_request_returns_durable_real_record_id(store):
+    from .test_capabilities import request_payload
     run=store.create_run("discover")
-    request={"blocked_question":"Can original text be accessed?","needed_operation":"read_original","input_fields":["source_id"],"required_output":"original text","provenance_needs":"exact locator","cost_visibility_needs":"upper bound","acceptance_example":"fixture original passage"}
+    request={**request_payload(),"needed_operation":"read_original"}
     identifier=store.save_capability_request(run.run_id,request)
     assert identifier.startswith("cap_")
     assert Store(store.db_path).get_record(identifier)["needed_operation"]=="read_original"
