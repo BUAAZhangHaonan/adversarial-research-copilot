@@ -586,7 +586,7 @@ class Store:
             rows=db.execute("SELECT data FROM issues WHERE run_id=? ORDER BY rowid",(run_id,)).fetchall()
         return [Issue.model_validate_json(row[0]) for row in rows]
 
-    def apply_issues(self,run_id,updated_issues,transitions,event_key=None,state_patch=None):
+    def apply_issues(self,run_id,updated_issues,transitions,event_key=None,state_patch=None,*,dry_run=False):
         incoming=[Issue.model_validate(i) for i in updated_issues]
         changes=[IssueTransition.model_validate(t) for t in transitions]
         ids=[i.issue_id for i in incoming]
@@ -638,16 +638,27 @@ class Store:
                             resolution_claim=next((claim for card in self.list_cards(run_id=run_id)
                                 if card.card_id==run.card_id for claim in card.draft.claims
                                 if (claim.claim_id,claim.version)==(issue.claim_id,issue.claim_version)),None)
-                        if run.card_id and resolution_claim is None:
-                            raise StateError("empirical_resolution_requires_verified_claim_evidence")
                         basis=self.list_evidence(ids=transition.basis_evidence_ids)
+                        target=claim_fingerprint(resolution_claim) if resolution_claim else None
                         if not any(e.verification_status=="verified" and e.claim_id==issue.claim_id and e.claim_version==issue.claim_version and e.relation in {"supports","challenges"}
-                            and (run.card_id is None or e.target_claim_fingerprint==claim_fingerprint(resolution_claim)) for e in basis):
-                            raise StateError("empirical_resolution_requires_verified_claim_evidence")
+                            and (run.card_id is None or (target is not None and e.target_claim_fingerprint==target)) for e in basis):
+                            error=StateError("empirical_resolution_requires_verified_claim_evidence")
+                            error.diagnostics=[{"type":str(error),"issue_id":issue.issue_id,
+                                "loc":["result","issue_transitions",changes.index(transition),"basis_evidence_ids"],
+                                "expected_claim":{"claim_id":issue.claim_id,"claim_version":issue.claim_version},
+                                "required":"verified supports/challenges evidence for the exact claim target; select current evidence or keep the issue unresolved",
+                                "provided_evidence":[{"evidence_id":e.evidence_id,"claim_id":e.claim_id,
+                                    "claim_version":e.claim_version,"verification_status":e.verification_status,
+                                    "relation":e.relation,"target_matches":target is not None and e.target_claim_fingerprint==target}
+                                    for e in basis]}]
+                            raise error
                     if not (transition.basis_evidence_ids or transition.basis_argument):
                         raise StateError("resolution_requires_basis")
                 if issue.redirect_to and issue.redirect_to not in by_id: raise StateError("unknown_issue_redirect")
-                db.execute("INSERT INTO issues VALUES (?,?,?) ON CONFLICT(run_id,id) DO UPDATE SET data=excluded.data",(run_id,issue.issue_id,_dump(issue)))
+                if not dry_run:
+                    db.execute("INSERT INTO issues VALUES (?,?,?) ON CONFLICT(run_id,id) DO UPDATE SET data=excluded.data",(run_id,issue.issue_id,_dump(issue)))
+            if dry_run:
+                return incoming
             db.execute("INSERT INTO issue_events(run_id,data,created_at) VALUES (?,?,?)",(run_id,_dump(changes),utc_now()))
             if event_key:
                 db.execute("INSERT INTO issue_applied VALUES (?,?,?)",(event_key,run_id,event_hash))
