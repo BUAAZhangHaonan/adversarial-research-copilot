@@ -20,6 +20,7 @@ from pydantic import BaseModel, ValidationError
 from .mcp_client import ToolArgumentError, model_schema, validate_arguments
 from .pricing import PriceBook
 from .budget import BudgetExceeded
+from .validation import output_validation_errors
 
 
 def encoded(value) -> str:
@@ -566,13 +567,15 @@ class Runtime:
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
             except (ValueError, ValidationError) as exc:
+                errors = (output_validation_errors(message.get('content') or '', envelope_type, exc)
+                          if isinstance(exc, ValidationError) else [str(exc)])
                 if correction_counts(state)['output_json']:
+                    state['final_validation_errors'] = errors
                     record.error = 'INVALID_OUTPUT_AFTER_REPAIR'
                     self._checkpoint(record, state, 'PAUSED_PROTOCOL')
                     raise RuntimePaused('PAUSED_PROTOCOL', record.error) from exc
                 # Rendered original system is authoritative on resume. Only the
                 # registered repair task supplies additional behavior.
-                errors = exc.errors(include_url=False, include_input=False) if isinstance(exc, ValidationError) else [str(exc)]
                 snapshot = self._load_prompt_snapshot(record)
                 repaired = self.loader.render_repair(snapshot, data, schema=envelope_type.model_json_schema(),
                     previous_response=message.get('content'), validation_errors=errors)

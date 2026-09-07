@@ -760,3 +760,34 @@ async def test_bad_finding_quote_pauses_before_acceptance_without_semantic_repai
     assert state['repair_count']==0 and bad_quote in state['response']['message']['content']
     assert len(requests)==1 and len(ledger.list_calls())==1 and store.list_evidence()==[]
     await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_complete_prefix_schema_errors_reach_single_repair_without_accepting_prefix(tmp_path):
+    bad = answer()
+    del bad['result']['value']
+    raw = json.dumps(bad) + ' trailing output'
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [sse(raw), sse(json.dumps(answer('repaired')))])
+    result = await invoke(runtime)
+    assert result.result.value == 'repaired' and len(requests) == 2
+    saved = json.loads(store.read_artifact(store.get_task('task_fixture').response_artifact_path))
+    errors = saved['repair_validation_errors']
+    assert errors[0]['type'] == 'json_invalid'
+    assert any(e.get('feedback_only') and e['loc'] == ['result', 'value'] for e in errors)
+    assert 'complete_json_prefix' in requests[1]['messages'][1]['content']
+    assert saved['repair_counts'] == {'tool_arguments': 0, 'output_json': 1}
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_final_structural_diagnostics_persist_without_third_request(tmp_path):
+    bad = answer()
+    del bad['result']['value']
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [sse('{bad'), sse(json.dumps(bad))])
+    with pytest.raises(RuntimePaused, match='INVALID_OUTPUT_AFTER_REPAIR'):
+        await invoke(runtime)
+    saved = json.loads(store.read_artifact(store.get_task('task_fixture').response_artifact_path))
+    assert any(e['loc'] == ['result', 'value'] and e['type'] == 'missing'
+               for e in saved['final_validation_errors'])
+    assert len(requests) == 2 and store.get_task('task_fixture').accepted_result is None
+    await runtime.close()

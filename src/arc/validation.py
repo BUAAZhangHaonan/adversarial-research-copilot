@@ -1,9 +1,39 @@
 """Structural evidence gates, never keyword-based scientific scoring."""
+import json
+
+from pydantic import ValidationError
+
 from .schemas import LibrarianResult, SelectorResult, DeveloperResult, ModeratorResult, ProposerResult, SkepticResult, Envelope
 
 
 class ProtocolViolation(ValueError):
     """A typed response violates a cross-record research contract."""
+
+
+def output_validation_errors(raw: str, envelope_type, original_error: ValidationError) -> list[dict]:
+    """Augment syntax feedback with strict prefix diagnostics, never parsed output."""
+    errors = original_error.errors(include_url=False, include_input=False)
+    if not any(error['type'] == 'json_invalid' for error in errors):
+        return errors
+
+    def reject_constant(_value):
+        raise ValueError('non_json_numeric_constant')
+
+    start = len(raw) - len(raw.lstrip(' \t\r\n'))
+    try:
+        prefix, end = json.JSONDecoder(parse_constant=reject_constant).raw_decode(raw, start)
+    except (ValueError, RecursionError):
+        return errors
+    if not isinstance(prefix, dict) or not raw[end:].strip(' \t\r\n'):
+        return errors
+    try:
+        envelope_type.model_validate(prefix)
+    except ValidationError as prefix_error:
+        errors.extend({**error, 'diagnostic_source': 'complete_json_prefix',
+                       'diagnostic_range': {'start': start, 'end': end, 'unit': 'unicode_codepoints'},
+                       'feedback_only': True}
+                      for error in prefix_error.errors(include_url=False, include_input=False))
+    return errors
 
 
 PROPOSED_ISSUE_VERSION_CONTRACT = 'same_round_new_issues_target_proposed_revision_v1'
