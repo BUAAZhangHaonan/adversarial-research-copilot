@@ -96,7 +96,8 @@ def _sources_for(card: dict, evidence: list[dict], sources: list[dict], base_dir
             and (url := (_public_url(s.get('url')) or _artifact_path(s.get('content_path'), base_dir, store)))]
 
 
-def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focused_stage: bool = False) -> dict:
+def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focused_stage: bool = False,
+                  claim_bindings: list[dict] = ()) -> dict:
     draft = card['draft']
     selection = card.get('selection')
     assessment = card.get('assessment')
@@ -109,10 +110,18 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
                   and issue.get('status') not in {'resolved', 'withdrawn'}]
     decision = (f"当前阶段科研判断：{ASSESSMENTS.get(assessment, assessment or '尚未形成判断')}。" if focused_stage else
                 f"当前结论：{SELECTIONS.get(selection, selection or '尚未形成保留判断')}。科研判断：{ASSESSMENTS.get(assessment, assessment or '尚未形成判断')}。")
+    bindings_text = '\n'.join(
+        f"- {_heading(b['claim_id'])} v{b['claim_version']} 引用 {_heading(b['evidence_id'])}：" +
+        ('背景依据；原证据针对 ' + _heading(b['evidence_claim_id']) +
+         f" v{b['evidence_claim_version']}，不转移验证状态。"
+         if b['binding'] == 'background_premise' else
+         '当前主张的定向证据；关联本身不表示主张已证实，仍需审查条件与支持关系。')
+        for b in claim_bindings)
     return {
         'title': _heading(draft.get('title') or anchor['question']),
         'decision_paragraph': decision+'\n\n'+_text(judgment.get('why_worth_investigating')),
-        'motivation_paragraph': _text(draft.get('motivation')),
+        'motivation_paragraph': _text(draft.get('motivation')) +
+            ('\n\n主张与引用关系：\n\n' + bindings_text if bindings_text else ''),
         'knowledge_gain_paragraph': _text(draft.get('contribution')),
         'nearest_work_paragraph': _text(draft.get('closest_work_delta')),
         'hypothesis_paragraph': _text(hypothesis.get('main_or_competing_explanations')),
@@ -174,7 +183,8 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
         target.parent.mkdir(parents=True, exist_ok=True)
         related_sources = _sources_for(card,evidence,sources,target.parent,store)
         all_sources.update({source['id']:source for source in _sources_for(card,evidence,sources,output_dir,store)})
-        context = _card_context(card, related_sources, issues, focused_stage=focused_stage)
+        context = _card_context(card, related_sources, issues, focused_stage=focused_stage,
+                                claim_bindings=store.claim_evidence_bindings(card['draft']))
         target.write_text(loader.render_report('card',context),encoding='utf-8')
         paths[f"card:{card['card_id']}:{card['version']}"] = target
         if category == 'MAIN_REPORT':

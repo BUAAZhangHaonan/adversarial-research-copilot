@@ -58,6 +58,7 @@ class WorkflowEngine:
             'subject': data(Subject(campaign_id=run.campaign_id, run_id=run.run_id,
                                     card_id=run.card_id, card_version=run.card_version)),
             'card': data(card), 'issues': data(self.store.get_issues(run_id)),
+            'claim_evidence_bindings': self.store.claim_evidence_bindings(card.draft) if card else [],
             'evidence': data(evidence),
             'sources': data(self.store.list_sources(ids=sorted(source_ids))),
             'constraints': run.config.get('constraints', {}),
@@ -176,6 +177,27 @@ class WorkflowEngine:
             fields['assessment'] = assessment
         self.store.update_run(run_id, **fields)
 
+    def _validate_source_recheck(self, recheck):
+        targets = recheck.get('target_source_ids')
+        if targets is None:
+            saved = json.loads(self.store.read_artifact(recheck['rejected_response_path']))
+            draft = json.loads(saved['response']['message']['content'])
+            targets = set()
+            for finding in draft['result']['findings'] + draft['result']['contrary_findings']:
+                try:
+                    self.store.validate_finding_sources([finding])
+                except StateError:
+                    targets.add(finding['source_id'])
+        if not targets:
+            raise WorkflowPause('PAUSED_PROTOCOL', 'source_recheck_has_no_failed_source')
+        reread = {item['result']['source_id']
+                  for item in self.runtime.tool_trace(recheck['replacement_task_id'])
+                  if item.get('status') == 'completed' and item.get('name') == 'read_record'
+                  and item.get('result', {}).get('content')
+                  and item['result'].get('source_id') == item.get('arguments', {}).get('record_id')}
+        if not set(targets).issubset(reread):
+            raise WorkflowPause('PAUSED_EXTERNAL', 'source_recheck_original_not_read')
+
     async def investigate(self, run_id, key, questions, *, fresh=False, extra=None):
         payload = {**self.context(run_id), 'questions': questions,
                    'fresh_verification_required': fresh, **(extra or {})}
@@ -193,6 +215,14 @@ class WorkflowEngine:
                 raise
             saved = json.loads(self.store.read_artifact(rejected.response_artifact_path))
             draft = json.loads(saved['response']['message']['content'])
+            failed_sources = set()
+            for finding in draft['result']['findings'] + draft['result']['contrary_findings']:
+                try:
+                    self.store.validate_finding_sources([finding])
+                except StateError:
+                    failed_sources.add(finding['source_id'])
+            if not failed_sources:
+                raise WorkflowPause('PAUSED_PROTOCOL', 'source_recheck_has_no_failed_source')
             trace = self.runtime.tool_trace(rejected.task_id)
             source_ids = sorted({sid for item in trace if item.get('status') == 'completed'
                                  for sid in item.get('source_ids', [])})
@@ -202,16 +232,22 @@ class WorkflowEngine:
                 'rejected_task_id': rejected.task_id,
                 'reason': exc.reason, 'replacement_task_id': f'{run_id}.{result_key}',
                 'rejected_response_path': rejected.response_artifact_path,
+                'target_source_ids': sorted(failed_sources),
                 'maximum_rechecks': 1}})
             result = await self.call(run_id, result_key, 'investigator', payload={
                 **original, 'sources_from_rejected_task': data(self.store.list_sources(ids=source_ids)),
+                'target_source_ids': sorted(failed_sources),
                 'rejected_unverified_result': draft['result'],
                 'questions': questions + [
                     'Which findings remain supported after checking their exact quotations against the registered original text?'],
                 'source_validation_failure': {'reason': exc.reason, 'task_id': rejected.task_id},
             }, tool_profile=['read_record', 'request_capability'])
+            self._validate_source_recheck(self.store.get_run(run_id).state[key + '_source_recheck'])
             self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks':
                 [rejected.task_id] + self.trace_tasks(run_id, result_key)})
+        recheck = self.store.get_run(run_id).state.get(key + '_source_recheck')
+        if recheck:
+            self._validate_source_recheck(recheck)
         trace = self.task_trace(run_id, key)
         if fresh and not any(t.get('name') in EXTERNAL_EVIDENCE_TOOLS and
                              t.get('status') == 'completed' for t in trace):
@@ -220,7 +256,6 @@ class WorkflowEngine:
         # Findings receive registry IDs only after the actual source passage exists.
         # On resume the result still belongs to the independently accepted
         # recheck task, never to the rejected source task.
-        recheck = self.store.get_run(run_id).state.get(key + '_source_recheck')
         if recheck:
             result_key = key + '.source_recheck'
         frozen = self.store.get_run(run_id).state['task_inputs'][result_key]['payload']

@@ -72,11 +72,15 @@ def test_pre_card_evidence_request_is_bound_to_enclosing_task_and_run(status):
 
 @pytest.mark.parametrize("subject",[
     {"card_id":"card1","card_version":1},
-    {"campaign_id":None},{"run_id":None},{"campaign_id":""},{"run_id":""},
+    {"run_id":None},{"run_id":""},
 ])
-def test_unbound_evidence_request_requires_pre_card_campaign_and_run(subject):
+def test_unbound_evidence_request_requires_pre_card_run(subject):
     with pytest.raises(ValidationError,match="evidence_request_requires_subject"):
         Envelope[FrameResult].model_validate(prerequisite_envelope(**subject))
+
+def test_direct_proposal_import_can_request_evidence_without_a_campaign():
+    envelope=Envelope[FrameResult].model_validate(prerequisite_envelope(campaign_id=None))
+    assert envelope.subject.run_id == 'run1' and envelope.subject.card_id is None
 
 @pytest.mark.parametrize("target",["claim_id","issue_id","draw_id"])
 def test_existing_entity_evidence_requests_keep_explicit_subject(target):

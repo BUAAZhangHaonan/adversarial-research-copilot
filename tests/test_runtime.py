@@ -452,6 +452,70 @@ async def test_finding_target_is_exactly_visible_claim_version(tmp_path,target):
     await runtime.close()
 
 
+def request_answer(**targets):
+    raw=answer()
+    raw['evidence_requests']=[{'request_local_id':'request1','claim_id':None,'issue_id':None,
+        'draw_id':None,'question':'Which original observation answers this question?',
+        'target_source_ids':[],'queries':['specific original comparison'],
+        'purpose':'Resolve the stated evidence gap.','decision_if_supported':'Retain this basis.',
+        'decision_if_contradicted':'Record the contrary condition.',**targets}]
+    return raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('field',['claim_id','issue_id','draw_id'])
+@pytest.mark.parametrize('visible',[True,False])
+async def test_evidence_request_entity_must_be_visible_in_frozen_payload(tmp_path,field,visible):
+    from arc.schemas import Envelope
+    from arc.store import StateError
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[])
+    raw=request_answer(**{field:'current_entity' if visible else 'invented_entity'})
+    payload={'nested_context':{'entities':[{field:'current_entity'}]}}
+    envelope=Envelope[Result].model_validate(raw)
+    if visible:
+        runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    else:
+        with pytest.raises(StateError,match=f'evidence_request_{field}_not_supplied_to_task'):
+            runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    assert requests==[] and store.list_tasks(SUBJECT['run_id'])==[]
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_evidence_request_checks_each_target_and_never_uses_tool_or_other_entity_ids(tmp_path):
+    from arc.schemas import Envelope
+    from arc.store import StateError
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[])
+    raw=request_answer(claim_id='claim1',issue_id='issue1',draw_id='draw1')
+    payload={'claim_ids':['claim1'],'nested':{'issue_ids':['issue1'],'draw_ids':['draw1']}}
+    envelope=Envelope[Result].model_validate(raw)
+    runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    payload['nested'].pop('issue_ids')
+    # Neither a claim with the same spelling nor a tool-returned issue grants
+    # that issue membership in the task's frozen research input.
+    payload['claim_ids'].append('issue1')
+    trace={'call_id':'tool1','name':'read_record','status':'completed','issue_ids':['issue1']}
+    with pytest.raises(StateError,match='evidence_request_issue_id_not_supplied_to_task'):
+        runtime._validate_semantics(envelope,payload,{'tool_trace':[trace]})
+    assert requests==[]
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_pre_card_null_evidence_request_targets_use_envelope_context(tmp_path):
+    from arc.schemas import Envelope
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[])
+    raw=request_answer()
+    raw['subject']={**SUBJECT,'campaign_id':'campaign_fixture'}
+    envelope=Envelope[Result].model_validate(raw)
+    runtime._validate_semantics(envelope,{}, {'tool_trace':[]})
+    assert envelope.evidence_requests[0].claim_id is None
+    assert envelope.evidence_requests[0].issue_id is None
+    assert envelope.evidence_requests[0].draw_id is None
+    assert requests==[]
+    await runtime.close()
+
+
 @pytest.mark.asyncio
 async def test_nested_existing_input_evidence_manifest_and_actual_dependency_snapshot(tmp_path):
     from arc.schemas import SourceRecord,EvidenceRecord

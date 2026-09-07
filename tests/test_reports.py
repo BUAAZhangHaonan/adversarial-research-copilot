@@ -37,6 +37,7 @@ class FakeLedger:
 
 
 class FakeStore:
+    def claim_evidence_bindings(self, draft): return []
     def __init__(self,tmp_path):
         self.db_path=tmp_path/'state.sqlite'
         self.artifact_root=tmp_path/'artifacts'
@@ -90,6 +91,30 @@ def test_report_preserves_state_judgments_versions_and_costs(tmp_path,monkeypatc
     for target in re.findall(r'\]\(([^)]+)\)',report):
         if not target.startswith('https://'):
             assert (paths['overview'].parent/unquote(target)).exists()
+
+
+def test_background_evidence_binding_is_visible_without_promoting_claim(tmp_path):
+    from arc.schemas import Claim
+    from arc.workflows import WorkflowEngine
+    from arc.config import Settings
+    from tests.test_selection import research_store, research_draft
+    store, _, ev = research_store(tmp_path)
+    draft = research_draft()
+    draft.claims = [Claim(claim_id='new_hypothesis', version=1,
+        text='The independently controlled distance intervention changes recall.',
+        conditions=['fixed token budget'], kind='hypothesis', evidence_ids=[ev.evidence_id])]
+    saved = store.save_card(draft)
+    run = store.create_run('run', card_id=saved.card_id, card_version=1)
+    original = store.list_evidence(ids=[ev.evidence_id])[0]
+    context = WorkflowEngine(store, None, Settings()).context(run.run_id)
+    assert context['claim_evidence_bindings'][0]['binding'] == 'background_premise'
+    assert context['claim_evidence_bindings'][0]['verification_transferred'] is False
+    paths = render_run(store, run.run_id, tmp_path / 'binding-report')
+    report = paths[f'card:{saved.card_id}:1'].read_text(encoding='utf-8')
+    assert '背景依据' in report and '不转移验证状态' in report
+    displayed = report.replace('\\_', '_')
+    assert 'new_hypothesis' in displayed and ev.claim_id in displayed and ev.evidence_id in displayed
+    assert store.list_evidence(ids=[ev.evidence_id])[0] == original
 
 
 def test_deterministic_report_rebuild_and_empty_discovery(tmp_path,monkeypatch):

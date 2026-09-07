@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 import pytest
-from arc.store import Store, StateError
+from arc.store import Store, StateError, claim_fingerprint
 from arc.schemas import (CardDraft, SourceRecord, EvidenceRecord, TaskRecord, Issue,
     IssueTransition, DirectionChangeDraft, Finding)
 from .test_contracts import card_payload, selection_payload
@@ -285,6 +285,7 @@ def test_targeted_finding_resolves_existing_second_version_claim(store):
     finding=Finding(claim="A controlled observation.",claim_id="C1",claim_version=2,conditions=["controlled setting"],source_id=src.source_id,locator=None,locator_status="locator_unverified",relation="supports",origin="original",excerpt="A controlled observation.",support_explanation="The model judged this observation relevant to C1 under the stated conditions.")
     ev=store.register_findings([finding],"targeted",allowed_claims=card.draft.claims)[0]
     assert (ev.claim_id,ev.claim_version)==("C1",2)
+    assert ev.target_claim_fingerprint==claim_fingerprint(card.draft.claims[0])
     assert Store(store.db_path).register_findings([finding],"targeted")[0]==ev
     issue=Issue(issue_id="I1",claim_id="C1",claim_version=2,content="empirical concern",status="resolved",evidence_ids=[ev.evidence_id],resolution_criterion="original evidence",change_this_round="supported",next_action="STOP")
     transition=IssueTransition(issue_id="I1",from_status=None,to_status="resolved",change_this_round="supported",basis_evidence_ids=[ev.evidence_id],basis_argument=None,resolution_reason="Explicitly targeted original evidence.")
@@ -472,3 +473,158 @@ def test_finding_prevalidation_rejects_search_snippet_as_unread_original(store):
     with pytest.raises(StateError,match="excerpt_not_in_returned_source"):
         store.validate_findings([finding],"snippet")
     assert store.list_evidence()==[]
+
+def test_new_card_claim_can_cite_background_without_transferring_verification(store):
+    ev=evidence(store,source(store),relation="supports")
+    original_evidence=ev.model_dump(mode="json")
+    payload=card_payload()
+    payload["claims"]=[{"claim_id":"new_synthesis","version":1,"text":"A new empirical synthesis to check.","conditions":["new condition"],"kind":"empirical","evidence_ids":[ev.evidence_id]}]
+    card=store.save_card(payload)
+    assert card.draft.model_dump()==CardDraft.model_validate(payload).model_dump()
+    bindings=store.claim_evidence_bindings(card.draft)
+    assert bindings==[{"claim_id":"new_synthesis","claim_version":1,
+        "evidence_id":ev.evidence_id,"evidence_claim_id":ev.claim_id,"evidence_claim_version":1,
+        "source_id":ev.source_id,"binding":"background_premise","relation":"supports",
+        "evidence_verification_status":"verified","verification_transferred":False}]
+    assert store.list_evidence(ids=[ev.evidence_id])[0].model_dump(mode="json")==original_evidence
+    run=store.create_run("run",card_id=card.card_id,card_version=card.version)
+    issue=Issue(issue_id="new_issue",claim_id="new_synthesis",claim_version=1,content="Does the new claim hold?",status="resolved",evidence_ids=[ev.evidence_id],resolution_criterion="Evidence for this claim under new conditions",change_this_round="claimed support",next_action="STOP")
+    transition=IssueTransition(issue_id="new_issue",from_status=None,to_status="resolved",change_this_round="claimed support",basis_evidence_ids=[ev.evidence_id],basis_argument=None,resolution_reason="Background is asserted as proof.")
+    with pytest.raises(StateError,match="empirical_resolution_requires_verified_claim_evidence"):
+        store.apply_issues(run.run_id,[issue],[transition])
+    assert store.get_issues(run.run_id)==[]
+
+def test_target_binding_is_direction_not_proof_and_rejects_old_version(store):
+    payload=card_payload()
+    payload["claims"]=[{"claim_id":"claim1","version":1,"text":"A controlled observation.","conditions":["synthetic"],"kind":"empirical","evidence_ids":["fixture_evidence"]}]
+    ev=evidence(store,source(store),relation="supports",target_claim_fingerprint=claim_fingerprint(payload["claims"][0]))
+    card=store.save_card(payload)
+    binding=store.claim_evidence_bindings(card.draft)[0]
+    assert binding["binding"]=="current_claim_target"
+    assert binding["verification_transferred"] is False
+    revised=card.draft.model_copy(deep=True)
+    revised.claims[0].version=2
+    revised.claims[0].conditions=["changed condition"]
+    with pytest.raises(StateError,match="claim_evidence_version_mismatch"):
+        store.claim_evidence_bindings(revised)
+    with pytest.raises(StateError,match="claim_evidence_version_mismatch"):
+        store.save_card(revised,card_id=card.card_id,parent_version=1)
+
+def test_claim_fingerprint_tracks_content_but_not_evidence_links():
+    from arc.schemas import Claim
+    claim=Claim(claim_id="C1",version=1,text="One claim",conditions=["condition A"],kind="empirical",evidence_ids=[])
+    fingerprint=claim_fingerprint(claim)
+    assert fingerprint==claim_fingerprint(claim.model_copy(update={"evidence_ids":["different link"]}))
+    for update in ({"claim_id":"C2"},{"version":2},{"text":"Other claim"},{"conditions":["condition B"]},{"kind":"hypothesis"}):
+        assert claim_fingerprint(claim.model_copy(update=update))!=fingerprint
+
+def test_same_named_claims_on_different_cards_cannot_transfer_target_evidence(store):
+    src=source(store)
+    cards=[]; runs=[]
+    for label in ("A","B"):
+        payload=card_payload()
+        payload["claims"]=[{"claim_id":"C1","version":1,"text":f"Claim from card {label}","conditions":[f"setting {label}"],"kind":"empirical","evidence_ids":[]}]
+        card=store.save_card(payload); cards.append(card)
+        run=store.create_run("run",card_id=card.card_id,card_version=card.version); runs.append(run)
+        store.put_task(TaskRecord(task_id=f"target-{label}",run_id=run.run_id,input_hash="i",prompt_hash="p",model_config_hash="m"))
+    finding=Finding(claim="A controlled observation.",claim_id="C1",claim_version=1,conditions=["observed setting"],source_id=src.source_id,locator=None,locator_status="locator_unverified",relation="supports",origin="original",excerpt="A controlled observation.",support_explanation="Model judgment about this explicit target, not a proof.")
+    ev_a=store.register_findings([finding],"target-A",allowed_claims=cards[0].draft.claims)[0]
+    original=ev_a.model_dump()
+    for card,expected in zip(cards,("current_claim_target","background_premise")):
+        draft=card.draft.model_copy(deep=True); draft.claims[0].evidence_ids=[ev_a.evidence_id]
+        binding=store.claim_evidence_bindings(draft)[0]
+        assert binding["binding"]==expected and binding["verification_transferred"] is False
+    assert store.list_evidence(ids=[ev_a.evidence_id])[0].model_dump()==original
+    with pytest.raises(StateError,match="finding_allowed_claim_not_registered_for_run"):
+        store.register_findings([finding],"target-B",allowed_claims=cards[0].draft.claims)
+    issue=Issue(issue_id="I1",claim_id="C1",claim_version=1,content="Does B hold?",status="resolved",evidence_ids=[ev_a.evidence_id],resolution_criterion="Evidence directed at B",change_this_round="claimed support",next_action="STOP")
+    transition=IssueTransition(issue_id="I1",from_status=None,to_status="resolved",change_this_round="claimed support",basis_evidence_ids=[ev_a.evidence_id],basis_argument=None,resolution_reason="Explicitly targeted original evidence.")
+    with pytest.raises(StateError,match="empirical_resolution_requires_verified_claim_evidence"):
+        store.apply_issues(runs[1].run_id,[issue],[transition])
+    assert store.get_issues(runs[1].run_id)==[]
+    ev_b=store.register_findings([finding],"target-B",allowed_claims=cards[1].draft.claims)[0]
+    assert ev_b.target_claim_fingerprint!=ev_a.target_claim_fingerprint
+    issue.evidence_ids=[ev_b.evidence_id]; transition.basis_evidence_ids=[ev_b.evidence_id]
+    store.apply_issues(runs[1].run_id,[issue],[transition])
+    assert store.get_issues(runs[1].run_id)[0].status=="resolved"
+
+def test_unbound_observation_does_not_gain_target_identity_from_matching_id(store):
+    src=source(store); run=store.create_run("discover")
+    store.put_task(TaskRecord(task_id="unbound",run_id=run.run_id,input_hash="i",prompt_hash="p",model_config_hash="m"))
+    finding=Finding(claim="A controlled observation.",conditions=["synthetic"],source_id=src.source_id,locator=None,locator_status="locator_unverified",relation="supports",origin="original",excerpt="A controlled observation.",support_explanation="Original observation only.")
+    ev=store.register_findings([finding],"unbound")[0]
+    assert ev.target_claim_fingerprint is None
+    payload=card_payload(); payload["claims"]=[{"claim_id":ev.claim_id,"version":1,"text":ev.claim,"conditions":ev.conditions,"kind":"empirical","evidence_ids":[ev.evidence_id]}]
+    card=store.save_card(payload)
+    assert store.claim_evidence_bindings(card.draft)[0]["binding"]=="background_premise"
+    target_run=store.create_run("run",card_id=card.card_id,card_version=card.version)
+    issue=Issue(issue_id="I1",claim_id=ev.claim_id,claim_version=1,content="Does the card claim hold?",status="resolved",evidence_ids=[ev.evidence_id],resolution_criterion="Explicit target evidence",change_this_round="claimed support",next_action="STOP")
+    transition=IssueTransition(issue_id="I1",from_status=None,to_status="resolved",change_this_round="claimed support",basis_evidence_ids=[ev.evidence_id],basis_argument=None,resolution_reason="Same named observation is insufficient.")
+    with pytest.raises(StateError,match="empirical_resolution_requires_verified_claim_evidence"):
+        store.apply_issues(target_run.run_id,[issue],[transition])
+    assert store.list_evidence(ids=[ev.evidence_id])[0].target_claim_fingerprint is None
+
+def test_old_issue_resolution_uses_only_same_card_run_linked_claim_history(store):
+    src=source(store)
+    payload=card_payload()
+    payload["claims"]=[{"claim_id":"C1","version":1,"text":"Original card claim","conditions":["condition A"],"kind":"empirical","evidence_ids":[]}]
+    card=store.save_card(payload)
+    run=store.create_run("run",card_id=card.card_id,card_version=1)
+    store.put_task(TaskRecord(task_id="historic-target",run_id=run.run_id,input_hash="i",prompt_hash="p",model_config_hash="m"))
+    finding=Finding(claim="A controlled observation.",claim_id="C1",claim_version=1,conditions=["condition A"],source_id=src.source_id,locator=None,locator_status="locator_unverified",relation="supports",origin="original",excerpt="A controlled observation.",support_explanation="Directed at the original card claim.")
+    original_ev=store.register_findings([finding],"historic-target")[0]
+    other_payload=card_payload()
+    other_payload["claims"]=[{**payload["claims"][0],"text":"Other card claim"}]
+    other_card=store.save_card(other_payload)
+    other_ev=evidence(store,src,evidence_id="other-card-evidence",claim_id="C1",relation="supports",target_claim_fingerprint=claim_fingerprint(other_card.draft.claims[0]))
+    issue=Issue(issue_id="old-I1",claim_id="C1",claim_version=1,content="Does the original claim hold?",status="open",evidence_ids=[],resolution_criterion="Original claim evidence",change_this_round="raised",next_action="REASON")
+    opening=IssueTransition(issue_id=issue.issue_id,from_status=None,to_status="open",change_this_round="raised",basis_evidence_ids=[],basis_argument=None,resolution_reason=None)
+    store.apply_issues(run.run_id,[issue],[opening])
+    revised=card.draft.model_copy(deep=True); revised.claims[0].version=2; revised.claims[0].text="Revised card claim"
+    current=store.save_card(revised,card_id=card.card_id,parent_version=1,run_id=run.run_id)
+    store.update_run(run.run_id,card_id=current.card_id,card_version=current.version)
+    store.link_card(run.run_id,other_card.card_id,other_card.version)
+    issue.status="resolved"; issue.evidence_ids=[other_ev.evidence_id]
+    resolving=IssueTransition(issue_id=issue.issue_id,from_status="open",to_status="resolved",change_this_round="checked",basis_evidence_ids=[other_ev.evidence_id],basis_argument=None,resolution_reason="Original claim only.")
+    with pytest.raises(StateError,match="empirical_resolution_requires_verified_claim_evidence"):
+        store.apply_issues(run.run_id,[issue],[resolving])
+    assert store.get_issues(run.run_id)[0].status=="open"
+    issue.evidence_ids=[original_ev.evidence_id]; resolving.basis_evidence_ids=[original_ev.evidence_id]
+    store.apply_issues(run.run_id,[issue],[resolving])
+    assert store.get_issues(run.run_id)[0].claim_version==1
+    assert store.get_card(current.card_id,current.version).draft.claims[0].evidence_ids==[]
+    # A fresh run attached only to v2 must not borrow an unlinked v1 record.
+    unlinked_run=store.create_run("run",card_id=current.card_id,card_version=current.version)
+    resolving.from_status=None
+    with pytest.raises(StateError,match="empirical_resolution_requires_verified_claim_evidence"):
+        store.apply_issues(unlinked_run.run_id,[issue],[resolving])
+
+def test_background_dependency_revision_keeps_required_explicit_review(store):
+    from arc.schemas import ClaimEvidenceReview
+    from arc.validation import ProtocolViolation,validate_revision
+    ev=evidence(store,source(store))
+    payload=card_payload()
+    payload["claims"]=[{"claim_id":"new_hypothesis","version":1,"text":"A bounded hypothesis.","conditions":["condition A"],"kind":"hypothesis","evidence_ids":[ev.evidence_id]}]
+    card=store.save_card(payload)
+    changed=card.draft.model_copy(deep=True)
+    changed.claims[0].version=2
+    changed.claims[0].conditions=["condition B"]
+    # The existing developer boundary must still reject an undeclared changed
+    # dependency before any revision is accepted.
+    class Revision:
+        unchanged_problem_anchor=card.draft.problem_anchor
+        proposed_revision=changed
+        affected_claims=[]
+        evidence_review=[]
+    with pytest.raises(ProtocolViolation,match="AFFECTED_CLAIMS_COVERAGE"):
+        validate_revision(store,card,Revision())
+    Revision.affected_claims=["new_hypothesis"]
+    with pytest.raises(ProtocolViolation,match="CLAIM_REVIEW_COVERAGE"):
+        validate_revision(store,card,Revision())
+    Revision.evidence_review=[ClaimEvidenceReview(claim_id="new_hypothesis",claim_version=2,
+        evidence_ids=[ev.evidence_id],still_applicable=False,explanation="The changed condition was checked.")]
+    with pytest.raises(ProtocolViolation,match="REVISED_CLAIM_INHERITS_INVALID_EVIDENCE"):
+        validate_revision(store,card,Revision())
+    Revision.evidence_review[0].still_applicable=True
+    validate_revision(store,card,Revision())
+    assert store.claim_evidence_bindings(changed)[0]["verification_transferred"] is False

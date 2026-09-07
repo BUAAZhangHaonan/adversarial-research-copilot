@@ -86,8 +86,8 @@ class Envelope(StrictModel, Generic[T]):
         for request in self.evidence_requests:
             if not (request.claim_id or request.issue_id or request.draw_id):
                 # Before a card/draw exists, the request belongs to this actual
-                # task and its campaign/run; no provisional entity ID is invented.
-                if not (self.subject.card_id is None and self.subject.campaign_id and self.subject.run_id):
+                # task and run; direct proposal imports need no campaign.
+                if not (self.subject.card_id is None and self.subject.run_id):
                     raise ValueError("evidence_request_requires_subject")
         ids = [r.request_local_id for r in self.evidence_requests]
         if len(ids) != len(set(ids)):
@@ -261,6 +261,7 @@ class EvidenceRecord(StrictModel):
     source_id: str
     claim_id: str
     claim_version: int = Field(ge=1, strict=True)
+    target_claim_fingerprint: str | None = None
     claim: str
     conditions: list[str]
     locator: str | None

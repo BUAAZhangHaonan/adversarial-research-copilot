@@ -168,9 +168,11 @@ async def run_comparison(settings, source_run_id):
                 card = store.save_card(draft, creation_key=run_id + '.card')
                 store.update_run(run_id, card_id=card.card_id, card_version=card.version)
                 novelty = await _frozen_call(store, runtime, run_id, 'novelty', 'novelty_examiner', payload={
-                    **frozen, 'card': data(card), 'evaluation_mode': 'frozen_material_only'})
+                    **frozen, 'card': data(card), 'evaluation_mode': 'frozen_material_only',
+                    'claim_evidence_bindings': store.claim_evidence_bindings(card.draft)})
                 judgments = await _frozen_call(store, runtime, run_id, 'selection', 'selector', payload={
-                    **frozen, 'card': data(card), 'novelty': data(novelty)})
+                    **frozen, 'card': data(card), 'novelty': data(novelty),
+                    'claim_evidence_bindings': store.claim_evidence_bindings(card.draft)})
                 validate_selection(store, card, judgments, novelty)
                 store.record_selection(run_id, card.card_id, card.version, judgments)
             store.update_run(run_id, status='COMPLETED', stop_reason='frozen_material_comparison')

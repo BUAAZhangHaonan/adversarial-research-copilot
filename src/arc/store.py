@@ -25,6 +25,12 @@ def _dump(value):
         raise TypeError("unsupported_state_value")
     return json.dumps(value, ensure_ascii=False, sort_keys=True,default=encode)
 
+def claim_fingerprint(claim):
+    """Identify the target claim content, independent of its evidence links."""
+    from .schemas import Claim
+    claim=Claim.model_validate(claim)
+    return hashlib.sha256(_dump(claim.model_dump(exclude={"evidence_ids"})).encode("utf-8")).hexdigest()
+
 def _tokens(text):
     """Latin terms and overlapping CJK bigrams; retrieval only, never judgment."""
     latin = re.findall(r"[a-z0-9_]+", text.casefold())
@@ -506,16 +512,25 @@ class Store:
         from .schemas import Claim
         if allowed_claims is None:
             allowed_claims=self.get_card(run.card_id,run.card_version).draft.claims if run.card_id else []
-        allowed={(c.claim_id,c.version) for item in allowed_claims for c in [Claim.model_validate(item)]}
-        registered_claims={(c.claim_id,c.version) for card in self.list_cards(run_id=task.run_id) for c in card.draft.claims}
-        if not allowed<=registered_claims: raise StateError("finding_allowed_claim_not_registered_for_run")
+        allowed={}
+        for item in allowed_claims:
+            claim=Claim.model_validate(item)
+            key=(claim.claim_id,claim.version)
+            fingerprint=claim_fingerprint(claim)
+            if key in allowed and allowed[key]!=fingerprint:
+                raise StateError("finding_ambiguous_target_claim")
+            allowed[key]=fingerprint
+        registered_claims={(c.claim_id,c.version,claim_fingerprint(c)) for card in self.list_cards(run_id=task.run_id) for c in card.draft.claims}
+        if not {(key[0],key[1],fingerprint) for key,fingerprint in allowed.items()}<=registered_claims:
+            raise StateError("finding_allowed_claim_not_registered_for_run")
         outputs=[]
         for index,(finding,record) in enumerate(zip(findings,records)):
             if finding.claim_id is not None and (finding.claim_id,finding.claim_version) not in allowed:
                 raise StateError("finding_target_claim_not_in_current_input")
             eid="ev_"+hashlib.sha256(f"{task_id}:{index}:{_dump(finding)}".encode()).hexdigest()[:32]
             existing=self.list_evidence(ids=[eid])
-            outputs.extend(existing or [record.model_copy(update={"evidence_id":eid,"run_id":task.run_id})])
+            outputs.extend(existing or [record.model_copy(update={"evidence_id":eid,"run_id":task.run_id,
+                "target_claim_fingerprint":allowed.get((finding.claim_id,finding.claim_version)) if finding.claim_id is not None else None})])
         return outputs
 
     def register_findings(self,findings,task_id,*,allowed_claims=None):
@@ -618,8 +633,16 @@ class Store:
                     if issue.claim_kind=="empirical" and not transition.basis_evidence_ids:
                         raise StateError("empirical_issue_not_resolved_by_agreement")
                     if issue.claim_kind=="empirical":
+                        resolution_claim=canonical_claim
+                        if run.card_id and resolution_claim is None:
+                            resolution_claim=next((claim for card in self.list_cards(run_id=run_id)
+                                if card.card_id==run.card_id for claim in card.draft.claims
+                                if (claim.claim_id,claim.version)==(issue.claim_id,issue.claim_version)),None)
+                        if run.card_id and resolution_claim is None:
+                            raise StateError("empirical_resolution_requires_verified_claim_evidence")
                         basis=self.list_evidence(ids=transition.basis_evidence_ids)
-                        if not any(e.verification_status=="verified" and e.claim_id==issue.claim_id and e.claim_version==issue.claim_version and e.relation in {"supports","challenges"} for e in basis):
+                        if not any(e.verification_status=="verified" and e.claim_id==issue.claim_id and e.claim_version==issue.claim_version and e.relation in {"supports","challenges"}
+                            and (run.card_id is None or e.target_claim_fingerprint==claim_fingerprint(resolution_claim)) for e in basis):
                             raise StateError("empirical_resolution_requires_verified_claim_evidence")
                     if not (transition.basis_evidence_ids or transition.basis_argument):
                         raise StateError("resolution_requires_basis")
@@ -649,8 +672,25 @@ class Store:
     def _validate_claim_evidence(self,draft):
         for claim in draft.claims:
             for evidence in self.list_evidence(ids=claim.evidence_ids):
-                if evidence.claim_id!=claim.claim_id or evidence.claim_version!=claim.version:
+                if evidence.claim_id==claim.claim_id and evidence.claim_version!=claim.version:
                     raise StateError("claim_evidence_version_mismatch")
+
+    def claim_evidence_bindings(self,draft):
+        """Describe reference targets without transferring scientific validation."""
+        draft=CardDraft.model_validate(draft)
+        self.validate_references(draft)
+        self._validate_claim_evidence(draft)
+        bindings=[]
+        for claim in draft.claims:
+            for evidence in self.list_evidence(ids=claim.evidence_ids):
+                bindings.append({"claim_id":claim.claim_id,"claim_version":claim.version,
+                    "evidence_id":evidence.evidence_id,"evidence_claim_id":evidence.claim_id,
+                    "evidence_claim_version":evidence.claim_version,"source_id":evidence.source_id,
+                    "binding":"current_claim_target" if evidence.claim_id==claim.claim_id and evidence.claim_version==claim.version
+                        and evidence.target_claim_fingerprint==claim_fingerprint(claim) else "background_premise",
+                    "relation":evidence.relation,"evidence_verification_status":evidence.verification_status,
+                    "verification_transferred":False})
+        return bindings
 
     def validate_references(self,obj):
         value=obj.model_dump(mode="json") if isinstance(obj,BaseModel) else obj

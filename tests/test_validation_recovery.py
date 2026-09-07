@@ -5,16 +5,19 @@ from tests.test_selection import research_store
 from tests.test_workflows import ScriptedRuntime, campaign_run
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('recheck_fails', [False, True])
-async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejection(tmp_path, recheck_fails):
+@pytest.mark.parametrize('recheck_fails,read_trace', [(False,'correct'), (True,'correct'), (False,'empty'), (False,'wrong_source')])
+async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejection(tmp_path, recheck_fails, read_trace):
     import json
     from arc.runtime import RuntimePaused
+    from arc.workflows import WorkflowPause
     from arc.schemas import TaskRecord
     store, _, _ = research_store(tmp_path)
     _, run = campaign_run(store, max_draws=1)
     class QuoteRuntime(ScriptedRuntime):
         async def invoke(self, **kw):
             if kw['task_id'].endswith('.shared'):
+                if self.store.get_task(kw['task_id']) is not None:
+                    raise RuntimePaused('PAUSED_PROTOCOL', 'excerpt_not_in_returned_source')
                 result = self.reply('investigator', 'INVOKE', kw['payload'], kw['task_id'])
                 path = self.store.save_artifact('tests/rejected.json', json.dumps({
                     'response': {'message': {'content': json.dumps({'result': result})}}}))
@@ -26,22 +29,34 @@ async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejectio
             assert kw['task_id'].endswith('.source_recheck')
             assert kw['tool_profile'] == ['read_record', 'request_capability']
             assert kw['payload']['sources_from_rejected_task'][0]['source_id'] == 'src_synthetic'
+            assert kw['payload']['target_source_ids'] == ['src_synthetic']
             if recheck_fails:
                 self.calls.append({'task_id': kw['task_id']})
                 raise RuntimePaused('PAUSED_PROTOCOL', 'excerpt_not_in_returned_source')
             return await super().invoke(**kw)
         def reply(self, role, task, payload, task_id):
             result = super().reply(role, task, payload, task_id)
-            if task_id.endswith('.source_recheck'):
+            if task_id.endswith(('.shared','.source_recheck')):
                 result['findings'] = [{'claim': 'The variables were not isolated.',
                     'conditions': ['synthetic'], 'source_id': 'src_synthetic',
                     'locator': None, 'locator_status': 'locator_unverified', 'relation': 'limits',
                     'origin': 'original', 'excerpt': 'they do not isolate the variables.',
                     'support_explanation': 'The authors explicitly state the limitation.'}]
+                if task_id.endswith('.shared'):
+                    # A valid quote from the same source does not waive reading
+                    # that source again when a different quote failed validation.
+                    result['findings'].append({**result['findings'][0], 'excerpt':'They isolate all variables.'})
             return result
         def tool_trace(self, task_id):
             if task_id.endswith('.source_recheck'):
-                return [{'name':'read_record', 'status':'completed', 'source_ids':['src_synthetic']}]
+                if read_trace == 'empty': return []
+                if read_trace == 'wrong_source':
+                    return [{'name':'read_record','status':'completed','source_ids':[],
+                        'arguments': {'record_id': 'different_source'},
+                        'result': {'source_id': 'different_source', 'content': 'Different original.'}}]
+                return [{'name':'read_record', 'status':'completed', 'source_ids':[],
+                    'arguments': {'record_id': 'src_synthetic'},
+                    'result': {'source_id': 'src_synthetic', 'content': 'Original passage.'}}]
             return super().tool_trace(task_id)
     runtime = QuoteRuntime(store)
     engine = WorkflowEngine(store, runtime, Settings())
@@ -50,6 +65,30 @@ async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejectio
             await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
         assert len(runtime.calls) == 1
         assert store.list_evidence(run_id=run.run_id) == []
+    elif read_trace != 'correct':
+        with pytest.raises(WorkflowPause, match='source_recheck_original_not_read'):
+            await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        assert 'shared' not in store.get_run(run.run_id).state
+        assert 'shared_trace_tasks' not in store.get_run(run.run_id).state
+        assert store.list_evidence(run_id=run.run_id) == []
+        before = len(runtime.calls)
+        rejected_before = store.get_task(run.run_id + '.shared')
+        with pytest.raises(WorkflowPause, match='source_recheck_original_not_read'):
+            await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        assert len(runtime.calls) == before
+        assert store.get_task(run.run_id + '.shared') == rejected_before
+        # Already-published results from an earlier execution still require the
+        # replacement task's own trace. Recover targets from the untouched raw.
+        state = dict(store.get_run(run.run_id).state)
+        state['shared'] = state['shared.source_recheck']
+        state['shared_trace_tasks'] = [run.run_id + '.shared', run.run_id + '.shared.source_recheck']
+        state['shared_source_recheck'].pop('target_source_ids')
+        store.update_run(run.run_id, state=state)
+        with pytest.raises(WorkflowPause, match='source_recheck_original_not_read'):
+            await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        assert len(runtime.calls) == before
+        assert store.list_evidence(run_id=run.run_id) == []
+        assert store.get_task(run.run_id + '.shared') == rejected_before
     else:
         await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
         before = len(runtime.calls)
@@ -58,6 +97,11 @@ async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejectio
         assert len(store.list_evidence(run_id=run.run_id)) == 1
         assert store.get_run(run.run_id).state['shared_trace_tasks'] == [
             run.run_id + '.shared', run.run_id + '.shared.source_recheck']
+        state = dict(store.get_run(run.run_id).state)
+        state['shared_source_recheck'].pop('target_source_ids')
+        store.update_run(run.run_id, state=state)
+        await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        assert len(runtime.calls) == before
     rejected = store.get_task(run.run_id + '.shared')
     assert rejected.status == 'PAUSED_PROTOCOL' and rejected.accepted_result is None
 

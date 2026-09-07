@@ -266,6 +266,11 @@ class Runtime:
         keys = EVIDENCE_REF_KEYS | SOURCE_REF_KEYS
         if reference_ids(envelope, keys) - reference_ids([payload, state['tool_trace']], keys):
             raise StateError('reference_not_supplied_to_task')
+        for field in ('claim_id', 'issue_id', 'draw_id'):
+            visible = reference_ids(payload, {field, field + 's'})
+            if any(getattr(request, field) and getattr(request, field) not in visible
+                   for request in envelope.evidence_requests):
+                raise StateError(f'evidence_request_{field}_not_supplied_to_task')
         findings = (getattr(envelope.result, 'findings', []) + getattr(envelope.result, 'contrary_findings', [])
                     if envelope.result is not None else [])
         self.store.validate_finding_sources(findings)
