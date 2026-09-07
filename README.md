@@ -33,7 +33,7 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data resum
 ```
 
 CLI 显式参数优先于 `--config runtime.yaml`，未填写的选项使用配置值。已开始 run 的配置和提示词
-冻结；不同提示词或输入需要新 run。长时间中断不清除旧调查，也不宣称恢复服务丢失的生成流。
+冻结；研究输入改变需要新 run。原任务协议失败后的显式新版本入口见[协议纠正](docs/PROTOCOL_CORRECTION.md)，保留原失败与同一预算。长时间中断不清除旧调查，也不宣称恢复服务丢失的生成流。
 远端长期运行可由用户用 `nohup`/tmux 启动 ARC，SSH 断开不影响该独立进程。
 
 ## 卡片、证据和记忆
