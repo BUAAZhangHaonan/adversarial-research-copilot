@@ -1,6 +1,7 @@
 """Explicit user-triggered task revisions; never automatic model retry loops."""
 from __future__ import annotations
 import json
+import re
 from pydantic import ValidationError
 from .schemas import Envelope, RESULT_SCHEMAS, utc_now
 from .store import StateError
@@ -20,23 +21,83 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
     source_key = history[-1]['replacement_key'] if history else task_key
     source = store.get_task(f'{run_id}.{source_key}')
     application_failure = None
+    issue_application_retry = False
+    prior_input = run.state['task_inputs'].get(source_key, run.state['task_inputs'][task_key])
+    pending = run.state.get('pending_issue_application_retry')
+    resumed_issue_application = bool(history and pending and pending.get('task_key') == task_key)
+    if resumed_issue_application:
+        pending_audit = json.loads(store.read_artifact(pending['audit_path']))
+        frozen = pending_audit['original_input']
+        card = store.get_card(run.card_id, run.card_version)
+        expected_subject = (run_id, run.card_id, run.card_version)
+        if (pending['round'] != int(run.state.get('rounds_completed', 0)) + 1
+                or pending_audit['run_id'] != run_id or pending_audit['task_key'] != task_key
+                or pending_audit['application_failure']['type'] != 'empirical_resolution_requires_verified_claim_evidence'
+                or tuple(frozen['subject'].get(k) for k in ('run_id', 'card_id', 'card_version')) != expected_subject
+                or tuple(prior_input['subject'].get(k) for k in ('run_id', 'card_id', 'card_version')) != expected_subject
+                or frozen['payload']['card'] != card.model_dump(mode='json')):
+            raise StateError('TASK_RETRY_APPLIED_CARD_MISMATCH')
     if task_key in run.state:
         cached = run.state[task_key]
         current = store.get_card(run.card_id, run.card_version).draft.problem_anchor.model_dump(mode='json')
         proposed = cached.get('proposed_card_revision') if isinstance(cached, dict) else None
-        if (run.stop_reason != 'problem_anchor_changed' or source is None
+        if (source is None
                 or source.status != 'ACCEPTED' or not source.accepted_result
-                or source.accepted_result.get('result') != cached or not proposed
-                or proposed.get('problem_anchor') == current):
+                or source.accepted_result.get('result') != cached):
             raise StateError('TASK_RETRY_REQUIRES_UNACCEPTED_TASK_KEY')
-        application_failure = {'type': 'problem_anchor_changed',
-            'loc': ['result', 'proposed_card_revision', 'problem_anchor'],
-            'expected': current, 'submitted': proposed.get('problem_anchor')}
+        if run.stop_reason == 'problem_anchor_changed' and proposed and proposed.get('problem_anchor') != current:
+            application_failure = {'type': 'problem_anchor_changed',
+                'loc': ['result', 'proposed_card_revision', 'problem_anchor'],
+                'expected': current, 'submitted': proposed.get('problem_anchor')}
+        elif run.stop_reason == 'empirical_resolution_requires_verified_claim_evidence':
+            match = re.fullmatch(r'round(\d+)\.moderator(?:\.evidence_reassessment)?', task_key)
+            number = int(match[1]) if match else None
+            base = f'round{number}.moderator'
+            pending_key = base + '.evidence_reassessment' if base + '.evidence_reassessment' in run.state else base
+            if number != int(run.state.get('rounds_completed', 0)) + 1 or task_key != pending_key:
+                raise StateError('TASK_RETRY_NOT_PENDING_ISSUE_RULING')
+            card = store.get_card(run.card_id, run.card_version)
+            old_subject = prior_input['subject']
+            if resumed_issue_application:
+                if (proposed is not None or cached.get('direction_change') is not None
+                        or source.accepted_result.get('subject') != old_subject):
+                    raise StateError('TASK_RETRY_APPLIED_CARD_MISMATCH')
+            else:
+                creation_key = (f'{run_id}.{source_key}.revision' if history else
+                    f'{run_id}.round{number}' + ('.evidence_reassessment' if task_key.endswith('.evidence_reassessment') else '') + '.revision')
+                with store._connect() as db:
+                    created = db.execute('SELECT card_id,version FROM card_creation WHERE creation_key=?',
+                        (creation_key,)).fetchone()
+                if (not proposed or old_subject.get('run_id') != run_id
+                        or old_subject.get('card_id') != run.card_id
+                        or card.parent_version != old_subject.get('card_version')
+                        or created is None or (created['card_id'], created['version']) != (run.card_id, run.card_version)
+                        or card.draft.model_dump(mode='json') != proposed):
+                    raise StateError('TASK_RETRY_APPLIED_CARD_MISMATCH')
+            try:
+                store.apply_issues(run_id, cached['updated_issues'], cached['issue_transitions'], dry_run=True)
+            except StateError as exc:
+                if str(exc) != run.stop_reason:
+                    raise StateError('TASK_RETRY_APPLICATION_FAILURE_CHANGED') from exc
+                application_failure = {'type': str(exc), 'diagnostics': getattr(exc, 'diagnostics', [])}
+            else:
+                raise StateError('TASK_RETRY_APPLICATION_FAILURE_NOT_REPRODUCED')
+            issue_application_retry = True
+            round_number = number
+            application_failure['correction_scope'] = {
+                'proposed_card_revision': None,
+                'instruction': 'Preserve the already saved current card. Correct only issue evidence references and issue status/ruling as justified by current registered evidence; return proposed_card_revision=null. Do not change claim text, conditions, versions, or research scope.'}
+        else:
+            raise StateError('TASK_RETRY_REQUIRES_UNACCEPTED_TASK_KEY')
     if (source is None or (not application_failure and (source.status != 'PAUSED_PROTOCOL'
             or source.accepted_result is not None))
             or not source.response_artifact_path or not source.rendered_prompt_path):
         raise StateError('TASK_RETRY_REQUIRES_FAILED_TASK_RECORD')
-    original_input = run.state['task_inputs'][task_key]
+    original_input = prior_input if resumed_issue_application else run.state['task_inputs'][task_key]
+    if issue_application_retry:
+        from .workflows import WorkflowEngine
+        context = WorkflowEngine(store, None, None).context(run_id)
+        original_input = {'payload': {**prior_input['payload'], **context}, 'subject': context['subject']}
     subject = original_input['subject']
     if (subject.get('run_id'), subject.get('card_id'), subject.get('card_version')) != (
             run_id, run.card_id, run.card_version):
@@ -47,7 +108,7 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
     envelope_type = Envelope[result_schema]
     saved = json.loads(store.read_artifact(source.response_artifact_path))
     raw = ((saved.get('response') or {}).get('message') or {}).get('content') or ''
-    if application_failure and role != 'moderator':
+    if (application_failure or resumed_issue_application) and role != 'moderator':
         raise StateError('TASK_RETRY_APPLICATION_ROLE_MISMATCH')
     errors = [application_failure] if application_failure else saved.get('final_validation_errors', [])
     if not errors:
@@ -55,6 +116,9 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
             envelope_type.model_validate_json(raw)
         except ValidationError as exc:
             errors = output_validation_errors(raw, envelope_type, exc)
+    if resumed_issue_application and not application_failure:
+        errors = [*errors, {'type': 'empirical_application_correction_scope',
+            **pending_audit['application_failure']['correction_scope']}]
     successful_tools = []
     for identifier in dict.fromkeys([item['source_task_id'] for item in history] + [source.task_id]):
         prior = store.get_task(identifier)
@@ -69,6 +133,7 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
              'replacement_key': replacement_key, 'role': role, 'task': task,
              'reason': reason.strip(), 'requested_at': utc_now(), 'trigger': 'explicit_user_command',
              'budget_account_id': run.budget_account_id, 'original_input': original_input,
+             'previous_input': prior_input,
              'tool_profile': [t['function']['name'] for t in saved.get('original_tools', [])],
              'application_failure': application_failure,
              'superseded_cached_result': run.state.get(task_key),
@@ -89,6 +154,9 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
                    | {'audit_path': path})
     retries[task_key] = history
     updated_state = {**run.state, 'task_retries': retries}
+    if issue_application_retry:
+        updated_state['pending_issue_application_retry'] = {'task_key': task_key,
+            'round': round_number, 'audit_path': path}
     if application_failure:
         for field in (task_key, task_key + '_trace_tasks', task_key + '_evidence_requests'):
             updated_state.pop(field, None)

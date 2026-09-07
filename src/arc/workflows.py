@@ -577,34 +577,41 @@ class WorkflowEngine:
                 return
         next_round = int(run.state.get('rounds_completed', 0)) + 1
         for number in range(next_round, self.settings.max_rounds + 1):
-            context = self.context(run_id)
-            proposer = await self.call(run_id, f'round{number}.proposer', 'proposer', payload=context)
-            skeptic = await self.call(run_id, f'round{number}.skeptic', 'skeptic', payload={
-                **self.context(run_id), 'proposer': data(proposer),
-            })
-            ruling = await self.call(run_id, f'round{number}.moderator', 'moderator', payload={
-                **self.context(run_id), 'proposer': data(proposer), 'skeptic': data(skeptic),
-                'claim_version_contract': PROPOSED_ISSUE_VERSION_CONTRACT,
-            })
-            moderator_key = f'round{number}.moderator'
-            ruling = self.save_moderator_revision(run_id, moderator_key, ruling,
-                                                  creation_key=f'{run_id}.round{number}.revision')
-            rechecked = await self.recheck_removed_claim_evidence(run_id, moderator_key)
-            if rechecked is not None:
-                # The first ruling was based on references that were removed.
-                # Do not apply its issues or scientific judgment. One separately
-                # budgeted reassessment is allowed inside this bounded round.
-                reassessment_key = moderator_key + '.evidence_reassessment'
-                reassessed = await self.call(run_id, reassessment_key, 'moderator', payload={
+            pending = self.store.get_run(run_id).state.get('pending_issue_application_retry')
+            if pending and pending['round'] == number:
+                moderator_key = pending['task_key']
+                ruling = await self.call(run_id, moderator_key, 'moderator')
+                if ruling.proposed_card_revision is not None or ruling.direction_change is not None:
+                    raise WorkflowPause('PAUSED_PROTOCOL', 'issue_application_retry_must_preserve_saved_card')
+            else:
+                context = self.context(run_id)
+                proposer = await self.call(run_id, f'round{number}.proposer', 'proposer', payload=context)
+                skeptic = await self.call(run_id, f'round{number}.skeptic', 'skeptic', payload={
+                    **self.context(run_id), 'proposer': data(proposer),
+                })
+                ruling = await self.call(run_id, f'round{number}.moderator', 'moderator', payload={
                     **self.context(run_id), 'proposer': data(proposer), 'skeptic': data(skeptic),
                     'claim_version_contract': PROPOSED_ISSUE_VERSION_CONTRACT,
-                    'superseded_ruling': {'status': 'not_applied_after_evidence_removal', 'result': data(ruling)},
-                    'evidence_recheck': data(rechecked),
                 })
-                ruling = self.save_moderator_revision(run_id, reassessment_key, reassessed,
-                    creation_key=f'{run_id}.round{number}.evidence_reassessment.revision',
-                    reject_further_removal=True)
-                moderator_key = reassessment_key
+                moderator_key = f'round{number}.moderator'
+                ruling = self.save_moderator_revision(run_id, moderator_key, ruling,
+                                                      creation_key=f'{run_id}.round{number}.revision')
+                rechecked = await self.recheck_removed_claim_evidence(run_id, moderator_key)
+                if rechecked is not None:
+                    # The first ruling was based on references that were removed.
+                    # Do not apply its issues or scientific judgment. One separately
+                    # budgeted reassessment is allowed inside this bounded round.
+                    reassessment_key = moderator_key + '.evidence_reassessment'
+                    reassessed = await self.call(run_id, reassessment_key, 'moderator', payload={
+                        **self.context(run_id), 'proposer': data(proposer), 'skeptic': data(skeptic),
+                        'claim_version_contract': PROPOSED_ISSUE_VERSION_CONTRACT,
+                        'superseded_ruling': {'status': 'not_applied_after_evidence_removal', 'result': data(ruling)},
+                        'evidence_recheck': data(rechecked),
+                    })
+                    ruling = self.save_moderator_revision(run_id, reassessment_key, reassessed,
+                        creation_key=f'{run_id}.round{number}.evidence_reassessment.revision',
+                        reject_further_removal=True)
+                    moderator_key = reassessment_key
             self.store.apply_issues(run_id, ruling.updated_issues, ruling.issue_transitions,
                 event_key=f'{run_id}.round{number}',
                 state_patch={'rounds_completed': number, 'final_ruling': data(ruling),
