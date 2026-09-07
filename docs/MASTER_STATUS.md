@@ -1,6 +1,6 @@
 # ARC master 当前状态
 
-2026-09-07。正式源码为 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，仅维护master；所有修复保留细粒度提交，不新建分支、不压缩历史。
+2026-09-08。正式源码为 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，仅维护master；所有修复保留细粒度提交，不新建分支、不压缩历史。
 
 ## 工程完成情况
 
@@ -23,11 +23,11 @@
 
 当前停在 `round1.moderator.evidence_reassessment` 的预算准入（PENDING），**不是新的协议失败**。develop上限25元，已结算上界10.578927元，剩余14.421073元，小于下一次Pro完整输出预留15.912元。run尚未创建，因此同卡三阶段链仍未全部通过。精确状态见 [CURRENT_VALIDATION_SNAPSHOT.json](CURRENT_VALIDATION_SNAPSHOT.json)。
 
-已向用户提出并等待选择：本轮develop/run各临时上限50元，共享原100元父账本（推荐），或保持25元逐次审批，或以当前预算停点结束真实验证。未把默认推荐当成授权，也未追加第二笔develop预算。获准后可从现检查点继续，无须重跑已完成角色。
+2026-09-08用户已授权自主分配剩余228元账户余额，本页上一段预算停点现已恢复。父账户累计限额调整至285.562384元（原已花上界57.562384 + 新增最多228），本轮两个阶段共享该边界，不再受旧25元阶段上限阻挡。Pro重评已从同一检查点继续；真实最终结果待当前运行结束后更新。
 
 最初失败是JSON尾随字符、claims字段错层及漏字段；随后定位到同轮新争点被错误拒绝、补证请求未向下游传递，以及新增方法细节写入冻结锚点。均已有对应修复或用户明确的纠正任务，不把它们称为科学否决。具体响应指针和真实补证效果见 [RUNTIME_VERSION_LIVE_RESULT.md](RUNTIME_VERSION_LIVE_RESULT.md)。
 
-父账户始终为 `arc-vnext-validation-20260907`，总上限100元，历史花费不重置。当前已结算快照为57.412830–57.562384元，预留0、未知调用0、父级剩余42.437616元；分项见 [COST_REPORT.md](COST_REPORT.md)。develop已按授权从20追加至25元；run的20→25条件授权尚未使用。正式默认仍每阶段20元。
+父账户仍为 `arc-vnext-validation-20260907`，历史花费不重置；当前新增228元授权见 [预算授权记录](BUDGET_EXTENSION_AUTHORIZATION.md)。当前已结算快照为57.412830–57.562384元，预留0、未知调用0、父级剩余42.437616元；分项见 [COST_REPORT.md](COST_REPORT.md)。旧20→25阶段条件授权已由9月8日自主分配授权替代。正式默认仍每阶段20元。
 
 L4三组旧对照尚无完整匿名评价，保持未完成，不声称ARC优于直接Pro。实验、训练、论文写作及材料访问限制仍由人处理。详细边界见 [DELIVERY.md](DELIVERY.md) 与 [L4_REPORT.md](L4_REPORT.md)。
 
