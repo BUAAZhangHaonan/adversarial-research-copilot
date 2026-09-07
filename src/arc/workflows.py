@@ -7,6 +7,7 @@ import json
 
 from .config import Settings
 from .schemas import RESULT_SCHEMAS, Subject, CardDraft, ProblemAnchor
+from .store import StateError
 from .validation import ProtocolViolation, validate_archive_comparisons, validate_selection, validate_revision
 
 
@@ -149,7 +150,7 @@ class WorkflowEngine:
                 raise ValueError('UNKNOWN_MODE')
         except WorkflowPause as exc:
             self.store.update_run(run_id, status=exc.status, stop_reason=exc.reason)
-        except ProtocolViolation as exc:
+        except (ProtocolViolation, StateError) as exc:
             self.store.update_run(run_id, status='PAUSED_PROTOCOL', stop_reason=str(exc))
         return self.store.get_run(run_id)
 
@@ -220,6 +221,7 @@ class WorkflowEngine:
         run = self.store.get_run(run_id)
         campaign = self.store.get_campaign(run.campaign_id)
         frame = await self.call(run_id, 'frame', 'discovery', 'FRAME', {
+            **self.context(run_id),
             'topic': campaign.topic, 'boundaries': campaign.boundaries,
             'resources': run.config.get('constraints', {}),
         })

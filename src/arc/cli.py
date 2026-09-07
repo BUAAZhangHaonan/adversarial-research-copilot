@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 import hashlib
-from importlib.resources import files
 import typer
 from dotenv import load_dotenv
 from .config import load_settings, Settings
+from .prompting import PromptLoader
 
 app = typer.Typer(help='ARC：发现研究卡、展开方案、压力测试。每个阶段默认结束即停。', no_args_is_help=True)
 
@@ -52,7 +52,7 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
             budget_account_id=run_id, campaign_id=campaign_id,
             parent_card_id=parent_card_id, parent_card_version=parent_card_version)
         campaign_id = campaign.campaign_id
-    prompt_hash = hashlib.sha256(files('arc_prompt_assets').joinpath('manifest.json').read_bytes()).hexdigest()
+    prompt_hash = 'bundle-sha256:' + PromptLoader().bundle_hash
     code_hash = hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path(__file__).parent.glob('*.py')))).hexdigest()
     state = {'source_ids': inherited['source_ids'], 'evidence_ids': inherited['evidence_ids'],
              'input_provenance': inherited} if inherited else {}
@@ -72,8 +72,9 @@ async def execute(settings, run_id):
     store, ledger = services(settings)
     run = store.get_run(run_id)
     frozen = Settings.model_validate(run.config)
-    runtime = await make_runtime(store, ledger, run, frozen)
+    runtime = None
     try:
+        runtime = await make_runtime(store, ledger, run, frozen)
         await WorkflowEngine(store, runtime, frozen).execute(run_id)
     except Exception as exc:
         status, reason = getattr(exc, 'status', None), getattr(exc, 'reason', None)

@@ -423,7 +423,7 @@ class Store:
                 rows=db.execute(f"SELECT data FROM {table} WHERE id IN ({','.join('?' for _ in ids)}) ORDER BY rowid",tuple(ids)).fetchall()
         return [model.model_validate_json(row[0]) for row in rows]
 
-    def register_evidence(self,evidence):
+    def validate_evidence(self,evidence):
         evidence=EvidenceRecord.model_validate(evidence)
         source=self.get_source(evidence.source_id)
         if source.content_origin=="secondary_analysis" and evidence.origin=="original":
@@ -457,35 +457,22 @@ class Store:
                 raise StateError("verified_evidence_requires_original_passage_and_explanation")
         if source.access_status=="source_unavailable" and evidence.locator_status!="source_unavailable":
             raise StateError("unavailable_source_locator_mismatch")
+        return evidence
+
+    def register_evidence(self,evidence):
+        evidence=self.validate_evidence(evidence)
         with self._transaction() as db:
             old=db.execute("SELECT data FROM evidence WHERE id=?",(evidence.evidence_id,)).fetchone()
             if old and EvidenceRecord.model_validate_json(old[0])!=evidence: raise StateError("evidence_immutable")
             db.execute("INSERT OR IGNORE INTO evidence VALUES (?,?,?,?)",(evidence.evidence_id,evidence.source_id,evidence.run_id,_dump(evidence)))
         return evidence
 
-    def register_findings(self,findings,task_id,*,allowed_claims=None):
-        task=self.get_task(task_id)
-        if task is None: raise StateError("finding_task_missing")
-        run=self.get_run(task.run_id)
-        from .schemas import Claim
-        if allowed_claims is None:
-            allowed_claims=self.get_card(run.card_id,run.card_version).draft.claims if run.card_id else []
-        allowed={(c.claim_id,c.version) for item in allowed_claims for c in [Claim.model_validate(item)]}
-        registered_claims={(c.claim_id,c.version) for card in self.list_cards(run_id=task.run_id) for c in card.draft.claims}
-        if not allowed<=registered_claims: raise StateError("finding_allowed_claim_not_registered_for_run")
+    def validate_finding_sources(self,findings):
+        """Pure provenance/quotation checks; no task state or records are written."""
         outputs=[]
         for index,item in enumerate(findings):
             finding=Finding.model_validate(item)
             source=self.get_source(finding.source_id)
-            if finding.claim_id is not None and (finding.claim_id,finding.claim_version) not in allowed:
-                raise StateError("finding_target_claim_not_in_current_input")
-            # A service's analysis stays unverified until an explicit original-passage
-            # check produces its own EvidenceRecord. A generated finding is not a quote.
-            eid="ev_"+hashlib.sha256(f"{task_id}:{index}:{_dump(finding)}".encode()).hexdigest()[:32]
-            existing=self.list_evidence(ids=[eid])
-            if existing:
-                outputs.extend(existing)
-                continue
             # Persist positions derived from the actual returned bytes decoded as
             # text, never a model's section/page assertion. Repeated excerpts have
             # no unique position unless additional context is supplied.
@@ -497,14 +484,49 @@ class Store:
                 if start>=0 and content.find(finding.excerpt,start+1)<0:
                     locator=f"chars:{start}:{start+len(finding.excerpt)}"
                     locator_status="verified"
-            record=EvidenceRecord(evidence_id=eid,source_id=source.source_id,
+            record=EvidenceRecord(source_id=source.source_id,
                 claim_id=finding.claim_id or "claim_"+hashlib.sha256(_dump({"claim":finding.claim,"conditions":finding.conditions}).encode()).hexdigest()[:24],claim_version=finding.claim_version or 1,
                 claim=finding.claim,conditions=finding.conditions,locator=locator,excerpt=finding.excerpt,
                 relation=finding.relation,origin=finding.origin,locator_status=locator_status,
                 verification_status="verified" if source.content_origin=="original" and finding.origin=="original" and locator_status=="verified" and finding.excerpt and finding.support_explanation else "unverified",
-                support_explanation=finding.support_explanation,run_id=task.run_id)
-            outputs.append(self.register_evidence(record))
+                support_explanation=finding.support_explanation)
+            try:
+                outputs.append(self.validate_evidence(record))
+            except StateError as exc:
+                exc.add_note(f"finding[{index}] source_id={finding.source_id}")
+                raise
         return outputs
+
+    def validate_findings(self,findings,task_id,*,allowed_claims=None):
+        findings=[Finding.model_validate(item) for item in findings]
+        records=self.validate_finding_sources(findings)
+        task=self.get_task(task_id)
+        if task is None: raise StateError("finding_task_missing")
+        run=self.get_run(task.run_id)
+        from .schemas import Claim
+        if allowed_claims is None:
+            allowed_claims=self.get_card(run.card_id,run.card_version).draft.claims if run.card_id else []
+        allowed={(c.claim_id,c.version) for item in allowed_claims for c in [Claim.model_validate(item)]}
+        registered_claims={(c.claim_id,c.version) for card in self.list_cards(run_id=task.run_id) for c in card.draft.claims}
+        if not allowed<=registered_claims: raise StateError("finding_allowed_claim_not_registered_for_run")
+        outputs=[]
+        for index,(finding,record) in enumerate(zip(findings,records)):
+            if finding.claim_id is not None and (finding.claim_id,finding.claim_version) not in allowed:
+                raise StateError("finding_target_claim_not_in_current_input")
+            eid="ev_"+hashlib.sha256(f"{task_id}:{index}:{_dump(finding)}".encode()).hexdigest()[:32]
+            existing=self.list_evidence(ids=[eid])
+            outputs.extend(existing or [record.model_copy(update={"evidence_id":eid,"run_id":task.run_id})])
+        return outputs
+
+    def register_findings(self,findings,task_id,*,allowed_claims=None):
+        records=self.validate_findings(findings,task_id,allowed_claims=allowed_claims)
+        with self._transaction() as db:
+            for record in records:
+                old=db.execute("SELECT data FROM evidence WHERE id=?",(record.evidence_id,)).fetchone()
+                if old and EvidenceRecord.model_validate_json(old[0])!=record:
+                    raise StateError("evidence_immutable")
+                db.execute("INSERT OR IGNORE INTO evidence VALUES (?,?,?,?)",(record.evidence_id,record.source_id,record.run_id,_dump(record)))
+        return records
 
     def put_task(self,task):
         task=TaskRecord.model_validate(task)

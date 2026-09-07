@@ -109,6 +109,10 @@ class PromptLoader:
             if name != "manifest.json":
                 self._dependencies(name)
 
+    @property
+    def bundle_hash(self) -> str:
+        return _hash(_json({name: _hash(self._source(name)) for name in sorted(self.registered_files)}))
+
     def _source(self, name: str) -> str:
         if name.startswith(("/", "\\")) or ".." in Path(name).parts:
             raise ValueError("invalid_template_path")

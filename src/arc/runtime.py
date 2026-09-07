@@ -268,6 +268,7 @@ class Runtime:
             raise StateError('reference_not_supplied_to_task')
         findings = (getattr(envelope.result, 'findings', []) + getattr(envelope.result, 'contrary_findings', [])
                     if envelope.result is not None else [])
+        self.store.validate_finding_sources(findings)
         targeted = [finding for finding in findings if getattr(finding, 'claim_id', None) is not None]
         if targeted:
             claims = list(payload.get('claims', []))
@@ -355,7 +356,14 @@ class Runtime:
                     reconciled = True
             if reconciled: self._checkpoint(record, state)
             if record.accepted_result is not None:
-                return envelope_type.model_validate(record.accepted_result)
+                accepted = envelope_type.model_validate(record.accepted_result)
+                try:
+                    self._validate_semantics(accepted, payload, state)
+                except (ValueError, RuntimeError) as exc:
+                    # Preserve the historical accepted record, but do not reuse
+                    # it when a current deterministic source check fails.
+                    raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
+                return accepted
             if record.status == 'UNKNOWN':
                 raise RuntimePaused('PAUSED_EXTERNAL', 'REMOTE_RESULT_UNKNOWN')
         else:

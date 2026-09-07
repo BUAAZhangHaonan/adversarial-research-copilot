@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import shutil
 from pathlib import Path
@@ -75,6 +76,25 @@ def test_investigator_targets_existing_claim_version_without_guessing():
     assert 'set both claim_id and claim_version to null' in system
     assert 'attach evidence for an older version to a revised claim' in system
     assert 'claim_existing' in task and 'claim_version' in task
+
+
+@pytest.mark.parametrize('prompt_id',['investigator.INVOKE','investigator.SCOPE_AUDIT'])
+def test_calibrated_investigator_preserves_v2_prefix_and_renders_evidence_boundaries(prompt_id):
+    text=(ASSETS/'roles/investigator.md').read_text(encoding='utf-8')
+    prefix,addition=text.split('\n## Exact excerpts, source access and claim scope\n',1)
+    assert hashlib.sha256(prefix.encode('utf-8')).hexdigest()=='7b412a9eb3aea6f245fa5fd9e8971689fb2835e74cf27b0d29292641e5b6811f'
+    rendered=PromptLoader(ASSETS).render(prompt_id,DATA,schema=SCHEMA)
+    system=rendered.messages[0]['content']
+    assert addition.strip() in system
+    assert 'one exact contiguous span' in system
+    assert 'Preserve capitalization, punctuation, citation markers' in system
+    assert 'If no source body is available' in system
+    assert 'source_access_limits or unresolved_questions' in system
+    assert 'requires its own inference finding, explicit premises' in system
+    assert 'does not establish that the full paper or the literature lacks it' in system
+    assert 'Keep an unknown source version unknown' in system
+    assert '`A ... B`' in system and '`We observed a change [8].`' in system
+    assert rendered.source_hashes['roles/investigator.md']==hashlib.sha256(text.encode()).hexdigest()
 
 
 def test_unregistered_or_missing_resources_fail_before_invocation(tmp_path):

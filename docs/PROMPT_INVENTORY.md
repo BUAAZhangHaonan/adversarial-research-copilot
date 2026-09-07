@@ -48,3 +48,5 @@ AST 检查只扫描 `src/arc`：SDK 仅允许 `runtime.py`，拒绝上游直接�
 2026-09-07：为让 investigator 输出与实际工具 trace 可确定性对齐，在 `roles/investigator.md` 原文后增加搜索映射小节：actual_searches 逐项覆盖成功的 search_literature/search_web，精确复制 trace_id、wrapper operation、submitted query/theme_document 与 returned source_ids；读取/档案调用不混算为搜索，失败保留为 access limit。原附录正文仍逐字保留。此调整对应 runtime 的 trace 对照验证，不是额外科研规则。
 
 2026-09-07：为使定向补证能连接已有争点，在 `roles/investigator.md` 后追加目标主张协议。调查当前 claim/issue 时明确复制任务给出的 claim_id 与 claim_version；新背景观察两者均为 null，不通过文本相似度猜依赖，不让旧版本证据自动支持改版主张。此调整配合 Finding 的成对可空字段和 Store 外键验证；提示词测试只证明协议进入模型输入，实际证据注册与争点关闭由 Store/runtime 测试覆盖。
+
+2026-09-07：依据真实开发 V2 调查的引用和范围错误，仅在 investigator 末尾追加连续原文摘录、metadata/snippet 与事实/推断范围的通用规则及短反例。原文全文 hash 前缀不变。失败原件、逐项类别、理由及未完成的 V3 验证见 [PROMPT_CALIBRATION](PROMPT_CALIBRATION.md)；未使用留出主题调参。

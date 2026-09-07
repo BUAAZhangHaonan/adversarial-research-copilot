@@ -382,8 +382,8 @@ async def test_changed_claim_cannot_inherit_old_version_evidence_in_develop(tmp_
                 result['evidence_review']=[{'claim_id':'claim_observation','claim_version':2,'evidence_ids':['ev_synthetic'],'still_applicable':True,'explanation':'A claimed reuse cannot upgrade the original claim version.'}]
             return result
     runtime=ChangedClaim(store)
-    with pytest.raises(StateError,match='claim_evidence_version_mismatch'):
-        await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
+    result=await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
+    assert result.status=='PAUSED_PROTOCOL' and result.stop_reason=='claim_evidence_version_mismatch'
     assert store.get_card(card.card_id).version==1
     assert store.get_run(run.run_id).status!='COMPLETED'
     assert not any(call['role']=='moderator' for call in runtime.calls)
@@ -402,10 +402,51 @@ async def test_moderator_receives_previous_issue_and_cannot_silently_drop_it(tmp
     transition=IssueTransition(issue_id='issue_old',from_status=None,to_status='needs_experiment',change_this_round='Registered from original evidence.',basis_evidence_ids=['ev_synthetic'],basis_argument=None,resolution_reason=None)
     store.apply_issues(run.run_id,[issue],[transition])
     runtime=ScriptedRuntime(store)
-    with pytest.raises(StateError):
-        await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
+    result=await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
+    assert result.status=='PAUSED_PROTOCOL' and result.stop_reason=='previous_issue_silently_dropped'
     moderator=next(call for call in runtime.calls if call['role']=='moderator')
     assert moderator['payload']['issues'][0]['issue_id']=='issue_old'
     assert moderator['payload']['issues'][0]['resolution_criterion']==issue.resolution_criterion
     assert store.get_issues(run.run_id)==[issue]
     assert store.get_run(run.run_id).status!='COMPLETED'
+
+@pytest.mark.asyncio
+async def test_cached_invalid_finding_stays_protocol_paused_without_new_draw_or_paid_replay(tmp_path):
+    store,_,_=research_store(tmp_path)
+    campaign=store.create_campaign('Research topic')
+    run=store.create_run('discover',campaign_id=campaign.campaign_id)
+    class BadFindingRuntime(ScriptedRuntime):
+        def reply(self,role,task,payload,task_id):
+            result=super().reply(role,task,payload,task_id)
+            if role=='investigator':
+                result['findings']=[{'claim':'Unverified assertion','conditions':[],
+                    'source_id':'src_synthetic','locator':None,'locator_status':'locator_unverified',
+                    'relation':'motivates','origin':'original','excerpt':'A fabricated quotation.',
+                    'support_explanation':'This deliberately fails original passage validation.'}]
+            return result
+    runtime=BadFindingRuntime(store)
+    engine=WorkflowEngine(store,runtime,Settings())
+    evidence_before=store.list_evidence()
+    first=await engine.execute(run.run_id)
+    calls_before=len(runtime.calls)
+    second=await engine.execute(run.run_id)
+    assert first.status==second.status=='PAUSED_PROTOCOL'
+    assert first.stop_reason==second.stop_reason=='excerpt_not_in_returned_source'
+    assert len(runtime.calls)==calls_before and store.list_evidence()==evidence_before
+    assert store.get_campaign(campaign.campaign_id).draws_started==0
+    assert store.list_cards(run_id=run.run_id)==[]
+
+@pytest.mark.asyncio
+async def test_discovery_frame_receives_seed_material_provenance_before_new_searches(tmp_path):
+    store,_,_=research_store(tmp_path)
+    campaign=store.create_campaign('Research topic')
+    run=store.create_run('discover',campaign_id=campaign.campaign_id,
+        state={'source_ids':['src_synthetic'],'evidence_ids':['ev_synthetic']})
+    runtime=ScriptedRuntime(store)
+    await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
+    frame=runtime.calls[0]
+    assert frame['task']=='FRAME'
+    assert [s['source_id'] for s in frame['payload']['sources']]==['src_synthetic']
+    assert [e['evidence_id'] for e in frame['payload']['evidence']]==['ev_synthetic']
+    stored=store.get_run(run.run_id).state['task_inputs']['frame']['payload']
+    assert stored['sources']==frame['payload']['sources']

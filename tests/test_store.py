@@ -444,3 +444,31 @@ def test_read_record_unknown_ids_and_versions_have_one_missing_error(store):
     for identifier,version in (("campaign_missing",None),("run_missing",None),("issue_missing",None),("anything",None),(card.card_id,999)):
         with pytest.raises(StateError,match="^record_missing$"):
             store.get_record(identifier,version)
+
+def test_finding_prevalidation_is_read_only_and_batch_registration_is_all_or_nothing(store):
+    src=source(store); run=store.create_run("discover")
+    store.put_task(TaskRecord(task_id="batch",run_id=run.run_id,input_hash="i",prompt_hash="p",model_config_hash="m"))
+    first=Finding(claim="A controlled observation.",conditions=[],source_id=src.source_id,locator=None,locator_status="locator_unverified",relation="motivates",origin="original",excerpt="A controlled observation.",support_explanation="Exact source text.")
+    second=first.model_copy(update={"excerpt":"A controlled...observation."})
+    prepared=store.validate_findings([first],"batch")
+    assert len(prepared)==1 and store.list_evidence()==[]
+    with pytest.raises(StateError,match="excerpt_not_in_returned_source") as error:
+        store.validate_findings([first,second],"batch")
+    assert str(error.value)=="excerpt_not_in_returned_source"
+    assert error.value.__notes__==[f"finding[1] source_id={src.source_id}"]
+    with pytest.raises(StateError,match="excerpt_not_in_returned_source"):
+        store.register_findings([first,second],"batch")
+    assert store.list_evidence()==[]
+    assert store.get_task("batch").status=="PENDING"
+    assert store.register_findings([first],"batch")[0].excerpt==first.excerpt
+
+def test_finding_prevalidation_rejects_search_snippet_as_unread_original(store):
+    src=store.register_source(SourceRecord(title="snippet metadata",url="https://example.test/snippet",source_type="paper",access_status="metadata_only",content_origin="metadata"))
+    run=store.create_run("discover")
+    store.put_task(TaskRecord(task_id="snippet",run_id=run.run_id,input_hash="i",prompt_hash="p",model_config_hash="m"))
+    finding=Finding(claim="Search result claim",conditions=[],source_id=src.source_id,locator=None,locator_status="source_unavailable",relation="motivates",origin="original",excerpt="Words in search snippet but no registered original.",support_explanation="Cannot substitute a snippet for original evidence.")
+    with pytest.raises(StateError,match="excerpt_not_in_returned_source"):
+        store.validate_finding_sources([finding])
+    with pytest.raises(StateError,match="excerpt_not_in_returned_source"):
+        store.validate_findings([finding],"snippet")
+    assert store.list_evidence()==[]

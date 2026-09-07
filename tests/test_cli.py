@@ -86,3 +86,21 @@ def test_card_stage_inherits_scoped_original_material_without_prior_approval(tmp
     assert stage.assessment is None and stage.status == 'RUNNING'
     assert 'final_ruling' not in stage.state and not store.get_issues(stage.run_id)
     assert ledger.summary(stage.run_id)['call_count'] == 0
+
+
+def test_new_run_prompt_version_changes_with_role_text_without_manifest_change(tmp_path,monkeypatch):
+    import shutil
+    from arc.cli import new_run
+    from arc.prompting import PromptLoader
+    assets=tmp_path/'prompts'
+    shutil.copytree(Path(__file__).parents[1]/'prompts',assets)
+    monkeypatch.setattr('arc.cli.PromptLoader',lambda:PromptLoader(assets))
+    settings=Settings(data_dir=tmp_path/'data')
+    first=new_run(settings,'discover',topic='same topic')
+    manifest=(assets/'manifest.json').read_bytes()
+    target=assets/'roles/investigator.md'
+    target.write_text(target.read_text(encoding='utf-8')+'\nA changed test fixture rule.\n',encoding='utf-8')
+    second=new_run(settings,'discover',topic='same topic')
+    assert (assets/'manifest.json').read_bytes()==manifest
+    assert first.prompt_version.startswith('bundle-sha256:')
+    assert first.prompt_version!=second.prompt_version

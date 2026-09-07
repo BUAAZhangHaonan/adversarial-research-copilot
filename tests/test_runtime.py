@@ -568,3 +568,33 @@ async def test_local_read_processing_failure_resumes_without_new_tool_admission(
     assert runtime.tool_trace('task_fixture')[0]['call_id']==original_call
     assert runtime.tool_trace('task_fixture')[0]['status']=='error'
     await runtime.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('metadata_only', [False, True])
+async def test_bad_finding_quote_pauses_before_acceptance_without_semantic_repair(tmp_path,metadata_only):
+    from arc.schemas import Finding,SourceRecord
+    class Findings(BaseModel):
+        findings:list[Finding]
+        contrary_findings:list[Finding]
+    responses=[]
+    runtime,store,ledger,requests=setup_runtime(tmp_path,responses)
+    source=store.register_source(SourceRecord(title='Frozen test material',url='https://example.org/material',
+        source_type='paper',access_status='metadata_only' if metadata_only else 'retrieved',
+        content_origin='metadata' if metadata_only else 'original'),
+        content=None if metadata_only else 'First sentence. Middle sentence. Last sentence.')
+    bad_quote='Search snippet presented as paper text.' if metadata_only else 'First sentence. ... Last sentence.'
+    finding=Finding(claim='A claimed observation',conditions=[],source_id=source.source_id,
+        locator=None,locator_status='locator_unverified',relation='motivates',origin='original',
+        excerpt=bad_quote,support_explanation='This is deliberately invalid source attribution.')
+    response=answer();response['result']={'findings':[finding.model_dump(mode='json')],'contrary_findings':[]}
+    responses.append(sse(json.dumps(response)))
+    payload={'source_ids':[source.source_id]}
+    for attempt in range(2):
+        with pytest.raises(RuntimePaused,match='excerpt_not_in_returned_source'):
+            await runtime.invoke('investigator','INVOKE',payload,Findings,SUBJECT,'task_fixture')
+    task=store.get_task('task_fixture')
+    assert task.status=='PAUSED_PROTOCOL' and task.accepted_result is None
+    state=json.loads(store.read_artifact(task.response_artifact_path))
+    assert state['repair_count']==0 and bad_quote in state['response']['message']['content']
+    assert len(requests)==1 and len(ledger.list_calls())==1 and store.list_evidence()==[]
+    await runtime.close()

@@ -23,6 +23,9 @@ async def make_runtime(store, ledger, run, settings):
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
         temporary.rename(resource_root)
     loader = PromptLoader(resource_root=resource_root)
+    if run.prompt_version.startswith('bundle-sha256:') and run.prompt_version != 'bundle-sha256:' + loader.bundle_hash:
+        from .runtime import RuntimePaused
+        raise RuntimePaused('PAUSED_PROTOCOL', 'RUN_PROMPT_BUNDLE_CHANGED_FORK_REQUIRED')
     config_root = files('arc_config_assets')
     prices = PriceBook(Path(str(config_root.joinpath('pricing.json'))))
     price_check = await prices.verify_online()
@@ -43,6 +46,7 @@ async def make_runtime(store, ledger, run, settings):
     state.update(available_tools=list(tools), blocked_capabilities=blocked)
     manifest_hash = hashlib.sha256((resource_root / 'manifest.json').read_bytes()).hexdigest()
     state['prompt_manifest_hash'] = manifest_hash
+    state['prompt_bundle_hash'] = loader.bundle_hash
     store.update_run(run.run_id, state=state)
     def progress(event):
         current = store.get_run(run.run_id)
