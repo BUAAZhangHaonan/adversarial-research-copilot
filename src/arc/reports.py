@@ -241,13 +241,32 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             pending_cards.append({'title':context['title'],'decision':context['decision_paragraph'],'path':relative})
     status = str(run['status'])
     cost_text = _text({key:value for key,value in budget.items() if not key.endswith('_micro')}) if budget else '费用账本未登记，费用未知。'
-    pending = [task for task in tasks if task.get('status') != 'ACCEPTED']
+    superseded = {item['source_task_id'] for attempts in state.get('task_retries', {}).values()
+                  for item in attempts}
+    accepted = {task['task_id'] for task in tasks if task.get('status') == 'ACCEPTED'}
+    for key, recheck in state.items():
+        if (key.endswith('_source_recheck') and isinstance(recheck, dict)
+                and key.removesuffix('_source_recheck') in state
+                and recheck.get('replacement_task_id') in accepted):
+            superseded.add(recheck.get('rejected_task_id'))
+    historical = [task for task in tasks if task.get('status') != 'ACCEPTED'
+                  and (status == 'COMPLETED' or task.get('task_id') in superseded)]
+    historical_ids = {task['task_id'] for task in historical}
+    pending = [task for task in tasks if task.get('status') != 'ACCEPTED'
+               and task.get('task_id') not in historical_ids]
+    historical_details = ''
+    if historical:
+        historical_details = '\n\n### 历史失败与未验收记录（保留审计）\n\n' + '\n'.join(
+            f"- [{_heading(task['task_id'])}](PROMPT_TRACE_INDEX.md)：{task.get('status')}；"
+            f"{_text(task.get('error', task.get('error_code')))}。原任务保留；"
+            f"{'已由后续任务接替' if task['task_id'] in superseded else '所属阶段已完成'}，不计入当前未完成任务。"
+            for task in historical)
     overview = {'report_title': f"ARC {_heading(run['mode'])} 研究总览",
                 'executive_summary':f"当前执行状态：{status}。已保存 {len(cards)} 张研究卡，其中 {len(main)} 张进入主报告，{len(leads)} 张为待补证线索。科研判断：{ASSESSMENTS.get(run.get('assessment'), run.get('assessment') or '尚未形成')}。",
                 'main_cards':main,'leads':leads,
                 'scope_changes':[{'summary':_text(change.get('proposed_problem_anchor')),'original_evidence_audit':_text({'original_sources_revisited':change.get('original_sources_revisited'),'missed_evidence_analysis':change.get('missed_evidence_analysis'),'trigger_evidence_ids':change.get('trigger_evidence_ids')})} for change in changes],
                 'scope_paragraph':_text({'run_id':run_id,'campaign_id':run.get('campaign_id'),'card_id':run.get('card_id'),'card_version':run.get('card_version')}),
-                'execution_status_paragraph':f"执行状态：{status}；停止原因：{_text(run.get('stop_reason'))}。已保存任务 {len(tasks)} 项，未完成 {len(pending)} 项。",
+                'execution_status_paragraph':f"执行状态：{status}；停止原因：{_text(run.get('stop_reason'))}。已保存任务 {len(tasks)} 项，当前未完成 {len(pending)} 项，历史失败与未验收记录 {len(historical)} 项。" + historical_details,
                 'cost_paragraph':cost_text,
                 'next_step_paragraph':f"{'恢复命令' if status.startswith('PAUSED') else '查看状态'}：`arc {'resume' if status.startswith('PAUSED') else 'status'} {_safe_id(run_id)}`。阶段结束后的下一阶段需要显式选择与调用。",
                 'sources':list(all_sources.values())}

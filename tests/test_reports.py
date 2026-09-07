@@ -96,6 +96,46 @@ def test_report_preserves_state_judgments_versions_and_costs(tmp_path,monkeypatc
             assert (paths['overview'].parent/unquote(target)).exists()
 
 
+@pytest.mark.parametrize('status', ['COMPLETED', 'PAUSED_PROTOCOL'])
+def test_report_separates_historical_failures_from_current_unfinished_tasks(tmp_path, monkeypatch, status):
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    store = FakeStore(tmp_path)
+    store.run.update(status=status, stop_reason='experiment_required' if status == 'COMPLETED' else 'CURRENT_OUTPUT_INVALID')
+    store.tasks = [
+        {'task_id': 'old-moderator', 'status': 'PAUSED_PROTOCOL', 'error': 'OLD_JSON_FAILURE'},
+        {'task_id': 'moderator-retry', 'status': 'ACCEPTED', 'accepted_result': {}},
+        {'task_id': 'old-source', 'status': 'PAUSED_PROTOCOL', 'error': 'OLD_QUOTE_FAILURE'},
+        {'task_id': 'source-recheck', 'status': 'ACCEPTED', 'accepted_result': {}},
+    ]
+    store.run['state'] = {'task_retries': {'moderator': [{'source_task_id': 'old-moderator',
+        'replacement_key': 'moderator-retry'}]}, 'retrieval': {'findings': []},
+        'retrieval_source_recheck': {'rejected_task_id': 'old-source', 'replacement_task_id': 'source-recheck'}}
+    if status == 'PAUSED_PROTOCOL':
+        store.tasks.append({'task_id': 'active-task', 'status': 'PAUSED_PROTOCOL', 'error': 'CURRENT_OUTPUT_INVALID'})
+    else:
+        # A completed stage also retains an older unsuccessful task without a
+        # retry link; the run's final status is authoritative for current work.
+        store.tasks.append({'task_id': 'earlier-task', 'status': 'PAUSED_PROTOCOL', 'error': 'EARLIER_FAILURE'})
+    before = copy.deepcopy(store.__dict__)
+    paths = render_run(store, 'run-1', tmp_path / 'history-report', PromptLoader(ASSETS))
+    report = paths['overview'].read_text(encoding='utf-8')
+    assert store.__dict__ == before
+    assert f'执行状态：{status}' in report
+    assert f'当前未完成 {0 if status == "COMPLETED" else 1} 项' in report
+    assert f'历史失败与未验收记录 {3 if status == "COMPLETED" else 2} 项' in report
+    assert 'OLD_JSON_FAILURE' in report and 'OLD_QUOTE_FAILURE' in report
+    assert '[old-moderator](PROMPT_TRACE_INDEX.md)' in report
+    records = report.split('## 未保留的卡与未完成事项', 1)[1]
+    assert 'old-moderator' not in records and 'old-source' not in records
+    if status == 'PAUSED_PROTOCOL':
+        assert 'active-task：PAUSED_PROTOCOL；CURRENT_OUTPUT_INVALID' in records
+        assert 'arc resume run-1' in report
+    else:
+        assert 'earlier-task' not in records and 'EARLIER_FAILURE' in report
+    trace = paths['trace'].read_text(encoding='utf-8')
+    assert 'old-moderator' in trace and 'old-source' in trace
+
+
 def test_background_evidence_binding_is_visible_without_promoting_claim(tmp_path):
     from arc.schemas import Claim
     from arc.workflows import WorkflowEngine
