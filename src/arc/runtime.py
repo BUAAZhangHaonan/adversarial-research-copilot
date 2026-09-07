@@ -30,6 +30,28 @@ def digest(value) -> str:
     return hashlib.sha256(encoded(value).encode()).hexdigest()
 
 
+def derive_investigator_searches(envelope, tool_trace):
+    """Derive execution facts without changing the model's research fields."""
+    from .schemas import InvestigatorResult, SearchTrace
+    if not isinstance(envelope.result, InvestigatorResult):
+        return envelope
+    searches = []
+    for trace in tool_trace:
+        if trace.get('status') != 'completed' or trace.get('name') not in {'search_web', 'search_literature'}:
+            continue
+        if trace.get('task_id') != envelope.task_id or trace.get('run_id') != envelope.subject.run_id:
+            raise ValueError('SEARCH_TRACE_TASK_MISMATCH')
+        arguments = trace['arguments']
+        searches.append(SearchTrace(trace_id=trace['call_id'], operation=trace['name'],
+            query=arguments.get('query', arguments.get('theme_document', arguments.get('url'))),
+            source_ids=trace['source_ids']))
+    if len({search.trace_id for search in searches}) != len(searches):
+        raise ValueError('DUPLICATE_SEARCH_TRACE_ID')
+    derived = envelope.model_copy(deep=True)
+    derived.result.actual_searches = searches
+    return derived
+
+
 EVIDENCE_REF_KEYS = frozenset({'evidence_id', 'evidence_ids', 'new_evidence_ids', 'anchor_evidence_ids',
     'trigger_evidence_ids', 'decisive_evidence_ids', 'basis_evidence_ids'})
 SOURCE_REF_KEYS = frozenset({'source_id', 'source_ids', 'target_source_ids', 'original_sources_revisited'})
@@ -312,6 +334,54 @@ class Runtime:
             if search.query != query or set(search.source_ids) != set(trace['source_ids']):
                 raise StateError('actual_search_trace_mismatch')
 
+    def _normalize_search_provenance(self, envelope, record, state):
+        from .schemas import InvestigatorResult
+        if not isinstance(envelope.result, InvestigatorResult):
+            return envelope
+        derived = derive_investigator_searches(envelope, state['tool_trace'])
+        before = envelope.model_dump(mode='json')
+        after = derived.model_dump(mode='json')
+        original_searches = before['result'].pop('actual_searches')
+        actual_searches = after['result'].pop('actual_searches')
+        before_hash, after_hash = digest(before), digest(after)
+        if before_hash != after_hash:
+            raise ValueError('SEARCH_NORMALIZATION_CHANGED_RESEARCH_FIELDS')
+        previous = state.get('actual_searches_provenance')
+        if original_searches == actual_searches and previous:
+            saved = json.loads(self.store.read_artifact(previous['audit_path']))
+            if digest(saved) != previous['audit_hash']:
+                raise ValueError('SEARCH_NORMALIZATION_AUDIT_HASH_MISMATCH')
+            if saved['authoritative_trace_hash'] != digest(state['tool_trace']) or saved['research_fields_after_hash'] != after_hash:
+                raise ValueError('SEARCH_NORMALIZATION_DEPENDENCY_CHANGED')
+            return derived
+        response = state.get('response') or {}
+        audit = {'kind': 'runtime_actual_searches_from_task_trace_v1',
+            'task_id': record.task_id, 'run_id': record.run_id,
+            'prior_task_status': record.status, 'prior_error': record.error,
+            'input_state_artifact_path': record.response_artifact_path,
+            'response_call_id': response.get('call_id'),
+            'raw_content_hash': digest(response.get('message', {}).get('content')),
+            'original_model_declaration': original_searches,
+            'authoritative_actual_searches': actual_searches,
+            'authoritative_trace_hash': digest(state['tool_trace']),
+            'authoritative_trace': [{key: trace.get(key) for key in
+                ('task_id', 'run_id', 'call_id', 'parent_call_id', 'name', 'status', 'arguments',
+                 'source_ids', 'raw_response_artifact_path')} for trace in state['tool_trace']],
+            'research_fields_before_hash': before_hash, 'research_fields_after_hash': after_hash}
+        audit_hash = digest(audit)
+        path = f'runs/{record.run_id}/tasks/{digest(record.task_id)}/normalizations/{audit_hash}.json'
+        try:
+            existing = self.store.read_artifact(path)
+        except FileNotFoundError:
+            self.store.save_artifact(path, encoded(audit))
+        else:
+            if existing != encoded(audit):
+                raise ValueError('SEARCH_NORMALIZATION_AUDIT_CHANGED')
+        # New acceptance checkpoints this provenance. Cached acceptance returns
+        # a derived view and independent audit without rewriting its TaskRecord.
+        state['actual_searches_provenance'] = {'source': audit['kind'], 'audit_path': path, 'audit_hash': audit_hash}
+        return derived
+
     async def invoke(self, role: str, task: str, payload: dict, result_schema: type[BaseModel],
                      subject, task_id: str, tool_profile: list[str] | None = None,
                      on_admitted: Callable | None = None):
@@ -372,6 +442,7 @@ class Runtime:
             if record.accepted_result is not None:
                 accepted = envelope_type.model_validate(record.accepted_result)
                 try:
+                    accepted = self._normalize_search_provenance(accepted, record, state)
                     self._validate_semantics(accepted, payload, state)
                 except (ValueError, RuntimeError) as exc:
                     # Preserve the historical accepted record, but do not reuse
@@ -468,6 +539,7 @@ class Runtime:
             try:
                 if envelope.task_id != task_id or envelope.subject.model_dump(mode='json') != subject_data:
                     raise ValueError('SUBJECT_OR_TASK_MISMATCH')
+                envelope = self._normalize_search_provenance(envelope, record, state)
                 self._validate_semantics(envelope, payload, state)
             except ValueError as exc:
                 record.error = str(exc)
@@ -478,6 +550,8 @@ class Runtime:
                 self._checkpoint(record, state, 'PAUSED_PROTOCOL')
                 raise RuntimePaused('PAUSED_PROTOCOL', record.error) from exc
             record.accepted_result = envelope.model_dump(mode='json') if envelope.result_status == 'complete' else None
+            if envelope.result_status == 'complete':
+                record.error = None
             self._checkpoint(record, state, 'ACCEPTED' if envelope.result_status == 'complete' else 'PAUSED_EXTERNAL')
             return envelope
 
