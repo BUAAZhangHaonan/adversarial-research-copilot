@@ -171,6 +171,23 @@ class WorkloadAssumptions(StrictModel):
     non_gpu_steps: str | None
 
 class ResourceEstimate(StrictModel):
+    model_config = ConfigDict(json_schema_extra={"allOf": [
+        {"properties": {
+            "wall_hours_range": {"properties": {"unit": {"const": "hours"}}},
+            "training_gpu_hours_range": {"properties": {"unit": {"const": "GPU-hours"}}},
+            "inference_gpu_hours_range": {"properties": {"unit": {"const": "GPU-hours"}}},
+        }},
+        {"if": {"properties": {"gpu_count": {"exclusiveMinimum": 0}}},
+         "then": {"properties": {
+             "gpu_type": {"type": "string", "minLength": 1},
+             "gpu_memory_gb_assumption": {"type": "number", "exclusiveMinimum": 0},
+         }}},
+        {"if": {"properties": {"gpu_count": {"const": 0}}},
+         "then": {"properties": {
+             "training_gpu_hours_range": {"properties": {"upper": {"maximum": 0}}},
+             "inference_gpu_hours_range": {"properties": {"upper": {"maximum": 0}}},
+         }}},
+    ]})
     gpu_type: str | None
     gpu_memory_gb_assumption: float | None = Field(ge=0, allow_inf_nan=False)
     gpu_count: int = Field(ge=0, strict=True)

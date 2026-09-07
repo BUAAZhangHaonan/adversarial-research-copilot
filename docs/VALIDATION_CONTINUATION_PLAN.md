@@ -20,3 +20,9 @@
 依赖检查应在新付费请求前返回`TASK_DEPENDENCY_CHANGED_FORK_REQUIRED`。这是只读重算结论，实际恢复结果另记。两个run自身提示词快照完整并与run记录一致；环境快照和当前依赖逐项一致。当前安装的read_record提示词虽已改变，bootstrap恢复时使用run自身冻结资源，因此不把此处错误误记成提示词文件丢失或环境变化。相关runtime/schemas/bootstrap源码与已测bac3659一致。
 
 本文件记录执行计划和依赖审计，不能代替最终`VALIDATION_SNAPSHOT.json`、真实trace或完成判定。
+
+## 开发输入暴露的资源协议可见性修复
+
+`explicit_input_schema_v2.run.import`的首稿通过了当时公布的JSON Schema，却违反既有Pydantic规则：0张GPU与正GPU-hours不一致。一次格式修复又产生非法JSON，真实暂停和原件均保留，见[L2协议审计](L2_SCHEMA_FORK_PROTOCOL_REVIEW.md)。这属于开发用例暴露的协议实现缺口，不是留出主题的科学结果调参。
+
+在正在执行的v2 develop结束后，将既有资源单位、GPU配置及0 GPU工时约束同步到公布schema，不改变原校验标准。完整工程测试与独立wheel安装通过后，用原`explicit_input.run`完全相同的输入进行一次`explicit_input_schema_v3.run`实际验证，独立默认20元账户仍归原100元父账户。记录代码提交、输入hash和原run；不复用旧科学判断、不修改原输出。该验证仅用于修复后的run入口，遇到新的暂停保留停点，不增加修复次数或额外预算，也不重跑留出对照。
