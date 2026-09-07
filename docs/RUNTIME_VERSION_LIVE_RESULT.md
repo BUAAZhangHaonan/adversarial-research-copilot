@@ -41,12 +41,22 @@ protocol_retry1 未消耗工具参数或JSON纠错，响应结构已合法。运
 恢复后，protocol_retry1 的结构化结果被接受，但 proposed_card_revision 的 problem_anchor.conditions 增加了外观距离统计、几何档位预注册和测量路径细节，触发 `problem_anchor_changed`，卡v3尚未保存。这与最初JSON错层和旧版本证据问题不同。用户明确选择保持原锚点，让Agent把这些内容放回方法/测量字段，创建新的显式纠正任务；不由CodeX直接改科研文本，也不把它当作已经批准的研究转向。
 
 
-## 当前实际终点
+## 2026-09-08 续跑终点
 
-01f9b02代码快照全套440项测试通过（96.08秒），最终wheel/sdist与仓库外独立安装验证通过。安装临时环境和pytest缓存已删除，核验记录为 `work/release-verification-current.json`。
+同一自然卡 discover → develop → run 三阶段执行完成。
 
-protocol_retry2已接受并保存同卡v3；v3的problem_anchor与v2完全一致。随后 `round1.moderator.evidence_recheck` 接受8条findings及1条contrary finding，均针对 `claim_d1c_measurement_ambiguity` v3；成功工具调用14次，工具参数纠错0次、JSON纠错1次。重核确认页面级资产定位及测量族判断的依据仍可用，指出bop25均值键的措辞精度问题；未把页面与README核验升格为ZIP内容或实验可行性已验证。
+| 阶段 | 状态 | 卡版本 | 判断 | 结束原因 |
+|---|---|---:|---|---|
+| discover | COMPLETED | 1 | — | no_distinct_direction |
+| develop | COMPLETED | 5 | PROMISING | experiment_required |
+| run | COMPLETED | 7 | PROMISING | experiment_required |
 
-后续 moderator.evidence_reassessment 已创建为PENDING，但完整输出预算未准入：develop已花10.578927元，25元限额下只剩14.421073元，不足预留15.912元。父账户累计57.412830–57.562384元、剩余42.437616元，预留0、未知0。当前唯一运行阻碍是阶段预算；暂无新的协议错误。run尚未启动，不能声明三阶段贯穿通过。
+原锚点纠正后已保存v3，随后8条findings和1条contrary finding绑定claim v3。新增余额授权后Pro重评接受并保存v4，进入定向检索。第一次检索把snippet挂到无正文的源上，原任务保持PAUSED_PROTOCOL。独立source_recheck真实读取确认metadata-only，撤回excerpt并改为source_unavailable/unresolved/inference；1aa8107修复必须非空正文的误拦截，原响应零新增调用复核后复用，继续第二轮。
 
-用户已收到本轮两阶段各临时上限50元、父级仍100元的推荐选项，尚未收到该项追加答复。此前20→25元授权保持有效且develop已使用；没有自行第二次追加或清零旧费用。当前状态与原件指针见 [CURRENT_VALIDATION_SNAPSHOT.json](CURRENT_VALIDATION_SNAPSHOT.json)。
+develop第二轮完成并保存卡v5，以PROMISING/experiment_required结束。run进一步修订为卡v6，测量主张升至v4，移除9条旧版引用后重新补证，8条支持和1条限制证据绑定当前主张；重评保存卡v7。随后一个争点的关闭依据仍选用了主张v2/v3的旧证据，因此应用校验拒绝。6b19f4e/5c395dc补齐精确诊断和已保存卡的显式纠正入口，要求Agent重新选取当前版本证据或保持未决，禁止借纠正任务改卡、转向或降低证据门槛。最新任务结果以本页阶段表和当前快照为准。
+
+源码验证 06de446：全套 480 项测试通过（103.44秒）；wheel/sdist构建、仓库外独立安装、CLI与提示词资源核验通过。日志及核验记录为 work/tests-final-reference-diagnostics.log、work/package-build-final.log、work/package-install.log、work/release-verification-current.json。
+
+父账本累计结算 84.810721–84.960337 元；新增228元授权后追加花费上界 27.397953 元，剩余 200.602047 元，预留0、未知调用0。历史花费未重置。 此次预算已按用户授权自主分配，未重复申请阶段额度。最终原始响应路径、纠错计数与任务状态见[当前快照](CURRENT_VALIDATION_SNAPSHOT.json)，私有详细导出为正式仓库 work/runtime-closeout-evidence.json。旧失败任务仍保留，不代表最终流程仍失败。
+
+三组对照的最新结果以[L4报告](L4_REPORT.md)为准。自然单卡贯穿与固定材料自动评价均不替代专家科学判断、实验和论文工作。

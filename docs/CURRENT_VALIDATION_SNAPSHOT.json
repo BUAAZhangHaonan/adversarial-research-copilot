@@ -1,36 +1,25 @@
 {
-  "at": "2026-09-07T15:54:54.720262+00:00",
-  "code": "01f9b02",
+  "at": "2026-09-07T18:57:22.498690+00:00",
+  "code": "06de446",
   "data_archive": "/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation",
   "parent": {
     "account_id": "arc-vnext-validation-20260907",
     "parent_id": null,
-    "limit_micro": 100000000,
-    "spent_lower_micro": 57412830,
-    "spent_upper_micro": 57562384,
+    "limit_micro": 285562384,
+    "spent_lower_micro": 84810721,
+    "spent_upper_micro": 84960337,
     "reserved_micro": 0,
-    "remaining_micro": 42437616,
-    "limit_cny": "100.000000",
-    "spent_lower_cny": "57.412830",
-    "spent_upper_cny": "57.562384",
+    "remaining_micro": 200602047,
+    "limit_cny": "285.562384",
+    "spent_lower_cny": "84.810721",
+    "spent_upper_cny": "84.960337",
     "reserved_cny": "0.000000",
-    "remaining_cny": "42.437616",
+    "remaining_cny": "200.602047",
     "unknown_calls": 0,
-    "call_count": 1671,
+    "call_count": 1830,
     "currency": "CNY",
     "unsettled_lower_micro": 0,
     "unsettled_lower_cny": "0.000000"
-  },
-  "selected_card": {
-    "card_id": "card_52bce58017164c2b9594c418eb0cac7b",
-    "versions": [
-      1,
-      2,
-      3
-    ],
-    "origin_run": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover",
-    "selection": "MAIN_REPORT",
-    "selection_reviewer": "codex_explicit_development_authorization"
   },
   "stages": [
     {
@@ -59,7 +48,15 @@
         "unsettled_lower_micro": 0,
         "unsettled_lower_cny": "0.000000"
       },
+      "selected_output_card": {
+        "card_id": "card_52bce58017164c2b9594c418eb0cac7b",
+        "version": 1,
+        "selection": "MAIN_REPORT"
+      },
       "task_retries": {},
+      "final_ruling_task_key": null,
+      "final_ruling": {},
+      "issues": [],
       "tasks": [
         {
           "key": "frame",
@@ -145,30 +142,31 @@
     },
     {
       "run_id": "arc-vnext-validation-20260907.natural_runtime_versions_v2.develop",
-      "status": "PAUSED_BUDGET",
-      "assessment": null,
-      "stop_reason": "budget_not_admitted",
+      "status": "COMPLETED",
+      "assessment": "PROMISING",
+      "stop_reason": "experiment_required",
       "card_id": "card_52bce58017164c2b9594c418eb0cac7b",
-      "card_version": 3,
+      "card_version": 5,
       "budget": {
         "account_id": "arc-vnext-validation-20260907.natural_runtime_versions_v2.develop",
         "parent_id": "arc-vnext-validation-20260907",
-        "limit_micro": 25000000,
-        "spent_lower_micro": 10578891,
-        "spent_upper_micro": 10578927,
+        "limit_micro": 285562384,
+        "spent_lower_micro": 17484811,
+        "spent_upper_micro": 17484877,
         "reserved_micro": 0,
-        "remaining_micro": 14421073,
-        "limit_cny": "25.000000",
-        "spent_lower_cny": "10.578891",
-        "spent_upper_cny": "10.578927",
+        "remaining_micro": 268077507,
+        "limit_cny": "285.562384",
+        "spent_lower_cny": "17.484811",
+        "spent_upper_cny": "17.484877",
         "reserved_cny": "0.000000",
-        "remaining_cny": "14.421073",
+        "remaining_cny": "268.077507",
         "unknown_calls": 0,
-        "call_count": 100,
+        "call_count": 198,
         "currency": "CNY",
         "unsettled_lower_micro": 0,
         "unsettled_lower_cny": "0.000000"
       },
+      "selected_output_card": null,
       "task_retries": {
         "round1.moderator": [
           {
@@ -191,6 +189,197 @@
           }
         ]
       },
+      "final_ruling_task_key": "round2.moderator",
+      "final_ruling": {
+        "assessment": "PROMISING",
+        "next_action": "HANDOFF_EXPERIMENT",
+        "stop_reason": null,
+        "concise_ruling": "判定 card_52bce58017164c2b9594c418eb0cac7b v4：评估 PROMISING，下一步 HANDOFF_EXPERIMENT。本轮实质变化：(1) issue_sk_cw_1 闭合——SIBGRAPI 2020 按可得部分判定（官方 SBC 文章页摘要层，本 moderator 经 read_record 独立复核 2061/2061 字符，确认 19 模型真实/合成数据组合比例消融、无外观×几何正交 factorial、无固定工业场景、无歧义分层），PRL 2022 经 INPE(502)/ADS(405)/ResearchGate(binary)/read_paper(仅arXiv) 重试不可达，按 resolution_criterion『重试后仍不可达』臂转为常设访问限制（书目锚定 PRL vol.159 pp.224-231、snippet 锚 DOI 10.1016/j.patrec.2022.04.008，ev_72c9cd14/ev_a6246616）；gap 主张在『已检文献/可得部分』限定内成立，不触发 reopen_conditions#1，ER1 持续闸门保留两文全文核验为常设检查项。(2) 四个 needs_experiment issue（sk_audit_2/sk_power_3/sk_constr_4/sk_ctrl_5）文本层已落地、执行期闭合条件不变。(3) issue_re_bop25_enum 按双方一致意见延期至 claim_d1c_measurement_ambiguity 下一版本：本 round 不改任何 claim 文本/版本/证据，避免触发第二轮 superseded 移除链；在任何成果报告引用该 claim 前必须完成措辞收紧。(4) skeptic 本轮四条新异议（SK-R2-CONFIRM-STRATA 确认性分层网格、SK-R2-GATE-POWER 效应量先验数值、SK-R2-GATE-CTRL C00 区间数值、SK-R2-AUDIT-TRIANGULATE H3 双腿互证）成立为执行前预注册要求，条款已并入 proposed_card_revision（minimal_test.controls/measurements、method 必要组件、simplest_path、risks、search_limits），四条新 issue 以 needs_experiment 登记、执行期预注册冻结为最终闭合条件。无方向变更（direction_change=null）；残余工作全部为实验执行闸门（渲染探针、BOP-Distrib 下载级核验、预注册冻结、C00 标定、种子噪声探针、覆盖统计），转交实验。",
+        "external_test_requirements": [
+          "执行步骤(0)渲染探针：在选定BlenderProc版本与T-LESS资产上跑通C00/A-/G-/A-G-四条件的逐轴开关并核对分布差异；失败则基于官方模块实现自定义最小管线并完整记录与官方bop_challenge脚本的全部偏离（risks#1）。",
+          "BOP-Distrib资产下载级核验+探针：test_primesense_gtDistributionsOnly.zip内容为逐图逐实例scene_gt_distribution.json、格式与eval_bop_distributionPose.py一致、传感器覆盖确认；用referenceEstimatedDistributions_tless-test.zip跑通官方toolkit并确认单模p=1提交被接受；任一失败即启用可见性带×对称组近似降级并限定结论范围（issue_sk_audit_2最终闭合条件）。",
+          "实验预注册冻结（在任何C00训练结果已知之前）：确认性主分析格（每错误类型的主度量族、主可见性带×对称组切片）与多重性控制程序；『预期轴效应』先验量级数值（锚定PNDR §6.1量级差与DIMO 2D层等图数格量级并注明来源）；C00『一致量级』区间数值（锚定现行MSSD/MSPD路径合成-only T-LESS参考量级）；H3双腿互证与分歧处置口径（SK-R2-CONFIRM-STRATA/GATE-POWER/GATE-CTRL/AUDIT-TRIANGULATE）。",
+          "C00阳性对照标定：执行前锁定公开合成-only T-LESS配方在现行MSSD/MSPD路径（eval_bop24_pose.py）的参考量级；标定结果记录为对照判定依据，超出冻结区间触发升50K/条件升级门（SK-CTRL-5+SK-R2-GATE-CTRL）。",
+          "种子噪声探针与预注册宣判规则执行：探针通过或错误类型份额统计同向才可宣判H1/H2，否则进入零归因/功效不足分支并报告最小可检测效应，禁止宣判可加（SK-POWER-3+SK-R2-GATE-POWER）。",
+          "训练-测试位姿分布覆盖重叠统计与外观固定配置图像层距离统计协变量实现，并随所有轴归因判定报告（SK-CONSTR-4执行项）。",
+          "claim_d1c_measurement_ambiguity 下一版措辞收紧落地（最终分数键枚举补全含bop25_mAP，issue_re_bop25_enum），在任何成果报告引用该claim之前完成。"
+        ]
+      },
+      "issues": [
+        {
+          "issue_id": "issue_sk_cw_1",
+          "claim_id": "claim_d1c_gap_logical",
+          "claim_version": 1,
+          "content": "closest_work_delta与search_limits未分析已存档的两篇6D读数层DR研究：SIBGRAPI 2020『A Study on the Impact of Domain Randomization for Monocular Deep 6DoF Pose Estimation』（官方SBC文章页2061/2061字符，摘要层：无纹理3D打印件上19模型纯合成/纯真实/合成补真实/混合随机化消融、公开24,800帧数据集；无外观×几何正交factorial、无交互统计、无歧义分层）与PRL 2022『The impact of domain randomization on cross-device monocular deep 6DoF pose estimation』（仅元数据，正文未核）。本轮独立复核：SBC页重取与存档一致（src_cd6f4e75）；INPE全文镜像两次失败（http 502/https TLS超时，src_373317540 metadata-only）；read_paper仅支持arXiv；PRL 2022无开放副本。gap主张按现有证据仍未被覆盖，不触发reopen_conditions#1；但『已检文献』边界与delta完整性存在审稿层风险，全文核验为闭合闸门。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_2860c70c135e61e84260856f7fb2d86f",
+            "ev_72c9cd14b58c4df7976be9beefc8e677",
+            "ev_a624661695ac20cd8587fc2729ce418d"
+          ],
+          "resolution_criterion": "经ER_SK_CLOSEST_6D_DR获取两文全文并核对：若含等价『同一具名工业固定场景（含T-LESS）外观×几何正交2×2注入+真实测试6D错误分解+歧义分层/交互检验』→触发reopen_conditions#1重判（PROMISING→REJECTED或SCOPE_CHANGE_PROPOSED）；若全文（或可得部分）确认无等价实验，或重试后仍不可达（不可达部分记录为search_limits常设限制，gap claim保持『已检文献』限定）→闭合本issue并转HANDOFF_EXPERIMENT。",
+          "change_this_round": "闭合：proposer行使双臂（SIBGRAPI按可得部分判定、PRL 2022按重试不可达收尾）；skeptic独立复核同意；moderator独立read_record复核两源后确认。ER1持续闸门保留两文全文核验为常设检查项，reopen检索锚DOI 10.1016/j.patrec.2022.04.008已补入search_limits。",
+          "next_action": "STOP",
+          "claim_kind": "logical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_audit_2",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 3,
+          "content": "v3修订默认以BOP-Distrib GT为H3/歧义感知腿读数，但需规定：单模态位姿输出如何映射为eval_bop_distributionPose.py期望的逐实例多模分布格式（旋转/平移列表+每模概率且按(im_id,obj_id,instance_id)归一），以及单模退化分布下distRecall/distPrecision的GT侧审计口径与论文原意的分布输出比较是否混同；且GT分布文件仅位于T-LESS的test_primesense（官方toolkit README目录结构），非primesense传感器无歧义感知GT。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_d37e37c4b2c0eebffc4d1ee9b83dd584",
+            "ev_adda2521b9e2d114485594a8b43be305",
+            "ev_d182673ca448e204600c28c52185d899"
+          ],
+          "resolution_criterion": "协议写明：单模态输出以单模(p=1)分布提交，distRecall/distPrecision按『估计匹配任一GT模』口径解读并在报告标注为GT侧歧义感知审计而非分布估计比较；执行首步用referenceEstimatedDistributions_tless-test.zip跑通eval_bop_distributionPose.py探针；toolkit拒绝退化分布时降级为最近模误差+可见性带×对称组近似并限定结论。映射规格文本已写入card v3（claim v3条件#4、method必要组件#5、minimal_test.measurements#5）；执行期探针通过为最终闭合条件。",
+          "change_this_round": "无状态变化；moderator独立复核toolkit README（src_67eea4c7，7891/7891）：仅支持T-LESS、test_primesense目录、p按(im_id,obj_id,instance_id)求和为1（单模p=1合法）、distRecall/distPrecision MSD/MPD错误类型——协议口径与之一致，无文本未尽事项。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_power_3",
+          "claim_id": "claim_d1c_h1_additive",
+          "claim_version": 1,
+          "content": "H1可加性判定（|Δ双窄−(Δ单窄A+Δ单窄G)|≤种子噪声）在n=3种子/格时种子噪声方差仅约2自由度，A:G交互检验功效很低；把『与种子噪声同量级』直接判为可加可能把功效不足误报为H1成立。卡内已有缓解但需把『功效不足时不得宣判H1』写死为判定规则。",
+          "status": "needs_experiment",
+          "evidence_ids": [],
+          "resolution_criterion": "预注册判定规则：仅当种子噪声探针通过（种子间方差显著小于预期轴效应）或错误类型份额统计给出同向结论时才可宣判H1/H2；否则进入零归因/功效不足分支，报告最小可检测效应并禁止宣称可加。规则文本已写入card v3（minimal_test.controls、simplest_path步骤(4)、risks#3）；执行期按规则判定为最终闭合条件。『预期轴效应』数值化由issue_sk_r2_gate_power承接。",
+          "change_this_round": "无状态变化；规则文本已落地且双方无争议；数值化先验转issue_sk_r2_gate_power（已并入proposed revision）。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_constr_4",
+          "claim_id": "claim_d1c_h2_interaction",
+          "claim_version": 1,
+          "content": "两轴干预在覆盖语义上不对称：G-主动把几何推出测试覆盖，A-只收窄随机化宽度至单一配置，『几何主导』读数可能部分来自干预构造而非轴本身重要性；覆盖重叠协变量只量化几何侧，外观侧无对应的『固定配置与真实测试外观距离』代理；G-窗口收缩原则（中心收缩vs尾部截断）未预先原则化，档位选择本身可能决定交互方向。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_215746482da2c370445a0737ab0875f2",
+            "ev_9b3aa6ad897bdb9bbf9f1cfc9ab6570f"
+          ],
+          "resolution_criterion": "协议预注册G-窗口收缩原则（与覆盖重叠统计联动报告）与≥2范围档位；为外观固定配置报告图像层距离统计作为协变量；H1/H2结论语句显式限定于该构造与档位内。条款已写入card v3（method必要组件#2、minimal_test.intervention/measurements/confounds、risks#5）；执行期落实为最终闭合条件。",
+          "change_this_round": "无状态变化；skeptic确认原则上已回答，执行期落实即可。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_ctrl_5",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 3,
+          "content": "C00阳性对照以『BOP Challenge 2020 PBR-only RGB方法排第5』为真实测试绝对水平量级参照存在口径混同：该排名基于2020年VSD系度量、50K图与当年架构；现行官方度量族已核为MSSD/MSPD-only（全文件核验，ev_0d5742d7承接）且本卡C00为约20K图。对照失败判读（实现失败vs图数不足）依赖该标定并决定risk#2升级门。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_18585463168c87fd22712d8c822d2b12",
+            "ev_0d5742d70b608b21622a1ecd9d519f35"
+          ],
+          "resolution_criterion": "执行前锁定公开合成-only T-LESS配方在当前MSSD/MSPD路径（eval_bop24_pose.py）下的参考量级；无公开数字则按预定义『一致量级』宽松区间与升50K/条件升级门执行，并把标定结果记录为对照判定依据。预定义条款已写入card v3（minimal_test.positive_controls#1、controls、risks#2）；执行期C00标定完成即闭合。区间数值化由issue_sk_r2_gate_ctrl承接。",
+          "change_this_round": "无状态变化；口径修正已落地；区间数值冻结转issue_sk_r2_gate_ctrl（已并入proposed revision）。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_sensor_6",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 3,
+          "content": "v3修订中『仅test_primesense（与BOP core评测传感器一致）』的传感器口径是合理推断而非官方页逐字事实：官方toolkit README目录结构仅列test_primesense且eval参数引用test_targets_bop19.json，但BOP挑战页2025版未直接写明T-LESS测试传感器清单。表述精度问题，不影响协议执行。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_d182673ca448e204600c28c52185d899"
+          ],
+          "resolution_criterion": "把该句改写为『依据官方toolkit目录结构（仅列test_primesense）与eval脚本bop19 targets推断，执行期以实际BOP数据集下载结构核验』；card v3已按此改写（claim v3条件#4与method必要组件#5）。纯文本精度修正，当轮闭合。",
+          "change_this_round": "维持resolved；moderator独立复核src_67eea4c7确认目录结构与targets默认值支撑改写表述。",
+          "next_action": "STOP",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_re_bop25_enum",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 3,
+          "content": "evidence_recheck的contrary finding（ev_e3515d55）：claim v3文本『最终分数仅bop24_mAP_mssd/mssd_mm/mspd与均值』漏列bop25_mAP（mssd均值）键；实质结论（现行官方错误类型=MSSD/MSPD-only、无VSD、最终分数键全部由这三族导出）不受影响，仅措辞精度。本轮不改claim文本（改文本需版本递增，会触发第二轮superseded移除链），limits证据已绑定claim v3 evidence_ids供审计。",
+          "status": "open",
+          "evidence_ids": [
+            "ev_e3515d55b12b83d758381731cfe00f0c"
+          ],
+          "resolution_criterion": "下一版claim文本按『错误类型仅mssd/mssd(mm)/mspd三类，最终分数键（含bop24/bop25均值变体）全部由这三族导出，无VSD』收紧；不改变claim结论与协议后果（VSD腿降级路径、报告注明义务）。在任何成果报告引用该claim之前必须完成。",
+          "change_this_round": "双方一致同意延期至claim下一版本（避免第二轮superseded移除链）；本round proposed revision的claims保持不变，无任何claim版本递增。",
+          "next_action": "STOP",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_r2_confirm_strata",
+          "claim_id": "claim_d1c_h2_interaction",
+          "claim_version": 1,
+          "content": "H2/H3的『判定随歧义分层或度量族翻转』主张只有在预注册的确认性分层网格与多重性控制下才可被结果支持，跨层翻转搜索不能事后进行；否则所有跨层翻转只能作为描述性稳定性检查，研究报告最可能被质疑处即为此（skeptic material异议，SK-R2-CONFIRM-STRATA）。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_b71382f95060831b82f107efcb72e638",
+            "ev_60fff8546c130dd02fd5c5f711ad096c"
+          ],
+          "resolution_criterion": "执行前预注册：确认性主分析格（每错误类型的主度量族、主可见性带×对称组切片）与多重性控制程序固定；其余切片一律标注为描述性稳定性检查。条款已写入proposed revision（minimal_test.controls/measurements、method必要组件、simplest_path (0a)、risks）；执行期预注册冻结为最终闭合条件。",
+          "change_this_round": "本轮新建；条款已并入proposed revision，无需再开纯文本辩论轮。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_r2_gate_power",
+          "claim_id": "claim_d1c_h1_additive",
+          "claim_version": 1,
+          "content": "种子噪声探针的『预期轴效应』先验量级必须在执行前数值化固定（任何C00训练结果已知之前），否则探针通过与H1宣判可事后化；可用锚点：PNDR §6.1单轴光照隔离量级差（22.24 vs 40.44）与DIMO 2D层等图数格轴排序量级（5.22 AP），须注明来源；报告口径显式加入最小可检测效应（MDE）条件限定（skeptic material异议，SK-R2-GATE-POWER）。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_27f77e1a159bf71ca22f4abfbf8689a5",
+            "ev_48afd28f78c254a14b3fbd8d86064915"
+          ],
+          "resolution_criterion": "在实验预注册中、于任何C00训练结果已知之前固定预期轴效应的量级区间（以PNDR §6.1或DIMO 2D层轴排序量级为宽松锚并写明来源）；报告口径显式加入『在最小可检测效应（MDE）范围内』的条件限定。条款已写入proposed revision（minimal_test.controls、simplest_path (0a)）；执行期预注册冻结为最终闭合条件。",
+          "change_this_round": "本轮新建；数值冻结条款已并入proposed revision。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_r2_gate_ctrl",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 3,
+          "content": "C00阳性对照的『一致量级』宽松区间数值必须在执行前固定，且锚定现行MSSD/MSPD路径与同族合成-only配方；若区间在C00结果出来后定义，对照门退化为事后判定，risk#2的『实现失败vs图数不足』判读与升50K/条件升级门失去约束（skeptic material异议，SK-R2-GATE-CTRL）。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_0d5742d70b608b21622a1ecd9d519f35",
+            "ev_18585463168c87fd22712d8c822d2b12"
+          ],
+          "resolution_criterion": "在C00训练完成前预注册区间数值，并注明其依据的公开合成-only T-LESS参考量级或同族方法在eval_bop24_pose.py路径的数字；标定结果按SK-CTRL-5记录为对照判定依据。条款已写入proposed revision（minimal_test.controls、positive_controls#1、simplest_path (0a)/(1)）；执行期预注册冻结为最终闭合条件。",
+          "change_this_round": "本轮新建；区间冻结条款已并入proposed revision。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_sk_r2_audit_triangulate",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 3,
+          "content": "H3歧义审计腿应把BOP-Distrib GT按替代参考而非裁决性真值处理（逐图位姿分布为自动标注生成，GT侧模态越多单模p=1读数越宽松），并在test_primesense上与可见性带×对称组近似交叉互证、预注册分歧处置；否则GT侧系统偏置可能直接传导为『测量地板带主导』的错误结论（skeptic minor异议，SK-R2-AUDIT-TRIANGULATE）。",
+          "status": "needs_experiment",
+          "evidence_ids": [
+            "ev_b71382f95060831b82f107efcb72e638",
+            "ev_d182673ca448e204600c28c52185d899"
+          ],
+          "resolution_criterion": "预注册写明：BOP-Distrib GT按替代参考处理；test_primesense上双腿并行读数并报告一致性；分歧时H3结论按近似质量降级表述（与risks#4既有降级条款衔接）。条款已写入proposed revision（minimal_test.controls/measurements、simplest_path (0a)/(3)、risks）；执行期落实为最终闭合条件。",
+          "change_this_round": "本轮新建；双腿互证条款已并入proposed revision。",
+          "next_action": "HANDOFF_EXPERIMENT",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        }
+      ],
       "tasks": [
         {
           "key": "fresh_verification",
@@ -293,9 +482,296 @@
         },
         {
           "key": "round1.moderator.evidence_reassessment",
-          "status": "PENDING",
+          "status": "ACCEPTED",
           "error": null,
-          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/299ef34e171a05ca19af7253dec427b56947734972825a11c87498b77920750c/states/ab4c94c4d49445c1a73cc6ee16a0734d.json",
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/299ef34e171a05ca19af7253dec427b56947734972825a11c87498b77920750c/states/5026cff9f2794b77a20567502495f357.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 6
+        },
+        {
+          "key": "round1.retrieval",
+          "status": "PAUSED_PROTOCOL",
+          "error": "excerpt_not_in_returned_source",
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/7ea3ae4b5603f0f0ce8fd26805ad89d1fdf4f0ff03169b62400fbe13f73d4161/states/a1f1b6149cab420a9a714223331461f7.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 17
+        },
+        {
+          "key": "round1.retrieval.source_recheck",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/132ccb17147b1e387f260cb09c4e3800a1e1fca8732bfdac9072c9b626cf77e5/states/1ae7d4dcdadc4c64ac669c2b25d96a86.json",
+          "correction_counts": {
+            "output_json": 1,
+            "tool_arguments": 0
+          },
+          "completed_tools": 12
+        },
+        {
+          "key": "round2.proposer",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/9e6cd65f62826cf2256e48335e4d4fe8c14fa341c391b02f027e97406549e030/states/ffc62cc094a24bf587470b27205c1d4c.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 6
+        },
+        {
+          "key": "round2.skeptic",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/408e8dee4e8d95976019efcb964972a9b3650892f4a23f18fc5c9988bc07ad1e/states/06f467cf63c24628b3bf69f559a15d4e.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 3
+        },
+        {
+          "key": "round2.moderator",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.develop/tasks/6b26ff7e63ad4ea46b3b664a400c92e68e99a874c49992b3b1973f9bdfeb36cd/states/271f9686ebcc41c0b7ea5983e4b023a6.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 3
+        }
+      ]
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.natural_runtime_versions_v2.run",
+      "status": "COMPLETED",
+      "assessment": "PROMISING",
+      "stop_reason": "experiment_required",
+      "card_id": "card_52bce58017164c2b9594c418eb0cac7b",
+      "card_version": 7,
+      "budget": {
+        "account_id": "arc-vnext-validation-20260907.natural_runtime_versions_v2.run",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 285562384,
+        "spent_lower_micro": 7594878,
+        "spent_upper_micro": 7594891,
+        "reserved_micro": 0,
+        "remaining_micro": 277967493,
+        "limit_cny": "285.562384",
+        "spent_lower_cny": "7.594878",
+        "spent_upper_cny": "7.594891",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "277.967493",
+        "unknown_calls": 0,
+        "call_count": 39,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      },
+      "selected_output_card": null,
+      "task_retries": {
+        "round1.moderator.evidence_reassessment": [
+          {
+            "source_task_id": "arc-vnext-validation-20260907.natural_runtime_versions_v2.run.round1.moderator.evidence_reassessment",
+            "replacement_key": "round1.moderator.evidence_reassessment.protocol_retry1",
+            "role": "moderator",
+            "task": "INVOKE",
+            "reason": "Development closeout authorized by the user: correct the stale evidence basis for issue_r1_skm1_metric_enumeration. Current card7 and claim v4 have already been saved and rechecked. Select matching current registered evidence for issue closure, or retain an unresolved status. Preserve all saved cards, original responses, prior task inputs and costs; return proposed_card_revision=null and direction_change=null. Same remaining CNY228 authorization, no additional funding.",
+            "requested_at": "2026-09-07T18:04:20.380716+00:00",
+            "audit_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/task-retries/round1.moderator.evidence_reassessment.protocol_retry1.json"
+          }
+        ]
+      },
+      "final_ruling_task_key": "round1.moderator.evidence_reassessment",
+      "final_ruling": {
+        "assessment": "PROMISING",
+        "next_action": "HANDOFF_EXPERIMENT",
+        "stop_reason": "协议重试轮（判定对象card v7，parent v6）：(1) 上轮唯一验证错误已修正——issue_r1_skm1_metric_enumeration的决议证据改为claim_d1c_measurement_ambiguity v4精确目标的已核验证据（ev_aacaa608，supports；ev_1793f08c，limits），issue状态与结论不变，账本其余条目同步核对（skeptic SK-C1–C5与issue_r2_skm2的证据引用均已对齐当前注册证据）；(2) 按correction_scope要求proposed_card_revision=null，当前卡v7保持不变（不改claim文本/条件/版本/研究范围）；(3) 证据重评估调查（evidence_recheck）确认9条被移除引用的底层源文对claim v4继续有效（8 supports+1 limits，新证据ID已并入claim v4的evidence_ids），新枚举限制观察（bop25_mAP_mm）经全文件证据确认为零协议后果、按主要键（非穷举）解读结案；(4) 剩余判别项全部为执行期闸门（预注册数值冻结、逐轴渲染探针、BOP-Distrib下载级核验与单模p=1探针、C00标定、种子探针与强制升级次序），检索工具无法代替，进一步纯文本评审不再改善决策，故按HANDOFF_EXPERIMENT结束本轮并保留当前科学评估。",
+        "concise_ruling": "判定card_52bce58017164c2b9594c418eb0cac7b v7（parent v6），证据重评估轮协议重试。上轮裁定因issue_r1_skm1_metric_enumeration的决议证据引用目标版本不匹配被拒（ev_79e5d454为claim v2目标、ev_e3515d55为claim v3目标，而issue目标为claim_d1c_measurement_ambiguity v4，类型empirical_resolution_requires_verified_claim_evidence）；本轮按correction_scope仅修正issue证据引用与账本、不返回proposed_card_revision、不改任何claim文本/条件/版本/研究范围。修正后该issue决议依据改为claim v4精确目标的已核验证据：ev_aacaa608（supports，eval_bop24_pose.py全文15501/15501，错误族分数键均由mssd/mssd(mm)/mspd三族导出、无VSD系键）与ev_1793f08c（limits，括号内均值键列举仍漏bop25_mAP_mm，实质结论与协议后果不受影响）。证据重评估调查结论维持：9条被移除引用（superseded_same_claim_target）为版本再绑定而非证据失效，其底层源文已以claim v4为目标重新核验注册并并入claim v4的evidence_ids（8 supports+1 limits）；『页面级≠内容级』边界与执行期闸门处置恰当。skeptic SK-C1–C5与proposer SKM1条款已在当前卡v7落地并结案；核心gap主张（T-LESS固定工业场景6D位姿层两轴正交注入+错误分解+条件化判定的可复用归因协议未被已检工作建立）在声明检索边界内维持；problem_anchor与5条件2×2+锚点格结构未改动；非拼接性判断维持。assessment=PROMISING（值得进入下一步人类调查与实验，不等于经验结论已证实）；转HANDOFF_EXPERIMENT，pending test与预注册冻结条款见external_test_requirements。",
+        "external_test_requirements": [
+          "执行前（任何C00训练结果已知前）冻结预注册，须含：确认性主分析格与多重性控制（全实例联合错误分解为主统计量）；『预期轴效应』先验量级数值（PNDR §6.1/DIMO宽松锚+同设置匹配预算标尺缺失声明+保守MDE目标值）；C00『一致量级』区间数值；种子噪声探针未通过时的强制升级次序（≥5种子/条件、图数×2、预算预留，升级后仍未通过才允许零归因分支）；G-强度校准带（C00→G-召回降幅目标区间、优先部分出覆盖）与A-G-地板判定规则；外观2-3档位范围复测与图像层距离统计的确认性地位；杠杆措辞约束（外观=随机化范围宽度、几何=位姿/相机覆盖宽度、布局为未操纵常量）；H3双腿互证与分歧处置口径（对应SK-C1/C2/C3/C4/C5与SK-R2系列条款）。",
+          "执行首步渲染探针：在选定BlenderProc版本+T-LESS资产上跑通默认全开→仅外观收窄→仅几何收窄→双窄的逐轴开关，记录与官方main_tless_random.py的全部偏离；失败则基于官方模块自定义最小管线并记录偏离（不换渲染器）。",
+          "执行首步BOP-Distrib下载级核验：test_primesense_gtDistributionsOnly.zip内容为逐图逐实例scene_gt_distribution.json、格式与eval_bop_distributionPose.py一致、传感器覆盖确认；以referenceEstimatedDistributions_tless-test.zip跑通官方toolkit探针并验证单模态p=1输出被接受；任一步失败按预注册降级为可见性带×对称组近似并限定结论范围（不把页面级核验当内容级可用性；页面/文件树/README/仓库四类页面级证据已以v4为目标重新绑定：ev_6aad9b41/ev_825e1aa1/ev_6211813c/ev_563e9365）。",
+          "C00阳性对照按执行前冻结的『一致量级』区间+升50K/条件升级门标定（SK-CTRL-5）；合成-only配方自配并记录标定结果；检测器recall阳性对照与合成域自检同步执行。",
+          "主格执行与报告：5条件×≥3种子训练，种子噪声探针先行并按SK-C1强制次序处置；读数以全实例联合错误分解为确认性主统计量，分层/度量切片按预注册确认性主格报告，其余标注为描述性稳定性检查；test_primesense上BOP-Distrib审计与可见性带×对称组近似双腿并行并报告一致性；A-G-低于地板阈值时交互结论仅基于错误份额/ID混淆条件读数并声明限制；训练-测试位姿覆盖重叠与外观图像层距离统计作为协变量报告。"
+        ]
+      },
+      "issues": [
+        {
+          "issue_id": "issue_r1_skc1_power_upgrade",
+          "claim_id": "claim_d1c_h1_additive",
+          "claim_version": 1,
+          "content": "以3种子/条件×4格估计A:G交互项功效不足：交互残差自由度仅8，交互对比标准误约为单边际差标准误的√2倍，常规显著性要求交互量级达种子噪声σ的约3–4倍；卡片锚定的两个先验量级（PNDR §6.1的22.24 vs 40.44 ADD AUC、DIMO等图数格的5.22 AP）均非本设置匹配预算标尺，若『预期轴效应』先验偏大则MDE随之偏大，真实1–3点轴效应会被判为种子噪声内并落入零归因分支，中央问题（两轴是否可加）未被实际回答。卡片已有SK-POWER-3/SK-R2-GATE-POWER门，但缺探针失败时的强制升级次序、保守MDE目标与全实例错误份额确认性主统计量。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_27f77e1a159bf71ca22f4abfbf8689a5",
+            "ev_48afd28f78c254a14b3fbd8d86064915"
+          ],
+          "resolution_criterion": "执行前预注册冻结：(i)种子噪声探针未通过时的强制升级规则（≥5种子/2×图数并预留预算），升级后仍未通过才允许进入零归因分支；(ii)『预期轴效应』除PNDR/DIMO宽松锚外须说明同设置匹配预算标尺的缺失并以保守MDE为目标值；(iii)全实例错误份额统计列为确认性主统计量。",
+          "change_this_round": "证据重评估轮（card v7）：controls第11–13条、necessary_components组件5/7、risks第3条与resources条件性预算预留已落地三项决议要求；数值在步骤(0a)冻结。",
+          "next_action": "STOP",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_r1_skc2_appearance_lever_scope",
+          "claim_id": "claim_d1c_render_param_layer",
+          "claim_version": 1,
+          "content": "外观轴收窄只测『随机化范围宽度』效应，无法区分『范围宽度不重要』与『该固定配置远离真实外观』（真实BRDF/光照值未知，卡内confounds第1条已承认）；渲染参数层干预正确（ev_9b3aa6ad物理耦合动机），但A-是范围收窄而非真实外观逼近，单档位+图像层距离协变量只能缓解不能消除方向混同。decision_changed『材质/光照建模与随机化』杠杆表述超出该干预可支持的结论范围（覆盖逻辑下还需借助ev_21574648的覆盖解读）。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_9b3aa6ad897bdb9bbf9f1cfc9ab6570f",
+            "ev_215746482da2c370445a0737ab0875f2"
+          ],
+          "resolution_criterion": "预注册中把外观轴2-3档位范围复测与图像层距离统计列为『杠杆建议』成立的必要条件；报告与decision措辞限定为『随机化范围宽度』杠杆，不主张真实BRDF/光照建模精度的收益。",
+          "change_this_round": "证据重评估轮（card v7）：contribution.decision_changed/knowledge_increment已限定为『随机化范围宽度』杠杆并声明不主张真实BRDF/光照建模精度收益；controls第15条与necessary_components组件2/7把外观档位复测与距离统计列为必要条件。",
+          "next_action": "STOP",
+          "claim_kind": "logical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_r1_skc3_ag_floor",
+          "claim_id": "claim_d1c_h2_interaction",
+          "claim_version": 1,
+          "content": "G-按设计使相当比例测试位姿出覆盖，A-G-双窄格可能触及检测地板（DIMO等图数格中『真实光照+随机位姿』塌至5.22 AP，ev_48afd28f）；若A-G-与检测地板不可分，H2覆盖型交互在最具诊断性的双窄格上不可解释，『外观效应只在几何覆盖充分时出现』与『双窄无害』两种解读无法区分。卡片仅有C00阳性对照与SK-CTRL-5区间门，无A-G-地板判定规则，G-强度（『相当比例出覆盖』）亦未设校准带约束，干预构造方向可能把读数推向地板。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_48afd28f78c254a14b3fbd8d86064915"
+          ],
+          "resolution_criterion": "预注册冻结：G-强度校准带（C00→G-召回降幅目标区间，优先『部分出覆盖』而非『大量出覆盖』构造）与A-G-地板规则（低于阈值时交互结论仅基于错误份额/ID混淆条件读数并声明限制）。",
+          "change_this_round": "证据重评估轮（card v7）：controls第14条、minimal_test.intervention、H2 validity_limit与risks第7条已写入G-强度校准带与A-G-地板判定规则。",
+          "next_action": "STOP",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_r1_skc4_layout_wording",
+          "claim_id": "claim_d1c_coverage_covariate",
+          "claim_version": 1,
+          "content": "几何轴干预只覆盖相机/位姿采样窗口；问题陈述与decision_changed中的『布局与遮挡结构/布局采样』成分在各条件间被固定（官方物理落体，ev_0a4f6068所列模块支持后续扩展），未受操纵。research_object『几何覆盖』与decision_changed『位姿/布局采样与覆盖』杠杆措辞包含未检验的布局成分，可能误导杠杆结论解读；不威胁协议内部效度。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_0a4f606844e5985713ba9d220d4833c9"
+          ],
+          "resolution_criterion": "预注册/报告措辞把几何杠杆明确为『位姿/相机覆盖宽度』，布局/遮挡结构标注为未操纵常量（anti_scope已预留为后续扩展）。",
+          "change_this_round": "证据重评估轮（card v7）：controls第16条限定几何杠杆为『位姿/相机覆盖宽度』并标注布局与遮挡结构为未操纵常量；contribution.decision_changed同口径；problem_anchor未改动。",
+          "next_action": "STOP",
+          "claim_kind": "logical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_r1_skc5_survivor_bias",
+          "claim_id": "claim_d1c_h1_additive",
+          "claim_version": 1,
+          "content": "连续位姿误差只统计ID正确实例，跨条件检出/ID混淆份额差异造成幸存实例构成漂移，单独比较连续误差分布可能把构成效应误读为轴效应（H2自身预测混淆率随外观收窄上升，各条件ID正确子集的难度构成随之不同）；H1的『错误类型份额』预测已部分缓解，但主读数必须以全实例联合分解为准。",
+          "status": "resolved",
+          "evidence_ids": [],
+          "resolution_criterion": "预注册全实例联合错误分解为主读数（检测失败份额+ID混淆份额+ID正确-位姿超阈份额=1），连续误差分布仅作描述性补充并在报告注明构成差异。",
+          "change_this_round": "证据重评估轮（card v7）：measurements第1条已列全实例联合错误分解为确认性主统计量；controls第13条与necessary_components组件4把连续位姿误差降为描述性补充并注明幸存实例构成差异。",
+          "next_action": "STOP",
+          "claim_kind": "hypothesis",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_r1_skm1_metric_enumeration",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 4,
+          "content": "claim_d1c_measurement_ambiguity v3文本『最终分数仅bop24_mAP_mssd/mssd_mm/mspd与均值』的穷举式枚举漏列bop25_mAP（mssd均值）键；MSSD/MSPD-only实质结论与『VSD须经legacy/自实现路径并注明非现行官方』的协议后果不受影响，仅措辞精度需收紧。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_aacaa60802d30243a0436718c0e10c3d",
+            "ev_1793f08c16162e64f89b9c513fe7338f"
+          ],
+          "resolution_criterion": "文字级收窄：最终分数键均从mssd/mssd(mm)/mspd三族导出（bop24_mAP_mssd、bop24_mAP_mssd_mm、bop24_mAP_mspd，均值键bop24_mAP与bop25_mAP），无任何VSD系键；实质结论与协议后果不变。",
+          "change_this_round": "协议重试轮（card v7）：证据引用目标修正——ev_79e5d454/ev_e3515d55（claim v2/v3目标）→ev_aacaa608（supports，claim v4目标）/ev_1793f08c（limits，claim v4目标）；claim当前为v4且文本已采用修正表述（三族导出+均值键bop24_mAP/bop25_mAP，条件新增枚举精度依据）；本轮新发现该列举仍漏bop25_mAP_mm，另立issue_r2_skm2_metric_enumeration_mm，本issue维持resolved。",
+          "next_action": "STOP",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        },
+        {
+          "issue_id": "issue_r2_skm2_metric_enumeration_mm",
+          "claim_id": "claim_d1c_measurement_ambiguity",
+          "claim_version": 4,
+          "content": "证据重评估轮独立全文件阅读（ev_1793f08c，relation=limits，claim v4目标）：eval_bop24_pose.py（master，15501/15501）final_scores除claim v4括号列举的三族键与均值键bop24_mAP/bop25_mAP外，还写bop25_mAP_mm（=mean([mssd_mm])）与非错误族计时键bop24_average_time_per_image；故claim v4『均值键bop24_mAP与bop25_mAP』在穷举读法下仍漏列bop25_mAP_mm。所有错误族分数键仍由mssd/mssd(mm)/mspd三族构成、无任何VSD系键，MSSD/MSPD-only实质断言与协议后果（VSD走legacy/自实现路径并注明非现行官方）不受影响。",
+          "status": "resolved",
+          "evidence_ids": [
+            "ev_1793f08c16162e64f89b9c513fe7338f",
+            "ev_aacaa60802d30243a0436718c0e10c3d"
+          ],
+          "resolution_criterion": "括号内分数键列举标注为非穷举示例或补列bop25_mAP_mm（并注明bop24_average_time_per_image为非错误族计时键）；MSSD/MSPD-only实质断言与协议后果不变。",
+          "change_this_round": "本轮由证据重评估调查创建并当场决议：实质层经全文件证据（ev_aacaa608/ev_1793f08c，均claim v4目标）闭合；括号列举按主要键（非穷举）解读结案；文字性补列留作作者下次修订的非阻塞编辑事项（本裁定不代做，避免claim版本递增触发第二次同类证据移除链）。",
+          "next_action": "STOP",
+          "claim_kind": "empirical",
+          "redirect_to": null
+        }
+      ],
+      "tasks": [
+        {
+          "key": "round1.proposer",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/tasks/e69175207ce228399e44b1f3b498ec238bb5e2c9a1d6ca1db106e0df60670268/states/dda6d4f979a14e0d9f051238f7df2f31.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 3
+        },
+        {
+          "key": "round1.skeptic",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/tasks/e7eb3cc70ff010a5374ea10727f268c1ebf75a9828198117d60fd4832cf24fe2/states/5b0c170b3dd64f0ebc06107fcb580208.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 7
+        },
+        {
+          "key": "round1.moderator",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/tasks/c83d5e04cb8681c46dca4559ef30044e32f4d473d38bafff3f6546fe07409b01/states/ce4acbdac5c7477b81d33d67ee8d5e6d.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 0
+        },
+        {
+          "key": "round1.moderator.evidence_recheck",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/tasks/25944701ecb51aa01970f924b137e5380eb76f93316387b0efd9b62c4835f860/states/68800f6a0c854978961bc964386a6f6f.json",
+          "correction_counts": {
+            "output_json": 1,
+            "tool_arguments": 0
+          },
+          "completed_tools": 11
+        },
+        {
+          "key": "round1.moderator.evidence_reassessment",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/tasks/d089cd6ec18039c70ffd1f8c71b4d0b28e53759f55e98f1f092aeaece69a65c8/states/eb780074ce604c2d8d594ace71cfb7a2.json",
+          "correction_counts": {
+            "output_json": 0,
+            "tool_arguments": 0
+          },
+          "completed_tools": 0
+        },
+        {
+          "key": "round1.moderator.evidence_reassessment.protocol_retry1",
+          "status": "ACCEPTED",
+          "error": null,
+          "response_artifact_path": "runs/arc-vnext-validation-20260907.natural_runtime_versions_v2.run/tasks/b5910a973df0f565ae10a85ccd1a974518131ab7f9b82d8a63c3e4163939fefd/states/2b4956c943a84798bc5e32aebe545439.json",
           "correction_counts": {
             "output_json": 0,
             "tool_arguments": 0
@@ -305,7 +781,7 @@
       ]
     }
   ],
-  "run_stage": "not_started",
-  "L3": "incomplete_budget_paused_before_develop_final_reassessment",
-  "L4": "incomplete_no_completed_anonymous_quality_comparison"
+  "same_card_chain_completed": true,
+  "l4_completed_count": 3,
+  "additional_spent_upper_cny": "27.397953"
 }
