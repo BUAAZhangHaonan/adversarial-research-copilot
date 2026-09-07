@@ -825,3 +825,29 @@ async def test_completed_moderator_can_request_evidence_for_its_declared_new_iss
         runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
     assert requests == [] and store.get_issues(SUBJECT['run_id']) == []
     await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('target, has_card, allowed', [
+    ('claim_new',True,True),('claim_unowned',True,False),('claim_new',False,False)])
+async def test_compose_requests_may_target_claims_declared_in_the_same_card(tmp_path,target,has_card,allowed):
+    from arc.schemas import Envelope, ComposeResult, Claim
+    from arc.store import StateError
+    from tests.test_selection import research_store, research_draft
+    research_store(tmp_path)
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [])
+    draft = research_draft()
+    draft.claims = [Claim(claim_id='claim_new',version=1,text='A proposed testable effect.',
+                         conditions=['Controlled setting'],kind='hypothesis',evidence_ids=[])]
+    raw = request_answer(claim_id=target)
+    raw['result'] = {'card_candidate':draft.model_dump(mode='json') if has_card else None,
+                     'composition_reason':'The question merits testing.', 'unresolved_prerequisites':[]}
+    envelope = Envelope[ComposeResult].model_validate(raw)
+    payload = {'evidence_ids':['ev_synthetic'],'source_ids':['src_synthetic']}
+    if allowed:
+        runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    else:
+        with pytest.raises(StateError,match='evidence_request_claim_id_not_supplied_to_task'):
+            runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    assert requests == [] and store.list_tasks(SUBJECT['run_id']) == []
+    await runtime.close()

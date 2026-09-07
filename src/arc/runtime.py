@@ -310,7 +310,7 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
     def _validate_semantics(self, envelope, payload, state):
-        from .schemas import InvestigatorResult, ModeratorResult
+        from .schemas import InvestigatorResult, ModeratorResult, ComposeResult
         from .store import StateError
         from .validation import validate_role_targets
         validate_role_targets(envelope, payload)
@@ -328,6 +328,10 @@ class Runtime:
             raise StateError('reference_not_supplied_to_task')
         for field in ('claim_id', 'issue_id', 'draw_id'):
             visible = reference_ids(payload, {field, field + 's'})
+            if field == 'claim_id' and isinstance(envelope.result, ComposeResult):
+                candidate = envelope.result.card_candidate
+                if candidate is not None:
+                    visible.update(claim.claim_id for claim in candidate.claims)
             if field == 'issue_id' and isinstance(envelope.result, ModeratorResult):
                 # A completed moderator may create an issue and request evidence
                 # for it in the same ruling. Store gates still validate the issue
@@ -376,7 +380,7 @@ class Runtime:
                 raise StateError('actual_search_trace_mismatch')
 
     def _normalize_search_provenance(self, envelope, record, state):
-        from .schemas import InvestigatorResult, ModeratorResult
+        from .schemas import InvestigatorResult, ModeratorResult, ComposeResult
         if not isinstance(envelope.result, InvestigatorResult):
             return envelope
         derived = derive_investigator_searches(envelope, state['tool_trace'])
