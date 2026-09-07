@@ -45,7 +45,7 @@ runs/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover/tasks/a4ccc3
 
 这些是对已读原文支持范围的检查。它们既不证明待研究方向一定成立，也不构成对尚未生成研究卡的否决。
 
-## 唯一提示词改动及理由
+## V2之后的调查提示词改动及理由
 
 仅在 `prompts/roles/investigator.md` 末尾追加 `Exact excerpts, source access and claim scope` 小节；追加前的全文按上述原role hash逐字保留。
 
@@ -65,3 +65,13 @@ runs/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover/tasks/a4ccc3
 本次离线运行 `pytest tests/test_prompts.py`：17 passed；`git diff --check`通过。未运行真实V3，未发起付费补查。
 
 代码侧的证据预校验由主线程负责，不能靠提示词替代。V2原件保持不动；主线程将使用明确的新V3 run复用已有原始材料验证，沿用原100元父账本。留出主题尚未运行，不用于本次调参。V3结果、费用及是否改善需在真实运行后另行补记；本记录不提前宣称质量提升。
+
+## V3之后：补证请求归属说明
+
+V3已保存card_106f9f81b76c449cb429c4c883dbeb1d v1。其draw1.novelty首先返回非JSON，单次结构修复后仍违反已有卡的EvidenceRequest契约：req_array_2025的claim_id、issue_id、draw_id全为null。离线重解析复现evidence_request_requires_subject；该任务保持PAUSED_PROTOCOL/INVALID_OUTPUT_AFTER_REPAIR，accepted_result=null，不人工补ID、不追加第二次修复。状态原件后缀为tasks/5c0d21efd3b1667b2f500002524edc9308794b4dddfefd3af7f864fd4dc38e6f/states/34930a4eddb447d0a9ad0827b1f5ce95.json。
+
+只在common/output_protocol.md末尾追加Evidence request ownership通用说明，原模板完整保留：已有卡的请求必须复制当前输入中相关的claim/issue/draw ID，nullable字段不代表三者都能为空；前卡尚无这些实体时才由实际task/run归属。不得编造ID，也不把卡片级subject替代请求级关联。未改变schema、判断标准或原有失败记录；没有加入案例标题或领域词黑名单。
+
+该公共资产SHA256：追加前76a264e10bbad00f9ce7694f5d7ee4a4773115ca6e7b192da835904b12142ac4；追加后99e1f8839135d599dfba0a47056a0f52463e2a9e6f4f85f3f8b3bd8a63202d8e。其原文前缀和所有语义角色的实际渲染已纳入测试；包含本改动及L4边界/种子修复的整套离线检查为258 passed / 46.23s，日志work/tests-evaluation-ownership.log。
+
+这是基于开发题目的协议校准，后续用明确标记的独立L2输入和固定材料对照验证。它不让原V3自动通过，也不证明模型科研判断已改善。原卡及被拒novelty中的实质问题见V3_EVIDENCE_REVIEW.md，未注入本次提示词。未使用holdout调参。

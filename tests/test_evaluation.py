@@ -46,7 +46,7 @@ class ComparisonRuntime(ScriptedRuntime):
         return super().reply(role,task,payload,task_id)
 
 
-def environment(tmp_path, monkeypatch, **runtime_options):
+def environment(tmp_path, monkeypatch, *, boundaries=None, **runtime_options):
     import arc.cli
     import arc.bootstrap
     store,_,_=research_store(tmp_path)
@@ -58,7 +58,7 @@ def environment(tmp_path, monkeypatch, **runtime_options):
     async def make_runtime(store, ledger, run, settings):
         return ComparisonRuntime(store,calls,**runtime_options)
     monkeypatch.setattr(arc.bootstrap,'make_runtime',make_runtime)
-    campaign=store.create_campaign('Controlled recall mechanisms')
+    campaign=store.create_campaign('Controlled recall mechanisms',boundaries=boundaries)
     source=store.create_run('discover',campaign_id=campaign.campaign_id,
         state={'source_ids':['src_synthetic'],'evidence_ids':['ev_synthetic']})
     return settings,store,source,calls
@@ -80,6 +80,52 @@ async def test_comparison_uses_identical_frozen_material_and_persists_judgments(
         assert candidate['cost']['limit_cny']=='20.000000'
     evaluator=[c for c in calls if c['role']=='evaluator'][0]
     assert all(set(c)=={'candidate_id','research_card'} for c in evaluator['payload']['candidates'])
+
+
+@pytest.mark.asyncio
+async def test_comparison_freezes_boundaries_for_every_stage_and_records_actual_shuffle_seed(tmp_path,monkeypatch):
+    import arc.evaluation
+    boundaries=['Use fixed training data; do not add labels.', 'Separate retrieval quality from reasoning accuracy.']
+    settings,store,source,calls=environment(tmp_path,monkeypatch,boundaries=boundaries)
+    actual_seeds=[]
+    original_shuffle=arc.evaluation.anonymous_candidates
+    def capture_shuffle(candidates,seed):
+        actual_seeds.append(seed)
+        return original_shuffle(candidates,seed=seed)
+    monkeypatch.setattr(arc.evaluation,'anonymous_candidates',capture_shuffle)
+    report=await run_comparison(settings,source.run_id)
+    assert report['comparison_status']=='completed'
+    assert len(calls)==9
+    assert all(call['payload']['boundaries']==boundaries for call in calls)
+    assert len([call for call in calls if '.ARC.' in call['task_id']])==5
+    assert len([call for call in calls if '.direct-Pro.' in call['task_id']])==3
+    assert len([call for call in calls if call['role']=='evaluator'])==1
+    frozen=store.read_artifact(f'evaluations/{source.run_id}/evidence.json')
+    assert json.loads(frozen)['material']['boundaries']==boundaries
+    saved=json.loads(store.read_artifact(f'evaluations/{source.run_id}/comparison.json'))
+    assert actual_seeds==[report['shuffle_seed']]==[saved['shuffle_seed']]
+    count=len(calls)
+    resumed=await run_comparison(settings,source.run_id)
+    assert len(calls)==count
+    assert resumed['shuffle_seed']==report['shuffle_seed']
+    assert resumed['identity_map_private']==report['identity_map_private']
+    assert store.read_artifact(f'evaluations/{source.run_id}/evidence.json')==frozen
+
+
+@pytest.mark.asyncio
+async def test_comparison_rejects_boundaryless_snapshot_without_rewriting_or_calling(tmp_path,monkeypatch):
+    import hashlib
+    from arc.validation import ProtocolViolation
+    settings,store,source,calls=environment(tmp_path,monkeypatch,boundaries=['An explicit original boundary.'])
+    material={'topic':store.get_campaign(source.campaign_id).topic,
+        'sources':[store.get_record('src_synthetic')], 'evidence':[store.get_record('ev_synthetic')]}
+    original=json.dumps({'material':material,'sha256':hashlib.sha256(json.dumps(material,ensure_ascii=False,sort_keys=True).encode('utf-8')).hexdigest()},ensure_ascii=False)
+    path=f'evaluations/{source.run_id}/evidence.json'
+    store.save_artifact(path,original)
+    with pytest.raises(ProtocolViolation,match='COMPARISON_MATERIAL_PROTOCOL_MISMATCH_MISSING_BOUNDARIES'):
+        await run_comparison(settings,source.run_id)
+    assert calls==[]
+    assert store.read_artifact(path)==original
 
 
 @pytest.mark.asyncio

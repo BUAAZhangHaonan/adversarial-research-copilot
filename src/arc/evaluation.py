@@ -118,7 +118,7 @@ async def run_comparison(settings, source_run_id):
         for source in sources:
             if source.get('content_path'):
                 source['content'] = store.read_artifact(source['content_path'])
-        material = {'topic': campaign.topic, 'sources': sources,
+        material = {'topic': campaign.topic, 'boundaries': campaign.boundaries, 'sources': sources,
             'evidence': [store.get_record(identifier) for identifier in evidence_ids]}
         material_bytes = json.dumps(material, ensure_ascii=False, sort_keys=True).encode('utf-8')
         frozen_text = json.dumps({'material': material,
@@ -126,6 +126,8 @@ async def run_comparison(settings, source_run_id):
         store.save_artifact(frozen_path, frozen_text)
     manifest = json.loads(frozen_text)
     frozen = manifest['material']
+    if 'boundaries' not in frozen:
+        raise ProtocolViolation('COMPARISON_MATERIAL_PROTOCOL_MISMATCH_MISSING_BOUNDARIES')
     material_hash = hashlib.sha256(json.dumps(frozen, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
     if material_hash != manifest['sha256']:
         raise ProtocolViolation('COMPARISON_MATERIAL_HASH_MISMATCH')
@@ -186,13 +188,14 @@ async def run_comparison(settings, source_run_id):
             'status': latest.status, 'stop_reason': latest.stop_reason,
             'pending_envelopes': {k: v for k, v in latest.state.get('comparison_envelopes', {}).items()
                                   if v['result_status'] != 'complete'}, 'cost': ledger.summary(run_id)})
-    report = {'automatic_screen_only': True, 'material_hash': material_hash,
+    shuffle_seed = 20260907
+    report = {'automatic_screen_only': True, 'material_hash': material_hash, 'shuffle_seed': shuffle_seed,
               'candidates': candidates, 'comparison_status': 'incomplete',
               'evaluation': None, 'parent_cost': ledger.summary(VALIDATION_PARENT)}
     if any(c['status'] != 'COMPLETED' for c in candidates):
         store.save_artifact(f'evaluations/{source_run_id}/comparison.json', json.dumps(report, ensure_ascii=False, indent=2))
         return report
-    anonymous, identity = anonymous_candidates(candidates)
+    anonymous, identity = anonymous_candidates(candidates, seed=shuffle_seed)
     eval_id = source_run_id + '.comparison.evaluator'
     try:
         evaluation = store.get_run(eval_id)

@@ -24,7 +24,8 @@ def test_spec_assets_are_exact():
     for path,body in blocks:
         actual=(ROOT/path).read_text(encoding='utf-8')
         additions={'prompts/roles/developer.md':'\n## IMPORT: preserve an explicitly supplied user question or proposal\n',
-                   'prompts/roles/investigator.md':'\n## Mechanical search trace mapping\n'}
+                   'prompts/roles/investigator.md':'\n## Mechanical search trace mapping\n',
+                   'prompts/common/output_protocol.md':'\n## Evidence request ownership\n'}
         if path in additions:
             assert actual.startswith(body)
             assert actual[len(body):].startswith(additions[path])
@@ -46,6 +47,16 @@ def test_registered_roles_render_traceable_task_and_minimal_prefix():
         assert f"roles/{entry['role']}.md" in rendered.dependencies
     assert 'common/selection_examples.md' not in loader.render('skeptic.INVOKE',DATA,schema=SCHEMA).dependencies
     assert 'common/resource_policy.md' in loader.render('discovery.COMPOSE',DATA,schema=SCHEMA).dependencies
+
+
+def test_request_ownership_is_visible_to_every_semantic_role():
+    loader=PromptLoader(ASSETS)
+    for prompt_id in loader.manifest['prompts']:
+        rendered=loader.render(prompt_id,DATA,schema=SCHEMA)
+        system=rendered.messages[0]['content']
+        assert 'Nullable fields do not permit all three to be null for an existing card.' in system
+        assert 'scoped to the actual task_id and subject.run_id' in system
+        assert 'Never invent an identifier' in system
 
 
 def test_registered_developer_import_preserves_user_question_provenance():

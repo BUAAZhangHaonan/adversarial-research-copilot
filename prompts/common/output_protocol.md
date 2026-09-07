@@ -16,3 +16,9 @@ The runtime decides execution state, starts tools, allocates identifiers, enforc
 Provide brief reasons that can be checked against evidence and explicit premises. Do not expose or demand private chains of thought. Follow the schema even when the correct result is inconclusive or negative.
 
 result_status is complete, needs_evidence or blocked. A complete result must validate against the task-specific result schema. For needs_evidence or blocked, result may be null, but note must explain the concrete missing prerequisite and requests must be explicit when applicable. The runtime must not accept a blocked object as a completed scientific judgment.
+
+## Evidence request ownership
+
+Every evidence request for an existing card must copy at least one relevant claim_id, issue_id or draw_id that is actually present in the current task input. Nullable fields do not permit all three to be null for an existing card. The envelope's card identity alone does not replace this request-level link. Never invent an identifier or copy an identifier found only in an unrelated archive record.
+
+Before a card exists, when no claim, issue or draw has yet been assigned, all three may be null: the request is then scoped to the actual task_id and subject.run_id. Keep its question, source/query, purpose and decision consequences concrete in either case. A request about a card's closest-work gap should name the affected supplied claim or current draw; an unanswered optional follow-up must not be presented as verified novelty.
