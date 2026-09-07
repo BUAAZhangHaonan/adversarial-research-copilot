@@ -50,8 +50,9 @@ class FakeStore:
         return next(card for card in self.cards if card['card_id']==card_id and card['version']==version)
     def list_evidence(self,**kwargs):
         return [{'evidence_id':'e-1','source_id':'s-1','claim':'文献中的具体主张','conditions':['特定分布'],'relation':'motivates','origin':'secondary_analysis','locator_status':'locator_unverified','verification_status':'unverified'}]
-    def list_sources(self):
-        return [{'source_id':'s-1','title':'作者论文 [甲] | 数据','url':'https://example.org/paper?q=(one)'}, {'source_id':'s-private','title':'不相关秘密','url':'https://example.org/private'}]
+    def list_sources(self, ids=None):
+        sources = [{'source_id':'s-1','title':'作者论文 [甲] | 数据','url':'https://example.org/paper?q=(one)'}, {'source_id':'s-private','title':'不相关秘密','url':'https://example.org/private'}]
+        return sources if ids is None else [source for source in sources if source['source_id'] in ids]
     def get_issues(self,run_id):
         return [{'issue_id':'issue-1','status':'needs_experiment','content':'需要实际测试区分解释','resolution_criterion':'有有效性检查','change_this_round':'已固定控制变量'}]
     def list_direction_changes(self,run_id):
@@ -117,6 +118,84 @@ def test_background_evidence_binding_is_visible_without_promoting_claim(tmp_path
     assert store.list_evidence(ids=[ev.evidence_id])[0] == original
 
 
+@pytest.mark.parametrize('reference_location', ['motivation', 'claim', 'issue', 'run'])
+def test_cross_run_report_resolves_only_referenced_inherited_evidence(tmp_path, monkeypatch, reference_location):
+    from arc.schemas import Claim, Issue, IssueTransition, SourceRecord
+    from tests.test_selection import research_store, research_draft
+
+    store, source, template_evidence = research_store(tmp_path)
+    origin = store.create_run('discover', run_id='run_origin')
+    inherited = store.register_evidence(template_evidence.model_copy(update={
+        'evidence_id': 'ev_inherited', 'run_id': origin.run_id}))
+    unrelated_source = store.register_source(SourceRecord(
+        source_id='src_unrelated', title='Unrelated private material', url='https://example.org/unrelated',
+        source_type='user_material', access_status='retrieved', content_origin='original'),
+        content='UNRELATED SOURCE. ' + store.read_artifact(source.content_path))
+    store.register_evidence(template_evidence.model_copy(update={
+        'evidence_id': 'ev_unrelated', 'source_id': unrelated_source.source_id, 'run_id': origin.run_id,
+        'locator': None, 'locator_status': 'locator_unverified', 'verification_status': 'unverified'}))
+    draft = research_draft()
+    draft.motivation.evidence_ids = []
+    draft.closest_work_delta.source_ids = []
+    draft.claims = [Claim(claim_id='claim_target', version=1, text='A conditional hypothesis.',
+                          conditions=[], kind='hypothesis', evidence_ids=[])]
+    if reference_location == 'motivation':
+        draft.motivation.evidence_ids = [inherited.evidence_id]
+    elif reference_location == 'claim':
+        draft.claims[0].evidence_ids = [inherited.evidence_id]
+    card_record = store.save_card(draft)
+    run = store.create_run('develop', run_id='run_current', card_id=card_record.card_id, card_version=1,
+        state={'evidence_ids': [inherited.evidence_id]} if reference_location == 'run' else {})
+    if reference_location == 'issue':
+        store.apply_issues(run.run_id, [Issue(issue_id='issue_current', claim_id='claim_target', claim_version=1,
+            content='Existing observation needs a separating test.', status='needs_experiment',
+            evidence_ids=[inherited.evidence_id], resolution_criterion='A controlled intervention.',
+            change_this_round='Opened with inherited observation.', next_action='HANDOFF_EXPERIMENT',
+            claim_kind='hypothesis')], [IssueTransition(issue_id='issue_current', from_status=None,
+            to_status='needs_experiment', change_this_round='Opened with inherited observation.',
+            basis_evidence_ids=[inherited.evidence_id], basis_argument=None, resolution_reason=None)])
+    assert store.list_evidence(run_id=run.run_id) == []
+    store.register_evidence(template_evidence.model_copy(update={
+        'evidence_id': 'ev_current_unreferenced', 'run_id': run.run_id}))
+    before = (store.get_run(run.run_id), store.get_card(card_record.card_id, 1),
+              store.list_evidence(), store.list_sources(), store.get_issues(run.run_id))
+    get_evidence, get_sources = store.list_evidence, store.list_sources
+
+    def scoped_evidence(ids=None, run_id=None):
+        assert ids is not None or run_id is not None, 'Report must not scan all evidence'
+        return get_evidence(ids=ids, run_id=run_id)
+
+    def scoped_sources(ids=None):
+        assert ids is not None, 'Report must not scan all sources'
+        assert unrelated_source.source_id not in ids
+        return get_sources(ids=ids)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(store, 'list_evidence', scoped_evidence)
+        patch.setattr(store, 'list_sources', scoped_sources)
+        paths = render_run(store, run.run_id, tmp_path / 'inherited-report')
+    trace = paths['trace'].read_text(encoding='utf-8')
+    assert inherited.evidence_id in trace and inherited.source_id in trace
+    assert '证据登记运行：run_origin' in trace
+    assert inherited.locator in trace
+    assert all(eid not in trace for eid in ['ev_unrelated', 'ev_synthetic', 'ev_current_unreferenced'])
+    overview = paths['overview'].read_text(encoding='utf-8')
+    detail = paths[f'card:{card_record.card_id}:1'].read_text(encoding='utf-8')
+    for name, contents in [('overview', overview), ('detail', detail)]:
+        if name == 'detail' and reference_location == 'run':
+            continue  # A run-only source is not attributed to a card that never cited it.
+        links = [unquote(value) for value in re.findall(r'\]\(([^)]+)\)', contents)]
+        report_dir = paths['overview' if name == 'overview' else f'card:{card_record.card_id}:1'].parent
+        assert any((report_dir / link).resolve() == (store.artifact_root / source.content_path).resolve()
+                   for link in links)
+    assert all('Unrelated private material' not in text and 'https://example.org/unrelated' not in text
+               for text in [overview, detail, trace])
+    after = (store.get_run(run.run_id), store.get_card(card_record.card_id, 1),
+             store.list_evidence(), store.list_sources(), store.get_issues(run.run_id))
+    assert after == before
+    assert store.list_evidence(ids=[inherited.evidence_id])[0].run_id == origin.run_id
+
+
 def test_deterministic_report_rebuild_and_empty_discovery(tmp_path,monkeypatch):
     monkeypatch.setattr('arc.budget.BudgetLedger',FakeLedger)
     store=FakeStore(tmp_path)
@@ -143,7 +222,7 @@ def test_report_links_actual_local_original_and_prompt_artifact(tmp_path,monkeyp
     store.artifact_root.mkdir()
     (store.artifact_root/'original.txt').write_text('Original material',encoding='utf-8')
     (store.artifact_root/'prompt.json').write_text('{}',encoding='utf-8')
-    store.list_sources=lambda:[{'source_id':'s-1','title':'本地原文','url':None,'content_path':'original.txt'}]
+    store.list_sources=lambda ids=None:[{'source_id':'s-1','title':'本地原文','url':None,'content_path':'original.txt'}]
     store.tasks[0]['rendered_prompt_path']='prompt.json'
     paths=render_run(store,'run-1',tmp_path/'output',PromptLoader(ASSETS))
     for key in ['overview','card:card-1:2','trace']:

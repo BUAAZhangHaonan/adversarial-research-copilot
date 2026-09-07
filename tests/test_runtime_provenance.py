@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 
 import pytest
+from pydantic import BaseModel
 
 from arc.runtime import BoundTool, RuntimePaused, derive_investigator_searches
 from arc.schemas import Envelope, InvestigatorResult
@@ -32,9 +33,9 @@ def tool_response():
         'arguments': '{"query":"controlled observation"}'}}])
 
 
-def fixture_runtime(tmp_path, responses):
+def fixture_runtime(tmp_path, responses, *, hit_source_ids=None):
     async def search(arguments, metadata):
-        return {'source_ids': ['fixture_source']}
+        return {'source_ids': ['fixture_source'] if hit_source_ids is None else hit_source_ids}
     tool = BoundTool('search_web', {'type': 'object', 'properties': {
         'query': {'type': 'string'}}, 'required': ['query']}, search, Decimal(0), 'LOCAL')
     runtime, store, ledger, requests = setup_runtime(tmp_path, responses, tools={'search_web': tool})
@@ -218,4 +219,59 @@ async def test_parent_payload_search_history_cannot_become_current_tool_executio
     assert result.result.actual_searches == []
     assert result.result.findings[0].source_id == 'fixture_source'
     assert len(requests) == 1 and runtime.tool_trace('task_fixture') == []
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_actual_search_repeated_hits_preserve_order_and_accept_without_deduplication(tmp_path):
+    hits = ['fixture_source', 'another_source', 'fixture_source']
+    runtime, store, ledger, requests = fixture_runtime(tmp_path,
+        [tool_response(), sse(json.dumps(research_answer()))], hit_source_ids=hits)
+    from arc.schemas import SourceRecord
+    store.register_source(SourceRecord(source_id='another_source', title='Another source',
+        url='https://example.test/another', source_type='paper',
+        access_status='metadata_only', content_origin='metadata'))
+    result = await invoke_research(runtime)
+    assert result.result.actual_searches[0].source_ids == hits
+    assert runtime.tool_trace('task_fixture')[0]['source_ids'] == hits
+    task = store.get_task('task_fixture')
+    assert task.accepted_result['result']['actual_searches'][0]['source_ids'] == hits
+    state = json.loads(store.read_artifact(task.response_artifact_path))
+    audit = json.loads(store.read_artifact(state['actual_searches_provenance']['audit_path']))
+    assert audit['authoritative_actual_searches'][0]['source_ids'] == hits
+    cost = ledger.summary('parent')
+    assert await invoke_research(runtime) == result
+    assert len(requests) == 2 and ledger.summary('parent') == cost
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_scientific_source_reference_duplicates_still_rejected(tmp_path):
+    class ScientificReferences(BaseModel):
+        source_ids: list[str]
+    raw = answer()
+    raw['result'] = {'source_ids': ['fixture_source', 'fixture_source']}
+    runtime, store, ledger, requests = fixture_runtime(tmp_path, [sse(json.dumps(raw))])
+    with pytest.raises(RuntimePaused, match='duplicate_source_reference'):
+        await runtime.invoke('investigator', 'INVOKE', {'source_ids': ['fixture_source']},
+            ScientificReferences, SUBJECT, 'task_fixture')
+    assert store.get_task('task_fixture').accepted_result is None
+    assert len(requests) == 1
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_investigator_request_duplicate_sources_not_exempted_with_search_log(tmp_path):
+    raw = research_answer()
+    raw['evidence_requests'] = [{'request_local_id': 'request1', 'claim_id': None,
+        'issue_id': None, 'draw_id': None, 'question': 'What limits this observation?',
+        'target_source_ids': ['fixture_source', 'fixture_source'], 'queries': [],
+        'purpose': 'Check the boundary', 'decision_if_supported': 'Retain the boundary',
+        'decision_if_contradicted': 'Revise the boundary'}]
+    runtime, store, ledger, requests = fixture_runtime(tmp_path,
+        [tool_response(), sse(json.dumps(raw))], hit_source_ids=['fixture_source', 'fixture_source'])
+    with pytest.raises(RuntimePaused, match='duplicate_source_reference'):
+        await invoke_research(runtime)
+    assert store.get_task('task_fixture').accepted_result is None
+    assert len(requests) == 2
     await runtime.close()

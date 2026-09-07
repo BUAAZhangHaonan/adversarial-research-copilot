@@ -290,10 +290,19 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
     def _validate_semantics(self, envelope, payload, state):
+        from .schemas import InvestigatorResult
         from .store import StateError
         from .validation import validate_role_targets
         validate_role_targets(envelope, payload)
-        self.store.validate_references(envelope)
+        research_references = envelope.model_dump(mode='json')
+        if isinstance(envelope.result, InvestigatorResult):
+            # Search hits are an ordered execution log, so repeated hits remain
+            # valid. Research citation lists retain the store's uniqueness rule.
+            research_references['result'].pop('actual_searches')
+            for search in envelope.result.actual_searches:
+                for source_id in search.source_ids:
+                    self.store.validate_references({'source_id': source_id})
+        self.store.validate_references(research_references)
         keys = EVIDENCE_REF_KEYS | SOURCE_REF_KEYS
         if reference_ids(envelope, keys) - reference_ids([payload, state['tool_trace']], keys):
             raise StateError('reference_not_supplied_to_task')

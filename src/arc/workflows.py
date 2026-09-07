@@ -20,7 +20,6 @@ class WorkflowPause(Exception):
 
 RESEARCH_TOOLS = ('search_literature', 'read_paper', 'search_web', 'read_web',
                   'lookup_archive', 'read_record', 'request_capability')
-EXTERNAL_EVIDENCE_TOOLS = {'search_literature', 'read_paper', 'search_web', 'read_web'}
 
 
 def data(value):
@@ -134,6 +133,45 @@ class WorkflowEngine:
         return [item for task_id in self.trace_tasks(run_id, key)
                 for item in self.runtime.tool_trace(task_id)]
 
+    def has_external_evidence_action(self, trace):
+        for item in trace:
+            result = item.get('result')
+            if (item.get('status') != 'completed' or not isinstance(result, dict)
+                    or result.get('is_error') is not False):
+                continue
+            sources, source_ids = result.get('sources'), result.get('source_ids')
+            if not isinstance(sources, list) or not isinstance(source_ids, list):
+                continue
+            if item.get('name') in {'search_literature', 'search_web'}:
+                # A successful empty search establishes an attempted search only.
+                return True
+            if item.get('name') not in {'read_paper', 'read_web'}:
+                continue
+            for coverage in sources:
+                if not isinstance(coverage, dict):
+                    continue
+                source_id = coverage.get('source_id')
+                count, total = coverage.get('content_chars'), coverage.get('content_total_chars')
+                complete = coverage.get('content_complete')
+                if (source_id not in source_ids or source_id not in item.get('source_ids', [])
+                        or type(count) is not int or count <= 0 or type(complete) is not bool
+                        or (total is not None and (type(total) is not int or total < count))
+                        or (complete and total != count)):
+                    continue
+                try:
+                    source = self.store.get_source(source_id)
+                    if (source.access_status != 'retrieved' or source.content_origin == 'metadata'
+                            or not source.content_path):
+                        continue
+                    body = self.store.read_artifact(source.content_path)
+                except (StateError, OSError):
+                    continue
+                inline = coverage.get('content')
+                if (len(body) >= count and body[:count].strip()
+                        and (inline is None or inline == body[:count])):
+                    return True
+        return False
+
     async def execute(self, run_id):
         run = self.store.get_run(run_id)
         if run.status in ('COMPLETED', 'PAUSED_SCOPE_CHANGE', 'CANCELLED'):
@@ -238,8 +276,7 @@ class WorkflowEngine:
                 **original, 'sources_from_rejected_task': data(self.store.list_sources(ids=source_ids)),
                 'target_source_ids': sorted(failed_sources),
                 'rejected_unverified_result': draft['result'],
-                'questions': questions + [
-                    'Which findings remain supported after checking their exact quotations against the registered original text?'],
+                'questions': questions,
                 'source_validation_failure': {'reason': exc.reason, 'task_id': rejected.task_id},
             }, tool_profile=['read_record', 'request_capability'])
             self._validate_source_recheck(self.store.get_run(run_id).state[key + '_source_recheck'])
@@ -249,8 +286,7 @@ class WorkflowEngine:
         if recheck:
             self._validate_source_recheck(recheck)
         trace = self.task_trace(run_id, key)
-        if fresh and not any(t.get('name') in EXTERNAL_EVIDENCE_TOOLS and
-                             t.get('status') == 'completed' for t in trace):
+        if fresh and not self.has_external_evidence_action(trace):
             self.checkpoint(run_id, missing_fresh_verification=key)
             raise WorkflowPause('PAUSED_EXTERNAL', 'fresh_verification_not_executed')
         # Findings receive registry IDs only after the actual source passage exists.
@@ -359,8 +395,7 @@ class WorkflowEngine:
             novelty = await self.call(run_id, f'draw{number}.novelty', 'novelty_examiner',
                                       payload={**self.context(run_id), 'archive_relations': relations})
             trace = self.task_trace(run_id, f'draw{number}.novelty')
-            if not any(t.get('name') in EXTERNAL_EVIDENCE_TOOLS and t.get('status') == 'completed'
-                       for t in trace):
+            if not self.has_external_evidence_action(trace):
                 raise WorkflowPause('PAUSED_EXTERNAL', 'closest_work_check_not_executed')
             judgment = await self.call(run_id, f'draw{number}.selection', 'selector', payload={
                 **self.context(run_id), 'novelty': data(novelty), 'archive_relations': relations,

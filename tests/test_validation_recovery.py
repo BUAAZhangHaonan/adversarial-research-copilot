@@ -30,6 +30,10 @@ async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejectio
             assert kw['tool_profile'] == ['read_record', 'request_capability']
             assert kw['payload']['sources_from_rejected_task'][0]['source_id'] == 'src_synthetic'
             assert kw['payload']['target_source_ids'] == ['src_synthetic']
+            assert kw['payload']['questions'] == ['Check the confound.']
+            assert kw['payload']['source_validation_failure'] == {
+                'reason':'excerpt_not_in_returned_source','task_id':run.run_id+'.shared'}
+            assert kw['payload']['rejected_unverified_result']['findings'][1]['excerpt'] == 'They isolate all variables.'
             if recheck_fails:
                 self.calls.append({'task_id': kw['task_id']})
                 raise RuntimePaused('PAUSED_PROTOCOL', 'excerpt_not_in_returned_source')

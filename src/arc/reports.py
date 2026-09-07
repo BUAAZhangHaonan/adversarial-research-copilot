@@ -29,6 +29,7 @@ LABELS = {
     'lower':'下界','upper':'上界','unit':'单位','status':'状态','spent_lower_cny':'已结算下界（元）',
     'spent_upper_cny':'已结算上界（元）','reserved_cny':'预留（元）','remaining_cny':'剩余额度（元）',
     'limit_cny':'授权上限（元）','cost_status':'费用可信度','account_id':'预算账户','parent_id':'父级账户',
+    'recorded_run_id':'证据登记运行',
 }
 SELECTIONS = {'MAIN_REPORT':'值得继续调查','LEAD_ONLY':'待补证线索','NOT_RETAINED':'本次不保留'}
 ASSESSMENTS = {'PROMISING':'值得继续调查','NEEDS_EVIDENCE':'缺少判断所需证据','REJECTED':'已有依据不支持继续','SCOPE_CHANGE_PROPOSED':'建议转向，当前已冻结'}
@@ -83,17 +84,38 @@ def _artifact_path(value: Any, output_dir: Path, store: Any) -> str | None:
     return quote(Path(os.path.relpath(path.resolve(), output_dir.resolve())).as_posix(), safe='/.-_')
 
 
-def _sources_for(card: dict, evidence: list[dict], sources: list[dict], base_dir: Path, store: Any) -> list[dict]:
-    draft = card['draft']
-    ids = set(draft.get('motivation', {}).get('evidence_ids', []))
-    ids.update((card.get('selection_result') or {}).get('evidence_ids', []))
-    for claim in draft.get('claims', []):
-        ids.update(claim.get('evidence_ids', []))
-    source_ids = set(draft.get('closest_work_delta', {}).get('source_ids', []))
-    source_ids.update(e['source_id'] for e in evidence if e.get('evidence_id') in ids)
+def _reference_ids(value: Any, keys: set[str]) -> set[str]:
+    if isinstance(value, list):
+        return set().union(*(_reference_ids(item, keys) for item in value))
+    if not isinstance(value, dict):
+        return set()
+    found = set()
+    for key, item in value.items():
+        if key in keys:
+            found.update(ref for ref in (item if isinstance(item, list) else [item]) if isinstance(ref, str))
+        elif isinstance(item, (dict, list)):
+            found.update(_reference_ids(item, keys))
+    return found
+
+
+EVIDENCE_KEYS = {'evidence_id', 'evidence_ids', 'anchor_evidence_ids', 'trigger_evidence_ids',
+                 'decisive_evidence_ids', 'basis_evidence_ids', 'new_evidence_ids'}
+SOURCE_KEYS = {'source_id', 'source_ids', 'target_source_ids', 'original_sources_revisited'}
+
+
+def _source_links(source_ids: set[str], sources: list[dict], base_dir: Path, store: Any) -> list[dict]:
     return [{'id': _heading(s['source_id']), 'title': _heading(s.get('title') or s['source_id']), 'url': url}
             for s in sources if s['source_id'] in source_ids
             and (url := (_public_url(s.get('url')) or _artifact_path(s.get('content_path'), base_dir, store)))]
+
+
+def _sources_for(card: dict, evidence: list[dict], sources: list[dict], base_dir: Path,
+                 store: Any, issues: list[dict] = ()) -> list[dict]:
+    references = [card, [issue for issue in issues if issue.get('card_id') in {None, card['card_id']}]]
+    ids = _reference_ids(references, EVIDENCE_KEYS)
+    source_ids = _reference_ids(references, SOURCE_KEYS)
+    source_ids.update(e['source_id'] for e in evidence if e['evidence_id'] in ids)
+    return _source_links(source_ids, sources, base_dir, store)
 
 
 def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focused_stage: bool = False,
@@ -148,18 +170,26 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     focused_stage = run['mode'] in {'develop', 'run'}
     if focused_stage and run.get('card_id'):
         cards = [_obj(store.get_card(run['card_id'], run['card_version']))]
-    evidence = [_obj(item) for item in store.list_evidence(run_id=run_id)]
-    sources = [_obj(item) for item in store.list_sources()]
     issues = [_obj(item) for item in store.get_issues(run_id)]
     changes = [_obj(item) for item in store.list_direction_changes(run_id)]
     tasks = [_obj(item) for item in store.list_tasks(run_id)]
     capabilities = [_obj(item) for item in store.list_capability_requests(run_id)]
+    state = run.get('state', {})
+    references = [cards, issues, changes, {key: state.get(key) for key in
+        ('evidence_ids', 'source_ids', 'final_ruling')},
+        [{'evidence_ids': task.get('evidence_ids', [])} for task in tasks]]
+    # Resolve inherited IDs without copying their records into the current run.
+    # Frozen archive windows and rejected candidate payloads are not report evidence.
+    evidence = [_obj(item) for item in store.list_evidence(
+        ids=sorted(_reference_ids(references, EVIDENCE_KEYS)))]
+    source_ids = _reference_ids(references, SOURCE_KEYS) | {e['source_id'] for e in evidence}
+    sources = [_obj(item) for item in store.list_sources(ids=sorted(source_ids))]
     ledger = BudgetLedger(store.db_path)
     budget = ledger.summary(run['budget_account_id']) if run.get('budget_account_id') else None
     calls = ledger.list_calls(run['budget_account_id']) if run.get('budget_account_id') else []
     paths: dict[str, Path] = {}
     main, leads, rejected, pending_cards = [], [], [], []
-    all_sources: dict[str, dict] = {}
+    all_sources = {source['id']: source for source in _source_links(source_ids, sources, output_dir, store)}
     for card in cards:
         # A later stage owns its assessment. Never display a prior discovery
         # selection as approval of a revised proposal or a rejected review.
@@ -181,8 +211,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
         relative = f"cards/{_safe_id(card['card_id'])}/v{int(card['version'])}.md"
         target = output_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        related_sources = _sources_for(card,evidence,sources,target.parent,store)
-        all_sources.update({source['id']:source for source in _sources_for(card,evidence,sources,output_dir,store)})
+        related_sources = _sources_for(card,evidence,sources,target.parent,store,issues)
         context = _card_context(card, related_sources, issues, focused_stage=focused_stage,
                                 claim_bindings=store.claim_evidence_bindings(card['draft']))
         target.write_text(loader.render_report('card',context),encoding='utf-8')
@@ -232,7 +261,8 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
                             'evidence':_text(task.get('evidence_ids',[])),'artifacts':artifacts})
     trace={'run_id':run_id,'tasks':trace_tasks,'evidence_records':[{'id':e['evidence_id'],'source_id':e['source_id'],'claim':e.get('claim'),
            'relation':e.get('relation'),'conditions':_text(e.get('conditions')),'locator':_text(e.get('locator')),
-           'verification':_text({key:e.get(key) for key in ['origin','locator_status','verification_status']})} for e in evidence]}
+           'verification':_text({**{key:e.get(key) for key in ['origin','locator_status','verification_status']},
+                                 'recorded_run_id':e.get('run_id')})} for e in evidence]}
     paths['trace']=output_dir/'PROMPT_TRACE_INDEX.md'
     paths['trace'].write_text(loader.render_report('trace',trace),encoding='utf-8')
     paths['cost']=output_dir/'COST_REPORT.md'

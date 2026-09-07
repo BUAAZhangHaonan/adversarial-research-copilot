@@ -35,7 +35,12 @@ class ScriptedRuntime:
     def tool_trace(self,task_id):
         if not self.fresh_trace:
             return []
-        return [{'name':'read_paper','status':'completed','source_ids':['src_synthetic'],'trace_id':'synthetic-tool-trace'}]
+        body=self.store.get_record('src_synthetic')['content']
+        return [{'name':'read_paper','status':'completed','source_ids':['src_synthetic'],
+                 'trace_id':'synthetic-tool-trace','result':{'is_error':False,
+                 'source_ids':['src_synthetic'],'sources':[{'source_id':'src_synthetic',
+                 'content':body,'content_chars':len(body),'content_total_chars':len(body),
+                 'content_complete':True}]}}]
 
     async def invoke(self,*,role,task,payload,result_schema,subject,task_id,tool_profile,on_admitted=None):
         self.calls.append({'role':role,'task':task,'task_id':task_id,'payload':copy.deepcopy(payload),'tools':list(tool_profile)})
