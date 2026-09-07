@@ -78,10 +78,21 @@ async def _frozen_call(store, runtime, run_id, key, role, task='INVOKE', payload
     if key in envelopes:
         envelope = Envelope[schema].model_validate(envelopes[key])
     else:
+        physical_key = key
+        retries = run.state.get('comparison_task_retries', {}).get(key, [])
+        if retries:
+            audit = json.loads(store.read_artifact(retries[-1]['audit_path']))
+            subject = {'campaign_id': run.campaign_id, 'run_id': run_id,
+                       'card_id': run.card_id, 'card_version': run.card_version}
+            if audit['subject'] != subject:
+                from .validation import ProtocolViolation
+                raise ProtocolViolation('COMPARISON_RETRY_SUBJECT_CHANGED')
+            physical_key = audit['replacement_key']
+            payload = {**(payload or {}), 'protocol_retry': audit['protocol_retry']}
         envelope = await runtime.invoke(role=role, task=task, payload=payload or {},
             result_schema=schema, subject=Subject(campaign_id=run.campaign_id, run_id=run_id,
                 card_id=run.card_id, card_version=run.card_version),
-            task_id=f'{run_id}.{key}', tool_profile=[])
+            task_id=f'{run_id}.{physical_key}', tool_profile=[])
         envelopes[key] = envelope.model_dump(mode='json')
         state = {**store.get_run(run_id).state, 'comparison_envelopes': envelopes}
         store.update_run(run_id, state=state)
