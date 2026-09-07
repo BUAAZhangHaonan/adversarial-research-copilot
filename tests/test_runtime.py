@@ -24,14 +24,14 @@ def answer(value='valid', evidence_ids=None):
             'result':{'value':value,'evidence_ids':evidence_ids or []},'evidence_requests':[],
             'capability_requests':[],'note':None}
 
-def sse(text=None, finish='stop', tools=None, reasoning='private reasoning'):
-    chunks=[{'id':'req_fixture','object':'chat.completion.chunk','created':1,'model':'deepseek-v4-flash',
+def sse(text=None, finish='stop', tools=None, reasoning='private reasoning', model='deepseek-v4-flash'):
+    chunks=[{'id':'req_fixture','object':'chat.completion.chunk','created':1,'model':model,
              'choices':[{'index':0,'delta':{'role':'assistant','reasoning_content':reasoning},'finish_reason':None}]}]
     delta={'content':text} if tools is None else {'tool_calls':tools}
-    chunks.append({'id':'req_fixture','object':'chat.completion.chunk','created':1,'model':'deepseek-v4-flash',
+    chunks.append({'id':'req_fixture','object':'chat.completion.chunk','created':1,'model':model,
                    'choices':[{'index':0,'delta':delta,'finish_reason':None}]})
     if finish is not None:
-        chunks.append({'id':'req_fixture','object':'chat.completion.chunk','created':1,'model':'deepseek-v4-flash',
+        chunks.append({'id':'req_fixture','object':'chat.completion.chunk','created':1,'model':model,
             'choices':[{'index':0,'delta':{},'finish_reason':finish}],
             'usage':{'prompt_tokens':100,'completion_tokens':50,'total_tokens':150,
                      'prompt_cache_hit_tokens':20,'prompt_cache_miss_tokens':80,
@@ -118,21 +118,61 @@ async def test_disconnect_unknown_keeps_reservation_and_no_replay(tmp_path):
     await runtime.close()
 
 @pytest.mark.asyncio
-async def test_native_tool_reasoning_association_and_trace(tmp_path):
+@pytest.mark.parametrize('model',['deepseek-v4-flash','deepseek-v4-pro'])
+async def test_native_tool_reasoning_association_and_trace(tmp_path,model):
     calls=[]
     async def read(args,meta):calls.append((args,meta));return {'source_ids':[],'answer':'fixture-data'}
     tool=BoundTool('read_record',{'type':'object','properties':{'record_id':{'type':'string'}},'required':['record_id']},read,Decimal(0),'LOCAL')
     tool_parts=[{'index':0,'id':'provider_tool_1','type':'function','function':{'name':'read_record','arguments':'{"record_id":"record_1"}'}}]
-    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(finish='tool_calls',tools=tool_parts),sse(json.dumps(answer()))],tools={'read_record':tool})
-    await invoke(runtime,tool_profile=['read_record'])
-    assert len(calls)==1 and len(requests)==2
-    assistant=requests[1]['messages'][-2];reply=requests[1]['messages'][-1]
-    assert assistant['reasoning_content']=='private reasoning'
-    assert assistant['tool_calls'][0]['id']==reply['tool_call_id']=='provider_tool_1'
-    assert 'tool_choice' not in requests[0] and 'response_format' not in requests[0]
-    trace=runtime.tool_trace('task_fixture')[0]
-    assert trace['status']=='completed' and trace['name']=='read_record'
-    assert len(ledger.list_calls())==3
+    second_parts=[{'index':0,'id':'provider_tool_2','type':'function','function':{'name':'read_record','arguments':'{"record_id":"record_2"}'}}]
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(finish='tool_calls',tools=tool_parts,reasoning='reasoning 1',model=model),sse(finish='tool_calls',tools=second_parts,reasoning='reasoning 2',model=model),sse(json.dumps(answer()),model=model)],tools={'read_record':tool})
+    runtime.role_models['investigator']=model
+    assert (await invoke(runtime,tool_profile=['read_record'])).result.value=='valid'
+    assert len(calls)==2 and len(requests)==3
+    for sent in requests:
+        assert sent['model']==model and sent['thinking']=={'type':'enabled'} and sent['reasoning_effort']=='max'
+        assert sent['max_tokens']==384000 and sent['stream'] and sent['stream_options']=={'include_usage':True}
+        assert sent['response_format']=={'type':'json_object'} and sent['tools']==requests[0]['tools']
+        assert 'tool_choice' not in sent and 'temperature' not in sent and 'stop' not in sent
+    for number in (1,2):
+        assistant=requests[number]['messages'][-2];reply=requests[number]['messages'][-1]
+        assert assistant['reasoning_content']==f'reasoning {number}'
+        assert assistant['tool_calls'][0]['id']==reply['tool_call_id']==f'provider_tool_{number}'
+    assert requests[2]['messages'][:-2]==requests[1]['messages']
+    assert all(trace['status']=='completed' and trace['name']=='read_record' for trace in runtime.tool_trace('task_fixture'))
+    assert len(ledger.list_calls())==5
+    cost=ledger.summary('parent')
+    assert (await invoke(runtime,tool_profile=['read_record'])).result.value=='valid'
+    assert len(requests)==3 and len(calls)==2 and ledger.summary('parent')==cost
+    await runtime.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('invalid_content',['', 'A prose response instead of JSON.'])
+@pytest.mark.parametrize('repair_succeeds',[True,False])
+async def test_native_json_output_invalid_or_empty_keeps_single_repair_policy(tmp_path,invalid_content,repair_succeeds):
+    calls=[]
+    async def read(args,meta):
+        calls.append(args);return {'source_ids':[],'answer':'fixture-data'}
+    tool=BoundTool('read_record',{'type':'object','properties':{'record_id':{'type':'string'}},'required':['record_id']},read,Decimal(0),'LOCAL')
+    parts=[{'index':0,'id':'provider_tool_1','type':'function','function':{'name':'read_record','arguments':'{"record_id":"record_1"}'}}]
+    repaired=json.dumps(answer('fixed')) if repair_succeeds else invalid_content
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(finish='tool_calls',tools=parts),sse(invalid_content),sse(repaired)],tools={'read_record':tool})
+    if repair_succeeds:
+        assert (await invoke(runtime,tool_profile=['read_record'])).result.value=='fixed'
+    else:
+        with pytest.raises(RuntimePaused,match='INVALID_OUTPUT_AFTER_REPAIR'):
+            await invoke(runtime,tool_profile=['read_record'])
+        assert store.get_task('task_fixture').accepted_result is None
+        with pytest.raises(RuntimePaused,match='INVALID_OUTPUT_AFTER_REPAIR'):
+            await invoke(runtime,tool_profile=['read_record'])
+    assert len(requests)==3 and len(calls)==1 and len(ledger.list_calls())==4
+    assert all(r['response_format']=={'type':'json_object'} and r['max_tokens']==384000
+        and r['reasoning_effort']=='max' and r['thinking']=={'type':'enabled'} and r['stream']
+        and 'tool_choice' not in r for r in requests)
+    assert requests[0]['tools']==requests[1]['tools'] and 'tools' not in requests[2]
+    assert 'Repair an invalid structured response' in requests[2]['messages'][1]['content']
+    state=json.loads(store.read_artifact(store.get_task('task_fixture').response_artifact_path))
+    assert state['repair_count']==1
     await runtime.close()
 
 @pytest.mark.asyncio

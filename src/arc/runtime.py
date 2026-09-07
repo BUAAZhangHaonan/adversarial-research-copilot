@@ -482,13 +482,11 @@ class Runtime:
         maximum = self.prices.admission_bound(config['model'])
         request = {k: v for k, v in config.items() if k not in {'thinking', 'tools'}}
         request.update(messages=state['messages'], stream=True, stream_options={'include_usage': True},
-                       extra_body={'thinking': config['thinking']})
+                       extra_body={'thinking': config['thinking']}, response_format={'type': 'json_object'})
         if state['tools']:
             # Thinking mode uses the provider's automatic choice; its official
             # integration explicitly excludes the tool_choice request field.
             request.update(tools=state['tools'])
-        else:
-            request['response_format'] = {'type': 'json_object'}
         started = datetime.now(UTC).isoformat()
         request_path = f'runs/{record.run_id}/tasks/{digest(record.task_id)}/requests/{call_id}.json'
         self.store.save_artifact(request_path, encoded(request))
