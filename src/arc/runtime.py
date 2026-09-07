@@ -103,7 +103,14 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
     tools = {}
 
     async def read_record(arguments, metadata):
-        record = store.get_record(arguments['record_id'], version=arguments.get('version'))
+        from .store import StateError
+        try:
+            record = store.get_record(arguments['record_id'], version=arguments.get('version'),
+                                      run_id=metadata.get('run_id'))
+        except StateError as exc:
+            if str(exc) not in {'record_missing', 'record_ambiguous_requires_run_id'}:
+                raise
+            return {'is_error': True, 'error': str(exc), 'record_id': arguments['record_id']}
         if record is None: return {'is_error': True, 'error': 'RECORD_NOT_FOUND'}
         result = dict(record)
         content = result.pop('content', None)
@@ -186,7 +193,9 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                 registered.append({'source_id': source.source_id, 'title': source.title, 'url': source.url,
                     'content_origin': origin, 'abstract': item.get('abstract'), 'snippet': item.get('snippet'),
                     'content_chars': len(text) if text else 0,
-                    'content_complete': source.content_complete, 'content_total_chars': source.content_total_chars,
+                    'content_complete': item.get('content_complete', bool(text)),
+                    'content_total_chars': item.get('content_total_chars', len(text) if text else None),
+                    'registered_content_complete': source.content_complete,
                     'content': text if text and len(text) <= 12000 else None,
                     'content_requires_read_record': bool(text and len(text) > 12000)})
             return {'is_error': False, 'source_ids': source_ids, 'sources': registered,
@@ -575,6 +584,7 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_ARGUMENTS_INVALID') from exc
         if tool.cost_upper_cny is None or not tool.cost_basis:
             raise RuntimePaused('PAUSED_EXTERNAL', 'COST_UNOBSERVABLE')
+        local_read = tool.service == 'local' and name in {'read_record', 'lookup_archive'} and tool.cost_upper_cny == 0
         if state.get('pending_tool'):
             call_id = state['pending_tool']
             metadata = self.ledger.get_call(call_id)['metadata']
@@ -582,12 +592,13 @@ class Runtime:
                     call['id'], arguments, parent_call_id):
                 raise RuntimePaused('PAUSED_PROTOCOL', 'PENDING_TOOL_ASSOCIATION_MISMATCH')
             raw_path = metadata.get('raw_response_artifact_path')
-            if not tool.persists_raw_response or not raw_path:
-                raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN')
-            try:
-                self.store.read_artifact(raw_path)
-            except FileNotFoundError as exc:
-                raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN') from exc
+            if not local_read:
+                if not tool.persists_raw_response or not raw_path:
+                    raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN')
+                try:
+                    self.store.read_artifact(raw_path)
+                except FileNotFoundError as exc:
+                    raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN') from exc
         else:
             call_id = 'tool_' + uuid4().hex
             metadata = {'run_id': record.run_id, 'task_id': record.task_id, 'tool_call_id': call['id'],
@@ -621,7 +632,7 @@ class Runtime:
                     raw_saved = True
                 except FileNotFoundError:
                     pass
-            if raw_saved:
+            if raw_saved or local_read:
                 error = {'call_id': call_id, 'error_type': type(exc).__name__, 'error': str(exc),
                          'raw_response_artifact_path': raw_path, 'recorded_at': datetime.now(UTC).isoformat()}
                 state.setdefault('tool_processing_errors', []).append(error)

@@ -375,6 +375,10 @@ class Store:
                 if previous.content_sha256 and source.content_sha256 and previous.content_sha256!=source.content_sha256:
                     previous_text=self.read_artifact(previous.content_path)
                     total_agrees=previous.content_total_chars is None or source.content_total_chars==previous.content_total_chars
+                    if (previous.representation_id and source.representation_id==previous.representation_id
+                            and total_agrees and not source.content_complete
+                            and previous_text.startswith(raw)):
+                        return previous
                     if (previous.content_complete or not previous.representation_id
                             or source.representation_id!=previous.representation_id or not total_agrees
                             or not raw.startswith(previous_text) or len(raw)<=len(previous_text)):
@@ -728,12 +732,41 @@ class Store:
         return {"records":records,"total":total,"offset":offset,"limit":limit,
                 "unsearched_limits":["lexical_recall_is_not_semantic_uniqueness"]+(["additional_matching_records_require_pagination"] if offset+len(records)<total else [])}
 
-    def get_record(self,id,version=None):
+    def get_record(self,id,version=None,run_id=None):
         with self._connect() as db:
-            kind=next((table for table in ("sources","evidence","tasks","capabilities") if db.execute(f"SELECT 1 FROM {table} WHERE id=?",(id,)).fetchone()),None)
+            kind=next((table for table in ("sources","evidence","tasks","capabilities","campaigns","runs") if db.execute(f"SELECT 1 FROM {table} WHERE id=?",(id,)).fetchone()),None)
             if kind=="capabilities":
                 row=db.execute("SELECT * FROM capabilities WHERE id=?",(id,)).fetchone()
                 return {"request_id":row["id"],"run_id":row["run_id"],**json.loads(row["data"])}
+            if kind is None:
+                if run_id is not None:
+                    issues=db.execute("SELECT run_id,data FROM issues WHERE id=? AND run_id=?",(id,run_id)).fetchall()
+                else:
+                    issues=db.execute("SELECT run_id,data FROM issues WHERE id=?",(id,)).fetchall()
+                if len(issues)>1: raise StateError("record_ambiguous_requires_run_id")
+                if issues: return {"run_id":issues[0]["run_id"],**Issue.model_validate_json(issues[0]["data"]).model_dump(mode="json")}
+                if version is None:
+                    card=db.execute("SELECT 1 FROM cards WHERE card_id=?",(id,)).fetchone()
+                else:
+                    card=db.execute("SELECT 1 FROM cards WHERE card_id=? AND version=?",(id,version)).fetchone()
+                if not card: raise StateError("record_missing")
+        if kind=="campaigns": return self.get_campaign(id).model_dump(mode="json")
+        if kind=="runs":
+            run=self.get_run(id)
+            evidence_ids=set(run.state.get("evidence_ids",[]))
+            source_ids=set(run.state.get("source_ids",[]))
+            if run.card_id:
+                card=self.get_card(run.card_id,run.card_version)
+                source_ids.update(card.draft.closest_work_delta.source_ids)
+                evidence_ids.update(card.draft.motivation.evidence_ids)
+                for claim in card.draft.claims: evidence_ids.update(claim.evidence_ids)
+            source_ids.update(e.source_id for e in self.list_evidence(ids=sorted(evidence_ids)))
+            return {"run_id":run.run_id,"campaign_id":run.campaign_id,"mode":run.mode,
+                    "card_id":run.card_id,"card_version":run.card_version,
+                    "status":run.status,"assessment":run.assessment,"stop_reason":run.stop_reason,
+                    "budget_account_id":run.budget_account_id,
+                    "source_ids":sorted(source_ids),"evidence_ids":sorted(evidence_ids),
+                    "issues":[issue.model_dump(mode="json") for issue in self.get_issues(id)]}
         if kind=="sources":
             source=self.get_source(id)
             result=source.model_dump(mode="json")

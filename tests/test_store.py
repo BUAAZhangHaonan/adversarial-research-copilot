@@ -348,6 +348,22 @@ def test_source_extension_rejects_unproven_or_conflicting_content(store,change):
         store.register_source(incoming,content=full)
     assert store.get_record(first.source_id)["content"]==old
 
+@pytest.mark.parametrize("complete",[True,False])
+@pytest.mark.parametrize("same_length",[True,False])
+def test_shorter_same_representation_reuses_longer_registered_source(store,complete,same_length):
+    full="original prefix and more original content"
+    old=full if complete else full[:25]
+    incoming_text=old if same_length else old[:15]
+    record=SourceRecord(title="original",url="https://example.test/paper",source_type="paper",access_status="retrieved",content_origin="original",content_complete=complete,content_total_chars=len(full),representation_id="service:extractor:samehash")
+    first=store.register_source(record,content=old)
+    incoming=record.model_copy(update={"source_id":"short_read","content_complete":False,"content_path":None,"content_sha256":None})
+    restored=store.register_source(incoming,content=incoming_text)
+    assert restored==first
+    assert store.get_record(first.source_id)["content"]==old
+    assert restored.content_complete is complete
+    assert incoming.content_complete is False
+    assert store.read_artifact(incoming.content_path)==incoming_text
+
 def test_card_provenance_inherits_only_linked_version_research_inputs(store):
     src=source(store); ev=evidence(store,src,relation="challenges")
     campaign=store.create_campaign("specific scope")
@@ -381,3 +397,35 @@ def test_imported_card_provenance_is_empty_without_prior_runs(store):
     assert context["provenance_run_ids"]==[]
     assert context["investigation_task_ids"]==[]
     assert context["evidence_ids"]==[]
+
+def test_read_record_supports_campaign_run_and_scoped_issue_without_raw_state(store):
+    src=source(store); ev=evidence(store,src,claim_id="C1")
+    campaign=store.create_campaign("Original campaign",boundaries=["fixed scope"])
+    run=store.create_run("discover",campaign_id=campaign.campaign_id,state={"evidence_ids":[ev.evidence_id],"task_inputs":{"raw_reasoning":"must not expose"},"private_checkpoint":"must not expose"})
+    issue=Issue(issue_id="I1",claim_id="C1",claim_version=1,content="unresolved concern",status="open",evidence_ids=[ev.evidence_id],resolution_criterion="check original",change_this_round="new",next_action="REASON")
+    transition=IssueTransition(issue_id="I1",from_status=None,to_status="open",change_this_round="new",basis_evidence_ids=[],basis_argument=None,resolution_reason=None)
+    store.apply_issues(run.run_id,[issue],[transition])
+    assert store.get_record(campaign.campaign_id)==campaign.model_dump(mode="json")
+    readable=store.get_record(run.run_id)
+    assert readable["source_ids"]==[src.source_id]
+    assert readable["evidence_ids"]==[ev.evidence_id]
+    assert readable["issues"]==[issue.model_dump(mode="json")]
+    assert "task_inputs" not in readable and "state" not in readable
+    assert "must not expose" not in json.dumps(readable)
+    assert store.get_record("I1")=={"run_id":run.run_id,**issue.model_dump(mode="json")}
+    other=store.create_run("run")
+    second=issue.model_copy(update={"content":"different run concern"})
+    store.apply_issues(other.run_id,[second],[transition])
+    with pytest.raises(StateError,match="ambiguous"):
+        store.get_record("I1")
+    assert store.get_record("I1",run_id=run.run_id)["content"]=="unresolved concern"
+    assert store.get_record("I1",run_id=other.run_id)["content"]=="different run concern"
+    with pytest.raises(StateError,match="^record_missing$"):
+        store.get_record("I1",run_id="not_this_run")
+
+def test_read_record_unknown_ids_and_versions_have_one_missing_error(store):
+    card=store.save_card(card_payload())
+    assert store.get_record(card.card_id,1)["card_id"]==card.card_id
+    for identifier,version in (("campaign_missing",None),("run_missing",None),("issue_missing",None),("anything",None),(card.card_id,999)):
+        with pytest.raises(StateError,match="^record_missing$"):
+            store.get_record(identifier,version)

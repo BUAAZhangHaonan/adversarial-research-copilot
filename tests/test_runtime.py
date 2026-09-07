@@ -379,6 +379,13 @@ async def test_web_excerpt_then_full_read_upgrades_same_original_without_protoco
     source=store.get_source(short['source_ids'][0])
     assert source.content_complete and store.get_record(source.source_id)['content']=='abcdefghijk'
     assert store.read_artifact(old_path)=='abcdefg'
+    reread=await tool.handler({'url':body['url'],'max_chars':7},
+        {'run_id':SUBJECT['run_id'],'raw_response_artifact_path':'tools/short-again.raw.json'})
+    assert reread['source_ids']==complete['source_ids']
+    assert reread['sources'][0]['content']=='abcdefg'
+    assert reread['sources'][0]['content_complete'] is False
+    assert reread['sources'][0]['registered_content_complete'] is True
+    assert store.get_record(source.source_id)['content']=='abcdefghijk'
 
 
 @pytest.mark.asyncio
@@ -517,4 +524,44 @@ async def test_unknown_nested_input_evidence_rejected_before_model_admission(tmp
         await runtime.invoke('investigator','INVOKE',{'nested':{'new_evidence_ids':['not_registered']}},
             Result,SUBJECT,'task_fixture')
     assert not requests and not ledger.list_calls()
+    await runtime.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('exists', [True, False])
+async def test_local_record_read_returns_campaign_or_explicit_missing_error(tmp_path, exists):
+    from arc.runtime import build_tools
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[])
+    campaign=store.create_campaign('Current controlled question')
+    tool=build_tools(store)['read_record']
+    result=await tool.handler({'record_id':campaign.campaign_id if exists else 'not_registered'}, {'run_id':SUBJECT['run_id']})
+    if exists:
+        assert result['campaign_id']==campaign.campaign_id and result['topic']==campaign.topic
+    else:
+        assert result['is_error'] is True and result['error']=='record_missing'
+    assert not requests and not ledger.list_calls()
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_local_read_processing_failure_resumes_without_new_tool_admission(tmp_path):
+    from arc.runtime import build_tools
+    from arc.store import StateError
+    parts=[{'index':0,'id':'local_read','type':'function','function':{'name':'read_record',
+             'arguments':json.dumps({'record_id':'not_registered'})}}]
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(finish='tool_calls',tools=parts),sse(json.dumps(answer()))])
+    runtime.tools=build_tools(store)
+    original=store.get_record
+    def broken(*args,**kwargs):raise StateError('simulated_local_read_failure')
+    store.get_record=broken
+    with pytest.raises(RuntimePaused,match='TOOL_LOCAL_PROCESSING_FAILED'):
+        await invoke(runtime,tool_profile=['read_record'])
+    task=store.get_task('task_fixture');state=json.loads(store.read_artifact(task.response_artifact_path))
+    original_call=state['pending_tool']
+    assert ledger.get_call(original_call)['state']=='SETTLED' and len(requests)==1
+    assert task.status=='PAUSED_PROTOCOL'
+    store.get_record=original
+    assert (await invoke(runtime,tool_profile=['read_record'])).result.value=='valid'
+    assert len(requests)==2 and len(ledger.list_calls())==3
+    assert runtime.tool_trace('task_fixture')[0]['call_id']==original_call
+    assert runtime.tool_trace('task_fixture')[0]['status']=='error'
     await runtime.close()
