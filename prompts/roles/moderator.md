@@ -18,3 +18,9 @@ Choose next_action:
 Do not use a score threshold, elapsed round count, remaining budget, or a repeated phrase to certify convergence. The runtime enforces limits independently. Do not append [JUDGE_DECISION], STOP tags or YAML controls outside the JSON.
 
 Return assessment, next_action, stop_reason, concise_ruling, issue_transitions, updated_issues, decisive_evidence_ids, proposed_card_revision, external_test_requirements, and direction_change when applicable. State the exact card version being judged. A budget or protocol pause is not a scientific rejection.
+
+## Runtime claim version assignment and issue targets
+
+When an existing claim's text, conditions, or kind changes, its version must increase. ARC preserves the original response and may derive a separate copy assigning original + 1 when the proposed version still equals the original. Already valid increments remain unchanged; regressions remain errors. This assignment changes no scientific text, evidence ID, issue status, resolution basis, or verification status, and cannot upgrade evidence for an earlier claim version.
+
+With the input claim_version_contract `same_round_new_issues_target_proposed_revision_v1`, every issue created in this round for a claim in proposed_card_revision refers to that proposed claim and its proposed version. ARC synchronizes such new references if it assigns that claim's version. Existing issue IDs keep their original claim/version targets; do not retarget them to a changed claim. Represent an objection to the revised claim as a separate new issue and explicitly account for the earlier issue. Without this input contract, ARC does not infer whether a new issue refers to the original or proposed claim. It pauses when such a reference would require an ambiguous version assignment.

@@ -23,7 +23,8 @@ def test_spec_assets_are_exact():
     assert len(blocks)==27
     for path,body in blocks:
         actual=(ROOT/path).read_text(encoding='utf-8')
-        additions={'prompts/roles/developer.md':'\n## IMPORT: preserve an explicitly supplied user question or proposal\n',
+        additions={'prompts/roles/moderator.md':'\n## Runtime claim version assignment and issue targets\n',
+                   'prompts/roles/developer.md':'\n## IMPORT: preserve an explicitly supplied user question or proposal\n',
                    'prompts/roles/investigator.md':'\n## Mechanical search trace mapping\n',
                    'prompts/common/output_protocol.md':'\n## Evidence request ownership\n',
                    'prompts/tools/read_record.md':'\n## Cached source coverage\n',

@@ -9,7 +9,8 @@ from .config import Settings
 from .schemas import RESULT_SCHEMAS, Subject, CardDraft, ProblemAnchor
 from .store import StateError
 from .runtime import RuntimePaused
-from .validation import ProtocolViolation, validate_archive_comparisons, validate_selection, validate_revision
+from .validation import (ProtocolViolation, validate_archive_comparisons, validate_selection,
+                         validate_revision, derive_claim_versions, PROPOSED_ISSUE_VERSION_CONTRACT)
 
 
 @dataclass
@@ -40,6 +41,37 @@ class WorkflowEngine:
         state.update(updates)
         self.store.update_run(run_id, state=state)
         return state
+
+    def revision_with_claim_versions(self, run_id, key, original, result):
+        run = self.store.get_run(run_id)
+        payload = run.state.get('task_inputs', {}).get(key, {}).get('payload', {})
+        derived, changes, references = derive_claim_versions(
+            original, result, prior_issues=payload.get('issues', []),
+            new_issue_contract=payload.get('claim_version_contract') == PROPOSED_ISSUE_VERSION_CONTRACT)
+        if not changes:
+            return derived
+        tasks = [self.store.get_task(task_id) for task_id in self.trace_tasks(run_id, key)]
+        audit = {'schema_version': 'arc.claim_versions.v1', 'run_id': run_id, 'task_key': key,
+                 'original_card_id': original.card_id, 'original_card_version': original.version,
+                 'source_tasks': [{'task_id': task.task_id,
+                                   'response_artifact_path': task.response_artifact_path}
+                                  for task in tasks if task is not None],
+                 'version_changes': changes, 'reference_updates': references,
+                 'derived_result': data(derived), 'verification_transferred': False}
+        path = f'runs/{run_id}/claim-version-derivations/{key}.json'
+        content = json.dumps(audit, ensure_ascii=False, sort_keys=True)
+        try:
+            previous = self.store.read_artifact(path)
+        except FileNotFoundError:
+            self.store.save_artifact(path, content)
+        else:
+            if previous != content:
+                raise ProtocolViolation('CLAIM_VERSION_DERIVATION_CHANGED')
+        paths = dict(run.state.get('claim_version_derivations', {}))
+        if paths.get(key) != path:
+            paths[key] = path
+            self.checkpoint(run_id, claim_version_derivations=paths)
+        return derived
 
     def context(self, run_id):
         run = self.store.get_run(run_id)
@@ -435,6 +467,7 @@ class WorkflowEngine:
                 raise WorkflowPause('PAUSED_PROTOCOL', 'revision_required')
             if revision.proposed_revision.problem_anchor != original.draft.problem_anchor:
                 raise WorkflowPause('PAUSED_PROTOCOL', 'problem_anchor_changed_without_scope_audit')
+            revision = self.revision_with_claim_versions(run_id, 'development', original, revision)
             validate_revision(self.store, original, revision)
             card = self.store.save_card(revision.proposed_revision, card_id=original.card_id,
                                         parent_version=original.version, creation_key=f'{run_id}.development.card')
@@ -481,6 +514,7 @@ class WorkflowEngine:
             })
             ruling = await self.call(run_id, f'round{number}.moderator', 'moderator', payload={
                 **self.context(run_id), 'proposer': data(proposer), 'skeptic': data(skeptic),
+                'claim_version_contract': PROPOSED_ISSUE_VERSION_CONTRACT,
             })
             if ruling.proposed_card_revision is not None:
                 run = self.store.get_run(run_id)
@@ -488,6 +522,7 @@ class WorkflowEngine:
                 card = self.store.get_card(original_subject['card_id'], original_subject['card_version'])
                 if ruling.proposed_card_revision.problem_anchor != card.draft.problem_anchor:
                     raise WorkflowPause('PAUSED_PROTOCOL', 'problem_anchor_changed')
+                ruling = self.revision_with_claim_versions(run_id, f'round{number}.moderator', card, ruling)
                 self.store.validate_claim_dependencies(card, ruling.proposed_card_revision)
                 revised = self.store.save_card(ruling.proposed_card_revision,
                                                 card_id=card.card_id, parent_version=card.version,

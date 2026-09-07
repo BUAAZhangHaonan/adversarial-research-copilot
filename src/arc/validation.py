@@ -1,9 +1,64 @@
 """Structural evidence gates, never keyword-based scientific scoring."""
-from .schemas import LibrarianResult, SelectorResult, DeveloperResult, ProposerResult, SkepticResult, Envelope
+from .schemas import LibrarianResult, SelectorResult, DeveloperResult, ModeratorResult, ProposerResult, SkepticResult, Envelope
 
 
 class ProtocolViolation(ValueError):
     """A typed response violates a cross-record research contract."""
+
+
+PROPOSED_ISSUE_VERSION_CONTRACT = 'same_round_new_issues_target_proposed_revision_v1'
+
+
+def derive_claim_versions(original, result, *, prior_issues=(), new_issue_contract=False):
+    """Assign omitted increments in a copy; never transfer evidence or judgments."""
+    if isinstance(result, DeveloperResult):
+        field = 'proposed_revision'
+    elif isinstance(result, ModeratorResult):
+        field = 'proposed_card_revision'
+    else:
+        raise TypeError('claim_version_derivation_requires_revision_result')
+    derived = result.model_copy(deep=True)
+    draft = getattr(derived, field)
+    changes, references = [], []
+    if draft is None:
+        return derived, changes, references
+    old = {claim.claim_id: claim for claim in original.draft.claims}
+    for claim in draft.claims:
+        previous = old.get(claim.claim_id)
+        if previous is None:
+            continue
+        changed_fields = [name for name in ('text', 'conditions', 'kind')
+                          if getattr(previous, name) != getattr(claim, name)]
+        # Regressions stay invalid. Already incremented versions stay untouched.
+        if changed_fields and claim.version == previous.version:
+            changes.append({'claim_id': claim.claim_id, 'original_version': previous.version,
+                            'submitted_version': claim.version, 'effective_version': previous.version + 1,
+                            'changed_fields': changed_fields})
+            claim.version = previous.version + 1
+    by_id = {change['claim_id']: change for change in changes}
+
+    def update(reference, path):
+        change = by_id.get(reference.claim_id)
+        if change and reference.claim_version == change['submitted_version']:
+            reference.claim_version = change['effective_version']
+            references.append({'path': path, 'claim_id': reference.claim_id,
+                               'submitted_version': change['submitted_version'],
+                               'effective_version': change['effective_version']})
+
+    if isinstance(derived, DeveloperResult):
+        for index, review in enumerate(derived.evidence_review):
+            update(review, f'evidence_review.{index}.claim_version')
+    else:
+        existing = {issue['issue_id'] if isinstance(issue, dict) else issue.issue_id
+                    for issue in prior_issues}
+        for index, issue in enumerate(derived.updated_issues):
+            change = by_id.get(issue.claim_id)
+            if (issue.issue_id not in existing and change
+                    and issue.claim_version == change['submitted_version']):
+                if not new_issue_contract:
+                    raise ProtocolViolation('CLAIM_VERSION_ISSUE_TARGET_AMBIGUOUS')
+                update(issue, f'updated_issues.{index}.claim_version')
+    return derived, changes, references
 
 
 def validate_role_targets(envelope: Envelope, payload: dict) -> None:
