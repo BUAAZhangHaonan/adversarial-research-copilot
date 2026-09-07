@@ -55,3 +55,21 @@ rejections, unresolved findings and costs. Inspect decisive source claims manual
 The automatic evaluator is an initial audit, not expert ground truth or proof of improvement.
 Report inconclusive comparisons honestly. Prompt changes require recorded failing output,
 diff and development-case recheck; no keyword blacklists or score-based stopping fixes.
+
+## Recorded execution continuation — before further paid stages
+
+The segmentation V3 run saved a natural card but stopped at an invalid novelty response
+after its one permitted repair. Preserve that result. Complete the explicitly labelled
+L2 question/proposal entries first. Then use the already fixed rendering development
+topic for one natural-chain attempt under `ARC_RENDERING_VALIDATION`, with the same
+default five-draw maximum, 20 CNY stages and original 100 CNY parent. This tests the
+recorded generic JSON/native-tool and request-ownership corrections on a different
+concrete investigation; it does not manually promote the segmentation card or repeat
+sampling until a favourable verdict appears.
+
+For L4, freeze registered original materials from segmentation V3 and, if available,
+the rendering attempt. Otherwise gather rendering materials with the existing fixed
+questions. Gather the fixed conflict holdout last, without prompt tuning on its results.
+Candidate and evaluator calls remain sequential, offline with respect to the frozen
+snapshot, at max effort. A protocol, source or budget stop is recorded as incomplete;
+no final report may turn that status into a successful quality comparison.
