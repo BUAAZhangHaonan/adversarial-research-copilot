@@ -182,6 +182,21 @@ def resume(ctx: typer.Context, run_id: str, add_budget_cny: Optional[str] = type
         ledger.add_budget(run.budget_account_id, add_budget_cny, reason='explicit_cli_budget_addition')
     asyncio.run(execute(ctx.obj, run_id))
 
+@app.command(name='retry-task')
+def retry_task(ctx: typer.Context, run_id: str, task_key: str = typer.Option(...),
+               reason: str = typer.Option(...)):
+    """显式重试失败的 Agent 任务；保留原记录、当前卡及预算。"""
+    from .retrying import prepare_task_retry
+    from .store import StateError
+    store, ledger = services(ctx.obj)
+    try:
+        retry = prepare_task_retry(store, ledger, run_id, task_key, reason)
+    except StateError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(json.dumps(retry, ensure_ascii=False))
+    asyncio.run(execute(ctx.obj, run_id))
+
+
 @app.command(name='import-card')
 def import_card(ctx: typer.Context, path: Path):
     """显式导入用户研究卡 JSON；不编造证据，不自动判通过。"""
