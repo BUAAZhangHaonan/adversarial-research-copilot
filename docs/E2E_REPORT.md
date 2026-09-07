@@ -1,14 +1,16 @@
 # 真实验收记录
 
-最新工程验证：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；git archive源码构建的wheel/sdist、独立安装及 `/tmp` 资源/CLI检查均通过。Rendering调查的零新增调用恢复已成功，19条findings登记。历史5e3830c的290项/54.28s及首次 `duplicate_source_reference` 恢复失败保留在下文。
+记录边界：本页工程证据及运行状态保留为 `d0d7459` 文档时点的历史记录，截止三笔预算追加之前；“暂停”“运行中”和未勾选项均指该时点，不代表最终续跑结果。最新执行状态与费用以 `docs/VALIDATION_SNAPSHOT.json`、`docs/COST_REPORT.md`、`docs/L4_REPORT.md` 及最终续跑记录为准；相应最终材料未落地前不预填结果。三笔追加授权见 [BUDGET_EXTENSION_AUTHORIZATION.md](BUDGET_EXTENSION_AUTHORIZATION.md)。
+
+d0d7459归档的工程验证：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；git archive源码构建的wheel/sdist、独立安装及 `/tmp` 资源/CLI检查均通过。Rendering调查的零新增调用恢复已成功，19条findings登记。历史5e3830c的290项/54.28s及首次 `duplicate_source_reference` 恢复失败保留在下文。
 
 本文件按层级分开工程契约、真实接口、自然研究卡贯穿和自动质量对照。自动判断不是人类认可，PROMISING 不是实验成功。本报告中的独立原文复核由Codex检查已保存材料完成，也不代表人类研究者认可。
 
-截至2026-09-07本次更新：Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty一次结构修复后仍为INVALID_OUTPUT_AFTER_REPAIR，没有accepted novelty。明确标记的软件输入develop停于预算准入，独立run因反复空读在新请求边界由开发者暂停。Rendering shared_investigation在bac3659下由已保存响应与实际搜索trace恢复为ACCEPTED；原raw及研究字段不改，只机械派生actual_searches，未新增模型/工具调用。随后自然卡v1已保存，draw1.novelty在PENDING时因阶段预留不足停为PAUSED_BUDGET，selector未执行。L4已按计划启动，首个segmentation ARC.frame技术暂停，direct-Pro在冻结快照中仍运行，尚无完整对照结果；L2未全部完成，L3未完成，L4未完成。
+截至d0d7459文档时点、三笔预算追加前：Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty一次结构修复后仍为INVALID_OUTPUT_AFTER_REPAIR，没有accepted novelty。明确标记的软件输入develop停于预算准入，独立run因反复空读在新请求边界由开发者暂停。Rendering shared_investigation在bac3659下由已保存响应与实际搜索trace恢复为ACCEPTED；原raw及研究字段不改，只机械派生actual_searches，未新增模型/工具调用。随后自然卡v1已保存，draw1.novelty在PENDING时因阶段预留不足停为PAUSED_BUDGET，selector未执行。L4已按计划启动，首个segmentation ARC.frame技术暂停，direct-Pro在冻结快照中仍运行，尚无完整对照结果；L2未全部完成，L3未完成，L4未完成。
 
 ## L1：工程与安装包
 
-- 最新代码快照：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`。由该HEAD的git archive构建wheel/sdist，在独立 `.venv-wheel` 安装并从 `/tmp` 运行 `work/check_installed.py` 与 `arc --help` 均通过；日志 `work/wheel-build-bac3659.log`、`work/wheel-install-bac3659.log`、`work/wheel-help-bac3659.log`。
+- 该历史文档对应的代码快照：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`。由该HEAD的git archive构建wheel/sdist，在独立 `.venv-wheel` 安装并从 `/tmp` 运行 `work/check_installed.py` 与 `arc --help` 均通过；日志 `work/wheel-build-bac3659.log`、`work/wheel-install-bac3659.log`、`work/wheel-help-bac3659.log`。
 - 历史快照：`5e3830cc65d462afb6420ae9860d57e4f7b55aaf`，290 tests / 54.28s，`work/tests-provenance.log`及 `work/wheel-*-5e3830c.log` 记录整套与独立安装通过。
 - 历史快照：`535357d`，283 tests passed / 52.08s，日志 `work/tests-claim-source.log`。该HEAD经git archive构建wheel/sdist并独立安装，从 `/tmp` 验证CLI和包资源；日志 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`。Windows此前快照282 tests / 427.42s不作为最终283项的记录。
 - 历史快照：`0f66f56`，263 tests passed / 48.55s，远端日志 `work/tests-json-tools.log`。该HEAD独立wheel验证通过，日志为 `work/wheel-build-0f66f56.log`、`work/wheel-install-0f66f56.log`、`work/wheel-help-0f66f56.log`。源码归档构建后在独立 `.venv-wheel` 安装，从 `/tmp` 检查CLI、0.2.0版本、prompt/报告/配置资源，避免仓库cwd掩盖漏打包。
@@ -20,7 +22,7 @@
 - 核心提交：66d998f；快照/继承/包资源：c09e0b9；真实本地读取与原文缓存修复：2f76f4c。修复后的完整测试日志：`work/final-tests.log`。
 - 离线覆盖 B01–B18 的证据映射见 IMPLEMENTATION_AUDIT。模拟/合成 fixture 不冒充真实研究证据。
 
-## L2：已完成的接口与恢复部分，三入口尚未完成
+## L2历史记录：接口与恢复部分已完成，三入口在当时尚未完成
 
 早期两次真实协议probe均使用max、thinking enabled、384000输出上限、完整流式usage和JSON协议；没有发送thinking模式不接受的tool_choice。响应均stop，返回模型别名与请求一致。别名不能单独证明实际模型权重版本。这是早期无联合工具要求的探针记录，后来的完整组合验证单独列在下表之后。
 
@@ -60,7 +62,7 @@
 
 开发验证库只重建来源唯一约束；全表逐行hash、201条source ID/JSON、账本与研究历史均不变，foreign_key_check/integrity_check通过。完整备份在 `.arc-validation/backups/source-constraints-20260907T033403919560Z.sqlite`；审计位于 artifacts 的 `maintenance/source-constraints-20260907T033403919560Z.json`。失败调用 `tool_1b6022b9e50d4fbda52da37761958f70` 的raw被本地重解析，不重发MCP；任务schema/prompt/model/effort均未改变。
 
-以上为V2调查过程中的历史修复。最新停点及V3已观察到的失败见下文；目前没有完成自然卡三阶段链，也没有完成L4，不能将这些接口成功写成L2三入口或L3/L4通过。
+以上为V2调查过程中的历史修复。其后历史停点及V3已观察到的失败见下文；在d0d7459时点没有完成自然卡三阶段链，也没有完成L4，不能将这些接口成功写成L2三入口或L3/L4通过。
 
 ## V2证据失败与V3校准验证
 
@@ -90,7 +92,7 @@ V3原最终回复不是JSON；一次格式修复后返回complete，但3个前�
 
 卡保存暂停时的状态快照：V3子账户163调用，人民币2.877053–2.887771，reserved=0。这是V3 child的费用，不是100元开发父账户累计总额，也不是随后恢复的最终费用。
 
-## eda3965恢复结果与当前真实边界
+## eda3965恢复结果与当时的真实边界
 
 - **背景依据与定向验证分开。** 不同claim ID之间可以引用背景证据，workflow/report公开binding且 `verification_transferred=false`；同ID旧version仍拒绝。定向EvidenceRecord新增 `target_claim_fingerprint`，覆盖ID/version/text/conditions/kind，不含evidence IDs。empirical resolution包括同card/run历史版本都要求指纹匹配，防止跨卡同名C1混用。
 - **请求归属按冻结上下文检查。** pre-card请求只需真实run/task，没有campaign的独立proposal也允许；如填写claim/issue/draw，必须在该任务冻结输入中可见。
@@ -114,7 +116,7 @@ develop的import、fresh_verification、development、round1 proposer/skeptic已
 
 535357d使claims必填；删除复核需旧版本和非空说明；明确的结构化claim/issue引用限制在当前卡与ledger；read_record保留原文总长并区分缓存分页，对无正文来源明确要求补取。没有把自由文本强行解释为ID，没有添加固定调用次数或关键词停机规则。旧付费响应、卡与判断不补回不重写。详见 [CLAIM_AND_SOURCE_FIXES](CLAIM_AND_SOURCE_FIXES.md)。
 
-新渲染自然链 `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover` 按预登记主题与默认五次上限启动，使用新代码与新bundle，仍属原100元父账本。其最新shared_investigation停点见下节；不能以离线修复证明真实科研链通过。
+新渲染自然链 `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover` 按预登记主题与默认五次上限启动，使用新代码与新bundle，仍属原100元父账本。其历史shared_investigation停点见下节；不能以离线修复证明真实科研链通过。
 
 ## Rendering：来源ID复写错误、重复命中误拒与成功恢复
 
@@ -128,22 +130,24 @@ Task `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.shared_inv
 
 `bac3659`的禁止新增模型/工具动作恢复已通过：shared_investigation为 `ACCEPTED`，error=None，19条findings已登记；原始raw及除actual_searches外的研究字段完全不变，repair_count=1，new_model_or_tool_calls=0。恢复窗口父账本保持1157调用、人民币18.981215–18.992283、reserved=0。审计路径相对于 `.arc-validation/artifacts/`：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`；normalization审计hash为 `16cd9bf3476c7e3c032d3b24b245708b2fe9c1e63d5847a625d40a8f5be540e4`。该账本快照不包含随后已恢复的自然抽卡新增调用。
 
-上述零调用恢复后，自然抽卡继续至卡保存；最新预算停点如下。19条摘录登记仍不代表全部科学、许可或可行性主张成立。
+上述零调用恢复后，自然抽卡继续至卡保存；追加授权前的预算停点如下。19条摘录登记仍不代表全部科学、许可或可行性主张成立。
 
-L2完整入口、L3自然同卡链、L4同材料对照和最终费用汇总仍未完成。只恢复机械检索记录不能作为科学通过或完成整个discover的依据。
+在d0d7459时点，L2完整入口、L3自然同卡链、L4同材料对照和最终费用汇总尚未完成。只恢复机械检索记录不能作为科学通过或完成整个discover的依据。
 
-## Rendering自然卡的预算停点与L4启动
+## d0d7459追加前记录：Rendering预算停点与L4启动
 
 Rendering自然run已保存 `card_52bce58017164c2b9594c418eb0cac7b` v1，共10条claims，题目为T-LESS固定场景外观/几何覆盖轴正交归因。frame/shared/archive/next/compose/card_archive均为ACCEPTED；draw1.novelty仍为PENDING，run停为 `PAUSED_BUDGET / budget_not_admitted`，没有accepted novelty，selector未执行。
 
 该阶段子账为140调用、人民币4.209140–4.209176、reserved=0；剩余15.790824低于下一次Pro完整请求15.912预留。这是请求发起前的预算准入暂停，并未花完20元，也不是科研否决。父入口快照为1231调用、人民币21.887283–21.898374、reserved=0、remaining=78.101626；父余额不替代阶段独立上限，未将父账户剩余挪给该阶段。
 
-E2E_RESULT记录L2 discover为PAUSED_BUDGET、L3为not_completed、selected_card=null。L4已按EVAL_PLAN于2026-09-07 08:11:25 UTC启动，顺序为segmentation V3、rendering、固定conflict holdout；目前仅记录运行中，无评价结果。L2/L3/L4均不关闭。
+E2E_RESULT记录L2 discover为PAUSED_BUDGET、L3为not_completed、selected_card=null。L4已按EVAL_PLAN于2026-09-07 08:11:25 UTC启动，顺序为segmentation V3、rendering、固定conflict holdout；该快照只记录启动后的运行中状态，无完整评价结果，不能据此关闭L2/L3/L4；不将它当成追加授权后的最终状态。
 
-真实报告在隔离目录重建的审计为 `work/report-check-bac3659/arc-vnext-validation-20260907.explicit_input.develop/AUDIT_RESULT.json`：7条引用均属于同一run，跨run引用数为0；研究记录hash及PAUSED_BUDGET状态保持不变。因此，本次真实重建只证明所观察报告重建不改变研究状态；跨run链接真实分支未观测，目前仅有 `tests/test_reports.py` 的 test_cross_run_report_resolves_only_referenced_inherited_evidence 等真实Store离线回归证据。
+真实报告在隔离目录重建的审计为 `work/report-check-bac3659/arc-vnext-validation-20260907.explicit_input.develop/AUDIT_RESULT.json`：7条引用均属于同一run，跨run引用数为0；研究记录hash及PAUSED_BUDGET状态保持不变。因此，本次真实重建只证明所观察报告重建不改变研究状态；跨run链接真实分支未观测，该快照仅有 `tests/test_reports.py` 的 test_cross_run_report_resolves_only_referenced_inherited_evidence 等真实Store离线回归证据。
 
 ## 启动SSH退出后的独立进程存活与L4首个技术停点
 
 真实独立进程验证见 `work/ssh-detached-verification.json`。2026-09-07 08:11:25 UTC通过nohup启动PID 3797713，启动SSH正常exit 0（退出码由主线程当时观察，审计文件明确未独立重采）。08:13:11与08:14:06 UTC的新连接均观察到PPID=1、SID=3797713，启动launcher已退出。首个ARC.frame原始请求 `call_82f4d131de9f41b6a5fca6a7dd588846` 与唯一repair `call_d83ed0a8652e4413b50fa5eeb88a6c6a` 均已完整返回并SETTLED，随后direct-Pro.compose的 `call_89dc686a52714b32aa5c72d343ff7f55` 实际进入IN_FLIGHT。它证明独立ARC进程在启动SSH正常退出后继续工作；不证明强制断网、provider流式断流恢复或实际超过24小时。
 
 该首个segmentation V3对照的ARC.frame首次正文为空，唯一repair返回blocked，最终 `PAUSED_EXTERNAL / frozen_material_blocked`，没有accepted frame；ARC子账为人民币1.323994–1.323996。这个记录是技术失败，不是科研否决。08:14:06 UTC冻结快照中direct-Pro仍运行，尚无完整对照或质量评价结果；后续L4结果另行记录。
+
+恢复时间范围：任务书要求取消任意“24小时后不可续跑”的失效规则，并验证旧状态可恢复。test_response_saved_survives_parse_failure_and_old_date与test_response_saved_before_validation_recovers_locally_after_long_pause使用旧日期和重建runtime验证该工程契约；它们不宣称真实等待过24小时，也不把额外等待设为新的验收阻塞。SSH正常退出后的真实存活证据另按上文范围记录。

@@ -1,5 +1,7 @@
 # ARC vNext 实现审计
 
+记录边界：本页工程证据及运行状态保留为 `d0d7459` 文档时点的历史记录，截止三笔预算追加之前；“暂停”“运行中”和未勾选项均指该时点，不代表最终续跑结果。最新执行状态与费用以 `docs/VALIDATION_SNAPSHOT.json`、`docs/COST_REPORT.md`、`docs/L4_REPORT.md` 及最终续跑记录为准；相应最终材料未落地前不预填结果。三笔追加授权见 [BUDGET_EXTENSION_AUTHORIZATION.md](BUDGET_EXTENSION_AUTHORIZATION.md)。
+
 验收契约：`EXECUTION_SPEC.md`，含附录 A–D。用户目标是得到有依据、有增量、可检验的研究卡及可行性分析；实验实施与论文由人完成。
 
 ## 版本与隔离
@@ -8,13 +10,13 @@
 
 采用 Typer/Pydantic、OpenAI SDK、官方 MCP SDK 2.x、Jinja StrictUndefined、SQLite 和文件。移除旧自制通信协议、关键词/分数控制、重复 reviewer 循环和旧 pipeline/chat-mode。删除清单为 `docs/REMOVED_TRACKED_FILES.json`，仅含受控旧实现；迁移见 `MIGRATION.md`。
 
-当前代码验证基准为 `bac3659512f2bae137b8a0241b71c64c17ff3549`（机械搜索来源、重复命中、报告继承与实际查证契约修复）：326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；该提交git archive构建的独立wheel/sdist及 `/tmp` 安装资源/CLI验证通过。历史5e3830c为290项/54.28s及独立安装通过；535357d为283项/52.08s，日志work/tests-claim-source.log。Windows此前282项/427.42s是更早快照；0f66f56的263项/48.55s、2b8b79a的258项/46.23s和eda3965的255项/47.29s均保留为历史验证，不将文档提交当作已测代码版本。
+d0d7459历史文档对应的代码验证基准为 `bac3659512f2bae137b8a0241b71c64c17ff3549`（机械搜索来源、重复命中、报告继承与实际查证契约修复）：326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；该提交git archive构建的独立wheel/sdist及 `/tmp` 安装资源/CLI验证通过。历史5e3830c为290项/54.28s及独立安装通过；535357d为283项/52.08s，日志work/tests-claim-source.log。Windows此前282项/427.42s是更早快照；0f66f56的263项/48.55s、2b8b79a的258项/46.23s和eda3965的255项/47.29s均保留为历史验证，不将文档提交当作已测代码版本。
 
-## 当前真实验收停点
+## d0d7459追加预算前的真实验收停点
 
 Flash/Pro均已完成JSON、native tools、thinking/max、384000输出上限和stream的联合真实探针。每模型两次模型请求、一次实际read_record、repair_count=0，最终finish_reason=stop，均为COMPLETED。它们共用原100元父账户；实际请求ID、工具ID、费用及原件指针见 [JSON_TOOL_PROTOCOL](JSON_TOOL_PROTOCOL.md) 与 [E2E_REPORT](E2E_REPORT.md)。该读取是run元数据，不能代替影响科研争点的新证据。
 
-L2显式软件输入develop当前为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡。Rendering自然run的shared_investigation已在bac3659下零新增调用恢复为ACCEPTED并登记19条findings，随后自然卡v1已保存，draw1.novelty在PENDING时因阶段预留不足暂停，selector未执行；最新停点见下文。
+L2显式软件输入develop在该历史快照中为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡。Rendering自然run的shared_investigation已在bac3659下零新增调用恢复为ACCEPTED并登记19条findings，随后自然卡v1已保存，draw1.novelty在PENDING时因阶段预留不足暂停，selector未执行；追加授权前的停点见下文。
 
 V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty。L2三入口尚未全部完成，L3自然同卡未完成；L4同材料对照已按计划启动，尚无结果。已有工程测试和联合探针不能关闭这些验收项。
 
@@ -61,7 +63,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 ## B01–B18 审阅问题
 
-以下状态指替换实现及回归覆盖，不声称已在旧基线逐一复现。旧版87项测试通过仅是基线记录。测试名称已经对本地 `work/arc-vnext/tests/` 函数定义核对；replaced 不等于真实 L2/L3/L4 已通过。本文件的矩阵和当前状态是本次交付核对依据，未纳入受控交付的旧核对草稿不作为最新验收记录。
+以下状态指替换实现及回归覆盖，不声称已在旧基线逐一复现。旧版87项测试通过仅是基线记录。测试名称已经对本地 `work/arc-vnext/tests/` 函数定义核对；replaced 不等于真实 L2/L3/L4 已通过。本文件矩阵和d0d7459历史状态是该次交付核对依据，未纳入受控交付的旧核对草稿不作为最新验收记录。
 
 | ID | 状态 | 替换实现与具体测试 |
 |---|---|---|
@@ -115,7 +117,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 | 判断边界 | replaced；`tests/test_selection.py` 六类测试及 test_required_knowledge_gates_cannot_be_marked_not_applicable、test_not_applicable_is_allowed_only_for_stitching_check；`tests/test_contracts.py`：test_reasonable_unperformed_experiment_can_be_promising_handoff。 | 合成例验证门槛，不验证实际科学判断正确。 |
 | 预算 | replaced；`tests/test_budget.py`：test_five_draws_share_one_stage_budget_and_resume、test_parent_includes_all_child_stages_and_own_calls、test_unknown_attempt_preserves_reservation_and_retry_is_separate；`tests/test_pricing.py`：test_tariff_boundary_and_reasoning_is_not_double_billed、test_missing_cache_and_usage_keep_conservative_upper；`tests/test_mcp.py`：test_unobservable_cost_blocks_before_session。 | 已知服务上界不能冒称正式逐请求发票。 |
 | 完成当前回复 | replaced；`tests/test_runtime.py`：test_budget_admission_precedes_draw_callback_and_no_dynamic_shortening、test_nonempty_invalid_finish_never_accepted_or_repaired；`tests/test_pricing.py`：test_full_context_joint_upper_covers_both_long_input_and_long_output。 | 不故意烧光20元制造真实边界；完整读取在mock精确测。 |
-| 恢复 | replaced（离线）；`tests/test_workflows.py`：test_resume_reuses_proposer_skeptic_and_long_context_tail；`tests/test_runtime.py`：test_successful_tool_reused_after_next_request_budget_pause、test_response_saved_before_validation_recovers_locally_after_long_pause、test_corrupt_snapshot_refuses_resume_without_new_model_request；`tests/test_prompts.py`：test_resumed_repair_uses_frozen_markdown_not_live_templates。 | confirmed_fixed：work/ssh-detached-verification.json证明启动SSH正常退出后独立进程继续完成真实响应/repair并开始下一任务。blocked：实际超过24小时、强制断网及provider断流恢复仍未实测；旧时间戳测试只证明没有时间硬过期。 |
+| 恢复 | replaced（离线）；`tests/test_workflows.py`：test_resume_reuses_proposer_skeptic_and_long_context_tail；`tests/test_runtime.py`：test_successful_tool_reused_after_next_request_budget_pause、test_response_saved_before_validation_recovers_locally_after_long_pause、test_corrupt_snapshot_refuses_resume_without_new_model_request；`tests/test_prompts.py`：test_resumed_repair_uses_frozen_markdown_not_live_templates。 | confirmed_fixed：work/ssh-detached-verification.json证明启动SSH正常退出后独立进程继续完成真实响应/repair并开始下一任务。工程恢复已覆盖旧日期、保存响应和重建runtime，不含实际等待24小时；后者不是新增验收阻塞。强制断网及provider断流恢复未实测，作为证据范围保留。 |
 | 证据 | confirmed_fixed / replaced；`tests/test_mcp.py`：test_strict_arguments_and_untrusted_urls；`tests/test_store.py`：test_missing_or_invented_source_and_excerpt_are_rejected、test_secondary_analysis_cannot_be_marked_original_or_verified、test_source_mirrors_share_canonical_identity_not_independent_evidence、test_same_named_claims_on_different_cards_cannot_transfer_target_evidence；`tests/test_selection.py`：test_covered_work_cannot_borrow_verified_evidence_from_another_source。 | exact摘录不证明复合主张成立，见V3_EVIDENCE_REVIEW。 |
 | 上下文 | replaced；`tests/test_workflows.py`：test_context_contains_only_relevant_evidence_not_entire_archive、test_resume_reuses_proposer_skeptic_and_long_context_tail；`tests/test_store.py`：test_full_original_preserves_decisive_condition_at_long_document_end、test_same_chinese_title_does_not_collide_and_archive_is_paginated；`tests/test_runtime.py`：test_native_tool_reasoning_association_and_trace、test_service_adapter_registers_original_without_truncating_paper。 | 没有量化声称中文召回率或实际token节省。 |
 | 提示词 | replaced；`tests/test_prompts.py`：test_unregistered_or_missing_resources_fail_before_invocation、test_duplicate_manifest_and_undefined_variables_fail、test_data_is_never_a_template_and_repair_retains_semantic_contract、test_ast_checks_dict_tool_descriptions_and_raw_messages；`tests/test_runtime.py`：test_repair_cannot_invent_reference。 | AST只扫描生产ARC，不扫描第三方references。 |
@@ -123,7 +125,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 ## 附录 A–D 的独立核对
 
-附录A为already_fixed（原稿落地），共27份，而不是27个语义调用。`tests/test_prompts.py::test_spec_assets_are_exact` 从任务书独立提取并逐文件比较。当前23份全文相等，developer/investigator/output_protocol/read_record四份保留完整原稿前缀后追加；本轮独立比较也检查这个边界。output_protocol归属说明随2b8b79a追加，read_record的Cached source coverage与metadata-only说明随535357d提交，均包含在当前326项测试中。本次source_recheck删除内联句子，不修改任何Markdown/schema，仍为23份全文相等与4份完整前缀。追加理由见PROMPT_INVENTORY/PROMPT_CALIBRATION/CLAIM_AND_SOURCE_FIXES；不把四份追加文件称为全文仍与附录相等。
+附录A为already_fixed（原稿落地），共27份，而不是27个语义调用。`tests/test_prompts.py::test_spec_assets_are_exact` 从任务书独立提取并逐文件比较。该代码快照中23份全文相等，developer/investigator/output_protocol/read_record四份保留完整原稿前缀后追加；本轮独立比较也检查这个边界。output_protocol归属说明随2b8b79a追加，read_record的Cached source coverage与metadata-only说明随535357d提交，均包含在该快照326项测试中。本次source_recheck删除内联句子，不修改任何Markdown/schema，仍为23份全文相等与4份完整前缀。追加理由见PROMPT_INVENTORY/PROMPT_CALIBRATION/CLAIM_AND_SOURCE_FIXES；不把四份追加文件称为全文仍与附录相等。
 
 | 附录编号 | 仓库内文件 |
 |---|---|
@@ -162,7 +164,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 ## 安装包的独立验证
 
-当前 `bac3659` 的受控git archive源码已分别构建wheel和sdist，并在独立 `.venv-wheel` 安装后从 `/tmp` 执行 `work/check_installed.py` 与 `arc --help`，CLI及prompt/报告/配置资源均通过。远端日志为 `work/wheel-build-bac3659.log`、`work/wheel-install-bac3659.log`、`work/wheel-help-bac3659.log`；它与326项整套测试对应同一代码提交。历史5e3830c和535357d的整套与独立安装结果分别为290项/54.28s、283项/52.08s，不能反向覆盖后续修复。
+该历史快照 `bac3659` 的受控git archive源码已分别构建wheel和sdist，并在独立 `.venv-wheel` 安装后从 `/tmp` 执行 `work/check_installed.py` 与 `arc --help`，CLI及prompt/报告/配置资源均通过。远端日志为 `work/wheel-build-bac3659.log`、`work/wheel-install-bac3659.log`、`work/wheel-help-bac3659.log`；它与326项整套测试对应同一代码提交。历史5e3830c和535357d的整套与独立安装结果分别为290项/54.28s、283项/52.08s，不能反向覆盖后续修复。
 
 历史安装快照：`eda3965` 从受控git archive源码构建wheel及sdist，产物位于远端 `work/release-dist-eda3965/`，日志为 `work/wheel-build-eda3965.log`、`work/wheel-install-eda3965.log`、`work/wheel-help-eda3965.log`。在独立 `.venv-wheel` 安装后，从 `/tmp` 执行 `work/check_installed.py`，确认0.2.0版本、15个登记语义prompt及报告/配置资源可加载，OpenAI 2.54.0、MCP 2.1.1。该验证不依赖仓库cwd或pytest的pythonpath；结果由主线程实际运行记录，本轮没有再次安装或远端写入。
 
@@ -174,7 +176,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 附录 B5 的完整输入/恢复检查有直接测试：tests/test_runtime.py 的 test_nested_existing_input_evidence_manifest_and_actual_dependency_snapshot、test_corrupt_snapshot_refuses_resume_without_new_model_request、test_changed_sdk_environment_requires_explicit_fork；tests/test_prompts.py 的 test_production_prompt_boundary 扫描 ARC AST，test_ast_boundary_rejects_illegal_calls_and_ignores_third_party 明确排除第三方目录。这些检查与单纯搜索提示词关键字不同。
 
-§11 的“超过24小时”恢复使用旧日期和重建 runtime 的离线模拟：test_response_saved_survives_parse_failure_and_old_date、test_response_saved_before_validation_recovers_locally_after_long_pause。它们不证明已经等候24小时。独立的work/ssh-detached-verification.json现已记录启动SSH正常退出后，从新连接观察ARC继续完成响应并开始下一任务；该精确定义的SSH退出存活已实测，不扩大为强制断网或provider流式断流恢复。
+§7.4取消任意“24小时后不可续跑”的失效规则，§11要求验证超过24h仍可恢复。对应工程测试使用旧日期和重建runtime：test_response_saved_survives_parse_failure_and_old_date、test_response_saved_before_validation_recovers_locally_after_long_pause。它们验证无任意失效及保存状态恢复，不声称实际等候24小时；任务书没有把额外等待24小时设为新的发布阻塞。独立的work/ssh-detached-verification.json现已记录启动SSH正常退出后，从新连接观察ARC继续完成响应并开始下一任务；该精确定义的SSH退出存活已实测，不扩大为强制断网或provider流式断流恢复。
 
 IMPLEMENTATION_CHECKLIST 的 D1 勾选代表已提交版本的替换实现与离线工程检查，不能代替 §11 全部真实场景；E0、E1a、E1b分别记录计划、协议探针和三入口数据传递。具体测试版本、运行状态与费用以 E2E_REPORT 和最终账本报告为准，不用历史测试数量推断待提交修复的结果。
 
@@ -210,7 +212,7 @@ V3原最终回复不是JSON；仅一次格式修复后返回complete，但3个�
 
 引用正确不等于科学判断正确。[V3_EVIDENCE_REVIEW](V3_EVIDENCE_REVIEW.md)记录了原作者IoU删除公式与集合定义不符、模型颠倒下采样/形态学操作顺序、章节标错，以及“稀疏大对象”与original/inference混写等问题。18条exact只证明摘录可定位，不能证明复合主张全部成立。
 
-卡保存暂停时V3子账户为163调用、人民币2.877053–2.887771、reserved=0；不是开发父账户总费用，也不是之后恢复的最终费用。eda3965恢复V3使用已有frame/shared/recheck/next/compose检查点，不重付这些已保存步骤；卡已保存不等于完成选择。最新新颖性暂停时V3子账为人民币4.529248–4.539975，与前述163调用的历史卡保存停点分开；当前没有accepted novelty。L2三入口、L3自然同卡和L4对照仍未全部完成。
+卡保存暂停时V3子账户为163调用、人民币2.877053–2.887771、reserved=0；不是开发父账户总费用，也不是之后恢复的最终费用。eda3965恢复V3使用已有frame/shared/recheck/next/compose检查点，不重付这些已保存步骤；卡已保存不等于完成选择。在当时新颖性暂停时V3子账为人民币4.529248–4.539975，与前述163调用的历史卡保存停点分开；该快照没有accepted novelty。L2三入口、L3自然同卡和L4对照仍未全部完成。
 
 `0f66f56`另修复有native tools时遗漏JSON模式：所有语义请求统一发送response_format=json_object，保留thinking/max、384000及stream，不加入tool_choice，不修改预算或单次结构修复上限。`tests/test_runtime.py` 的 test_native_tool_reasoning_association_and_trace、test_native_json_output_invalid_or_empty_keeps_single_repair_policy覆盖完整请求与非法/空正文；实际双模型联合探针随后通过。这不会把原V3失败任务变为accepted，也不保证模型科学判断正确。
 
@@ -229,20 +231,20 @@ V3原最终回复不是JSON；仅一次格式修复后返回complete，但3个�
 
 `bac3659`的禁止新增模型/工具动作恢复已通过：shared_investigation为 `ACCEPTED`，error=None，19条findings已登记；原始raw及除actual_searches外的研究字段完全不变，repair_count=1，new_model_or_tool_calls=0。恢复窗口父账本保持1157调用、人民币18.981215–18.992283、reserved=0。审计路径相对于 `.arc-validation/artifacts/`：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`；normalization审计hash为 `16cd9bf3476c7e3c032d3b24b245708b2fe9c1e63d5847a625d40a8f5be540e4`。该账本快照不包含随后已恢复的自然抽卡新增调用。
 
-上述恢复是真实本地恢复证据，不是重新生成科研内容，也不关闭L2/L3/L4。后续自然抽卡已到卡保存及新颖性预算准入暂停；本次只勾选工程与已完成的受控恢复，完整流程、质量对照、实际超过24小时、强制断网/provider断流恢复以及最终父账本结算仍缺相应验收记录；启动SSH正常退出后的独立进程存活另已实测。
+上述恢复是真实本地恢复证据，不是重新生成科研内容，也不关闭L2/L3/L4。后续自然抽卡已到卡保存及新颖性预算准入暂停；本次只勾选工程与已完成的受控恢复，在该历史时点，完整流程、质量对照及最终父账本结算尚缺验收记录；实际等待24小时、强制断网/provider断流未实测只限定证据范围，不扩大验收要求；启动SSH正常退出后的独立进程存活另已实测。
 
-## 最新自然阶段与报告验证边界
+## d0d7459追加前的自然阶段与报告验证边界
 
 Rendering自然run已保存 `card_52bce58017164c2b9594c418eb0cac7b` v1，共10条claims，题目为T-LESS固定场景外观/几何覆盖轴正交归因。frame/shared/archive/next/compose/card_archive均为ACCEPTED；draw1.novelty仍为PENDING，run停为 `PAUSED_BUDGET / budget_not_admitted`，没有accepted novelty，selector未执行。
 
 该阶段子账为140调用、人民币4.209140–4.209176、reserved=0；剩余15.790824低于下一次Pro完整请求15.912预留。这是请求发起前的预算准入暂停，并未花完20元，也不是科研否决。父入口快照为1231调用、人民币21.887283–21.898374、reserved=0、remaining=78.101626；父余额不替代阶段独立上限，未将父账户剩余挪给该阶段。
 
-E2E_RESULT记录L2 discover为PAUSED_BUDGET、L3为not_completed、selected_card=null。L4已按EVAL_PLAN于2026-09-07 08:11:25 UTC启动，顺序为segmentation V3、rendering、固定conflict holdout；目前仅记录运行中，无评价结果。L2/L3/L4均不关闭。
+E2E_RESULT记录L2 discover为PAUSED_BUDGET、L3为not_completed、selected_card=null。L4已按EVAL_PLAN于2026-09-07 08:11:25 UTC启动，顺序为segmentation V3、rendering、固定conflict holdout；该快照只记录启动后的运行中状态，无完整评价结果；不能由该历史记录关闭L2/L3/L4，也不将它作为追加后的最终状态。
 
-真实报告在隔离目录重建的审计为 `work/report-check-bac3659/arc-vnext-validation-20260907.explicit_input.develop/AUDIT_RESULT.json`：7条引用均属于同一run，跨run引用数为0；研究记录hash及PAUSED_BUDGET状态保持不变。因此，本次真实重建只证明所观察报告重建不改变研究状态；跨run链接真实分支未观测，目前仅有 `tests/test_reports.py` 的 test_cross_run_report_resolves_only_referenced_inherited_evidence 等真实Store离线回归证据。
+真实报告在隔离目录重建的审计为 `work/report-check-bac3659/arc-vnext-validation-20260907.explicit_input.develop/AUDIT_RESULT.json`：7条引用均属于同一run，跨run引用数为0；研究记录hash及PAUSED_BUDGET状态保持不变。因此，本次真实重建只证明所观察报告重建不改变研究状态；跨run链接真实分支未观测，该快照仅有 `tests/test_reports.py` 的 test_cross_run_report_resolves_only_referenced_inherited_evidence 等真实Store离线回归证据。
 
 ## 启动SSH退出后的独立进程存活
 
 真实独立进程验证见 `work/ssh-detached-verification.json`。2026-09-07 08:11:25 UTC通过nohup启动PID 3797713，启动SSH正常exit 0（退出码由主线程当时观察，审计文件明确未独立重采）。08:13:11与08:14:06 UTC的新连接均观察到PPID=1、SID=3797713，启动launcher已退出。首个ARC.frame原始请求 `call_82f4d131de9f41b6a5fca6a7dd588846` 与唯一repair `call_d83ed0a8652e4413b50fa5eeb88a6c6a` 均已完整返回并SETTLED，随后direct-Pro.compose的 `call_89dc686a52714b32aa5c72d343ff7f55` 实际进入IN_FLIGHT。它证明独立ARC进程在启动SSH正常退出后继续工作；不证明强制断网、provider流式断流恢复或实际超过24小时。
 
-验收状态为confirmed_fixed（独立进程跨启动SSH正常退出继续运行）。首个frame的PAUSED_EXTERNAL不影响该进程存活证据，也不能被写成接受了科研frame或完成了L4。实际24小时仍未验证，L2/L3/L4未关闭。
+验收状态为confirmed_fixed（独立进程跨启动SSH正常退出继续运行）。首个frame的PAUSED_EXTERNAL不影响该进程存活证据，也不能被写成接受了科研frame或完成了L4。未实际等待24小时仅是证据范围说明，不是额外验收阻塞。L2/L3/L4在该历史时点未关闭，最终状态另见顶部所列记录。
