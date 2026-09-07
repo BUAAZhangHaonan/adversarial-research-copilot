@@ -4,6 +4,7 @@ from __future__ import annotations
 import anyio
 import ipaddress
 import os
+import re
 import shlex
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -18,6 +19,13 @@ from mcp.client.sse import sse_client
 
 class MCPFailure(RuntimeError):
     pass
+
+
+class ToolArgumentError(MCPFailure):
+    """Recoverable argument structure errors, distinct from access-policy failures."""
+    def __init__(self, code, details):
+        super().__init__(code)
+        self.details = details
 
 
 @dataclass(frozen=True)
@@ -57,13 +65,33 @@ def model_schema(schema: dict) -> dict:
 
 def validate_arguments(parameters: dict, arguments: dict) -> None:
     if not isinstance(arguments, dict):
-        raise MCPFailure('TOOL_ARGUMENTS_NOT_OBJECT')
+        raise ToolArgumentError('TOOL_ARGUMENTS_NOT_OBJECT',
+                                [{'path': [], 'validator': 'type', 'expected': 'object'}])
     # Omitted additionalProperties in MCP does not authorize ARC metadata.
     allowed = set(parameters.get('properties', {}))
     if set(arguments) - allowed:
-        raise MCPFailure('TOOL_ARGUMENTS_UNDECLARED')
-    if list(Draft202012Validator(parameters).iter_errors(arguments)):
-        raise MCPFailure('TOOL_ARGUMENTS_SCHEMA')
+        raise ToolArgumentError('TOOL_ARGUMENTS_UNDECLARED',
+            [{'path': [key], 'validator': 'additionalProperties', 'expected': False}
+             for key in sorted(set(arguments) - allowed)])
+    errors = list(Draft202012Validator(parameters).iter_errors(arguments))
+    if errors:
+        def details(error):
+            path = list(error.absolute_path)
+            editable = [path]
+            if error.validator == 'required' and isinstance(error.instance, dict):
+                editable = [path + [key] for key in error.validator_value if key not in error.instance]
+            elif error.validator == 'additionalProperties' and isinstance(error.instance, dict):
+                properties = error.schema.get('properties', {})
+                patterns = error.schema.get('patternProperties', {})
+                editable = [path + [key] for key in error.instance
+                            if key not in properties and not any(re.search(p, key) for p in patterns)]
+            elif error.validator in {'anyOf', 'oneOf', 'allOf', 'not', 'if', 'dependentRequired'}:
+                # A compound failure does not identify which otherwise valid fields may change.
+                editable = []
+            return {'path': path, 'validator': error.validator,
+                    'expected': error.validator_value, 'editable_paths': editable}
+        raise ToolArgumentError('TOOL_ARGUMENTS_SCHEMA',
+                                [details(error) for error in errors])
     def check(value):
         if isinstance(value, dict):
             for item in value.values(): check(item)
