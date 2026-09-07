@@ -59,3 +59,7 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data retry
 支持ARC的frame/family/compose/novelty/selection，direct-Pro的compose/novelty/selection，以及evaluator的judge。只为指定技术失败或blocked步骤创建新任务版本，成功步骤与候选不重抽；needs_evidence科学结果不能通过这个入口重抽。冻结材料、原提示词bundle、旧响应和费用保持不变，新任务接收结构化错误与原响应，工具仍禁用。
 
 已存在的验证父账户复用其明确授权，新对照账户使用settings.budget_cny（默认20元），不会将已有账户强行重置为100元或覆盖已批准的阶段额度。
+
+## 原文不可得时的引文撤回
+
+原文复核仍要求对每个失败来源执行真实的 read_record。若返回明确为零缓存、需要重新抓取的元数据记录，Agent 可以撤回该来源的全部原文引述：每条对应 finding 必须为 source_unavailable、unresolved、inference、excerpt=null，并填写访问限制。满足这些条件后继续科学评审，不把“正文不存在”误判为“没有执行读取”。未读取、仍保留验证引文、未明确披露限制的输出继续拒绝；原失败、原始响应和费用记录保留。此处允许记录未知，不意味着补齐证据或自动通过科学结论。

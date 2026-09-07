@@ -311,11 +311,30 @@ class WorkflowEngine:
                     targets.add(finding['source_id'])
         if not targets:
             raise WorkflowPause('PAUSED_PROTOCOL', 'source_recheck_has_no_failed_source')
-        reread = {item['result']['source_id']
-                  for item in self.runtime.tool_trace(recheck['replacement_task_id'])
-                  if item.get('status') == 'completed' and item.get('name') == 'read_record'
-                  and item.get('result', {}).get('content')
-                  and item['result'].get('source_id') == item.get('arguments', {}).get('record_id')}
+        reads = [item['result']
+                 for item in self.runtime.tool_trace(recheck['replacement_task_id'])
+                 if item.get('status') == 'completed' and item.get('name') == 'read_record'
+                 and item.get('result', {}).get('source_id')
+                 and item['result']['source_id'] == item.get('arguments', {}).get('record_id')]
+        reread = {record['source_id'] for record in reads if record.get('content')}
+        # A source with no cached body cannot yield a verified quote. Permit an
+        # explicit withdrawal after reading its availability record; the missing
+        # evidence remains unresolved for the subsequent scientific decision.
+        unavailable = {record['source_id'] for record in reads
+                       if not record.get('content') and record.get('requires_source_fetch') is True
+                       and record.get('cached_content_chars') == 0}
+        if set(targets) - reread and unavailable:
+            task = self.store.get_task(recheck['replacement_task_id'])
+            result = (task.accepted_result or {}).get('result', {}) if task else {}
+            for source_id in (set(targets) - reread) & unavailable:
+                findings = [finding for finding in result.get('findings', []) + result.get('contrary_findings', [])
+                            if finding.get('source_id') == source_id]
+                if findings and result.get('source_access_limits') and all(
+                        finding.get('locator_status') == 'source_unavailable'
+                        and finding.get('relation') == 'unresolved'
+                        and finding.get('origin') == 'inference'
+                        and finding.get('excerpt') is None for finding in findings):
+                    reread.add(source_id)
         if not set(targets).issubset(reread):
             raise WorkflowPause('PAUSED_EXTERNAL', 'source_recheck_original_not_read')
 
