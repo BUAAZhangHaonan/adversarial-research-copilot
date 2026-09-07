@@ -30,6 +30,26 @@ def digest(value) -> str:
     return hashlib.sha256(encoded(value).encode()).hexdigest()
 
 
+def correction_counts(state):
+    """Read old checkpoints without granting another use of an exhausted category."""
+    if 'repair_counts' in state:
+        return dict(state['repair_counts'])
+    tool_used = bool(state.get('tool_correction') or state.get('repair_kind') == 'tool_arguments')
+    json_used = bool(state.get('repair_snapshot_path') or
+                     (state.get('repair_count') and not tool_used))
+    return {'tool_arguments': int(tool_used), 'output_json': int(json_used)}
+
+
+def spend_correction(state, kind):
+    counts = correction_counts(state)
+    if counts[kind]:
+        raise ValueError('CORRECTION_CATEGORY_EXHAUSTED')
+    counts[kind] = 1
+    state['repair_counts'] = counts
+    state['repair_count'] = sum(counts.values())
+    state['repair_kind'] = kind
+
+
 def derive_investigator_searches(envelope, tool_trace):
     """Derive execution facts without changing the model's research fields."""
     from .schemas import InvestigatorResult, SearchTrace
@@ -478,6 +498,7 @@ class Runtime:
             record.environment_snapshot_hash = hashlib.sha256(environment.encode()).hexdigest()
             self.store.save_artifact(record.environment_snapshot_path, environment)
             state = {'messages': rendered.messages, 'calls': [], 'tool_trace': [], 'repair_count': 0,
+                     'repair_counts': {'tool_arguments': 0, 'output_json': 0},
                      'pending_model': None, 'pending_tool': None, 'response': None, 'tools': functions,
                      'original_tools': functions,
                      'subject': subject_data, 'prompt_hash': rendered.prompt_hash,
@@ -545,7 +566,7 @@ class Runtime:
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
             except (ValueError, ValidationError) as exc:
-                if state['repair_count']:
+                if correction_counts(state)['output_json']:
                     record.error = 'INVALID_OUTPUT_AFTER_REPAIR'
                     self._checkpoint(record, state, 'PAUSED_PROTOCOL')
                     raise RuntimePaused('PAUSED_PROTOCOL', record.error) from exc
@@ -556,8 +577,7 @@ class Runtime:
                 repaired = self.loader.render_repair(snapshot, data, schema=envelope_type.model_json_schema(),
                     previous_response=message.get('content'), validation_errors=errors)
                 state['messages'] = repaired.messages
-                state['repair_count'] = 1
-                state['repair_kind'] = 'output_json'
+                spend_correction(state, 'output_json')
                 state['response'] = None
                 state['tools'] = []
                 state['prompt_hash'] = repaired.prompt_hash
@@ -665,14 +685,13 @@ class Runtime:
         # Preparing a partially executed batch is idempotent on recovery.
         if correction and correction['original_response_id'] == response_id:
             return
-        if state['repair_count']:
+        if correction_counts(state)['tool_arguments']:
             self._pause_tool_correction(record, state, 'TOOL_ARGUMENTS_INVALID_AFTER_CORRECTION')
         try:
             instruction = self.loader.render_tool_correction(self._load_prompt_snapshot(record), failures)
         except ValueError as exc:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
-        state['repair_count'] = 1
-        state['repair_kind'] = 'tool_arguments'
+        spend_correction(state, 'tool_arguments')
         state['tool_correction'] = {'phase': 'preparing', 'original_response_id': response_id,
                                     'failures': failures, 'instruction': instruction}
         self._checkpoint(record, state, 'RESPONSE_SAVED')

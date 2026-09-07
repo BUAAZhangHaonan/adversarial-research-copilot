@@ -268,20 +268,29 @@ async def test_completed_sibling_and_saved_correction_survive_restart(tmp_path, 
 
 
 @pytest.mark.asyncio
-async def test_tool_correction_consumes_the_json_repair_allowance(tmp_path):
+@pytest.mark.parametrize('json_fixed', [True, False])
+async def test_tool_and_json_have_independent_single_corrections(tmp_path, json_fixed):
     runtime, store, ledger, requests, executed = fixture(tmp_path, [
         tool_response(native('bad_original', INVALID)),
         tool_response(native('corrected_call', CORRECTED)),
         sse('{broken'),
+        sse(json.dumps(answer()) if json_fixed else '{still broken'),
     ])
-    with pytest.raises(RuntimePaused, match='INVALID_OUTPUT_AFTER_REPAIR'):
-        await invoke(runtime, tool_profile=['read_record'])
-    assert len(requests) == 3 and len(executed) == 1 and saved(store)['repair_count'] == 1
+    if json_fixed:
+        assert (await invoke(runtime, tool_profile=['read_record'])).result.value == 'valid'
+    else:
+        with pytest.raises(RuntimePaused, match='INVALID_OUTPUT_AFTER_REPAIR'):
+            await invoke(runtime, tool_profile=['read_record'])
+    assert len(requests) == 4 and len(executed) == 1 and saved(store)['repair_count'] == 2
+    assert saved(store)['repair_counts'] == {'tool_arguments': 1, 'output_json': 1}
+    assert 'tools' not in requests[-1]
     await runtime.close()
 
 
+
+
 @pytest.mark.asyncio
-async def test_json_repair_does_not_grant_a_second_tool_correction(tmp_path):
+async def test_final_json_repair_cannot_restart_research_tools(tmp_path):
     runtime, store, ledger, requests, executed = fixture(tmp_path, [
         sse('{broken'), tool_response(native('bad_original', INVALID)),
     ])
