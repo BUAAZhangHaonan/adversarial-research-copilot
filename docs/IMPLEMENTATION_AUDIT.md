@@ -8,7 +8,15 @@
 
 采用 Typer/Pydantic、OpenAI SDK、官方 MCP SDK 2.x、Jinja StrictUndefined、SQLite 和文件。移除旧自制通信协议、关键词/分数控制、重复 reviewer 循环和旧 pipeline/chat-mode。删除清单为 `docs/REMOVED_TRACKED_FILES.json`，仅含受控旧实现；迁移见 `MIGRATION.md`。
 
-最近已提交并完成整套验证的版本为 `eda3965`：255 tests passed / 47.29s，日志 `work/tests-claim-bindings.log`，独立wheel安装验证也已通过。此前 `acc012a` 的238项/43.04s、`a8ddc5a` 的220项/42.42s与独立wheel验证、`b7b3df9` 的211项测试均为历史快照。V3已恢复卡保存，但新颖性核查在一次结构修复后仍以INVALID_OUTPUT_AFTER_REPAIR停止，尚无accepted novelty；工程测试不表示L2/L3/L4已经完成。随后工作树的L4边界/随机种子与请求归属追加通过258项测试/46.23s，日志work/tests-evaluation-ownership.log；它与eda3965已提交快照分开，正在准备的JSON/native tools修复尚未真实验证。
+当前代码验证基准为 `535357d08667ee192e246f8de0a126de0a544f0d`（主张续接、结构化目标及缓存/metadata-only来源修复）：283 tests passed / 52.08s，日志 `work/tests-claim-source.log`；该提交git archive构建的独立wheel/sdist及 `/tmp` 安装资源验证通过。本次文档更新起点为 `3f6026f`，不将文档提交当作另一个已测代码版本。Windows此前282项/427.42s是较早快照；0f66f56的263项/48.55s、2b8b79a的258项/46.23s和eda3965的255项/47.29s均为历史验证。
+
+## 当前真实验收停点
+
+Flash/Pro均已完成JSON、native tools、thinking/max、384000输出上限和stream的联合真实探针。每模型两次模型请求、一次实际read_record、repair_count=0，最终finish_reason=stop，均为COMPLETED。它们共用原100元父账户；实际请求ID、工具ID、费用及原件指针见 [JSON_TOOL_PROTOCOL](JSON_TOOL_PROTOCOL.md) 与 [E2E_REPORT](E2E_REPORT.md)。该读取是run元数据，不能代替影响科研争点的新证据。
+
+L2显式软件输入develop当前为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡；535357d的新run真实验证刚开始，尚无最终结果。
+
+V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty。L2三入口尚未全部完成，L3自然同卡和L4同材料对照仍未完成；已有工程测试和联合探针不能关闭这些验收项。
 
 ## 十八项决定逐条对应
 
@@ -98,7 +106,7 @@
 
 ## §11 离线矩阵逐行核对
 
-以下为 `eda3965` 整合测试所支持的范围。实现与测试的文件名均为仓库相对路径；不把模拟模型的答案当成真实科研证据。
+以下既有回归及新增主张/来源反例均包含在 `535357d` 的283项整合测试中。实现与测试的文件名均为仓库相对路径；不把模拟模型的答案当成真实科研证据。
 
 | 矩阵行 | 状态 / 文件与回归证据 | 未被该测试证明的部分 |
 |---|---|---|
@@ -115,7 +123,7 @@
 
 ## 附录 A–D 的独立核对
 
-附录A为already_fixed（原稿落地），共27份，而不是27个语义调用。`tests/test_prompts.py::test_spec_assets_are_exact` 从任务书四反引号块独立提取并逐文件比较。当前工作树24份全文相等，investigator/developer/output_protocol三份保留完整原稿前缀后追加协议；本轮独立比较也检查了这个边界。output_protocol的请求归属说明是eda3965之后的追加，已计入随后工作树258项测试，不能归入该提交255项测试的已验证范围。追加项见PROMPT_INVENTORY/PROMPT_CALIBRATION，不声称当前三文件仍与原稿全文相等。
+附录A为already_fixed（原稿落地），共27份，而不是27个语义调用。`tests/test_prompts.py::test_spec_assets_are_exact` 从任务书独立提取并逐文件比较。当前23份全文相等，developer/investigator/output_protocol/read_record四份保留完整原稿前缀后追加；本轮独立比较也检查这个边界。output_protocol归属说明随2b8b79a追加，read_record的Cached source coverage与metadata-only说明随535357d提交，均包含在当前283项测试中。追加理由见PROMPT_INVENTORY/PROMPT_CALIBRATION/CLAIM_AND_SOURCE_FIXES；不把四份追加文件称为全文仍与附录相等。
 
 | 附录编号 | 仓库内文件 |
 |---|---|
@@ -154,7 +162,9 @@
 
 ## 安装包的独立验证
 
-`eda3965` 从受控git archive源码构建wheel及sdist，产物位于远端 `work/release-dist-eda3965/`，日志为 `work/wheel-build-eda3965.log`、`work/wheel-install-eda3965.log`、`work/wheel-help-eda3965.log`。在独立 `.venv-wheel` 安装后，从 `/tmp` 执行 `work/check_installed.py`，确认0.2.0版本、15个登记语义prompt及报告/配置资源可加载，OpenAI 2.54.0、MCP 2.1.1。该验证不依赖仓库cwd或pytest的pythonpath；结果由主线程实际运行记录，本轮没有再次安装或远端写入。
+当前 `535357d` 的受控git archive源码已分别构建wheel和sdist，并在独立环境从 `/tmp` 验证CLI及安装后的prompt/报告/配置资源。远端日志为 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`；它与283项整套测试对应同一代码提交，独立.venv-wheel从/tmp加载安装资源。
+
+历史安装快照：`eda3965` 从受控git archive源码构建wheel及sdist，产物位于远端 `work/release-dist-eda3965/`，日志为 `work/wheel-build-eda3965.log`、`work/wheel-install-eda3965.log`、`work/wheel-help-eda3965.log`。在独立 `.venv-wheel` 安装后，从 `/tmp` 执行 `work/check_installed.py`，确认0.2.0版本、15个登记语义prompt及报告/配置资源可加载，OpenAI 2.54.0、MCP 2.1.1。该验证不依赖仓库cwd或pytest的pythonpath；结果由主线程实际运行记录，本轮没有再次安装或远端写入。
 
 `pyproject.toml` 显式打包arc、arc_prompt_assets、arc_config_assets及Markdown/JSON/YAML；`tests/test_prompts.py::test_installed_package_loads_from_other_directory` 是另一个本地资源回归，不能单独替代上面的独立wheel验证。
 
@@ -194,10 +204,14 @@ V3原最终回复不是JSON；仅一次格式修复后返回complete，但3个�
 
 后续draw1.next通过，COMPOSE已ACCEPTED并生成 `clm_meas_01` 至 `clm_meas_07` 的version 1草稿；save_card却因 `claim_evidence_version_mismatch` 暂停。9处引用均是不同claim ID之间的背景依据，不是同ID旧版本证据偷渡。这是卡保存的工程停点，不是科研否决。原件、旧草稿和EvidenceRecord没有被手工改写。
 
-新提交 `eda3965` 区分两类关系：跨ID背景引用合法并在workflow/report公开binding，`verification_transferred`始终为false；同ID旧version仍拒绝。定向EvidenceRecord新增 `target_claim_fingerprint`，覆盖ID/version/text/conditions/kind而不包含evidence IDs；empirical resolution对同card/run历史版本也要求指纹匹配，防止不同卡恰好使用C1时错误继承验证。
+历史修复 `eda3965` 区分两类关系：跨ID背景引用合法并在workflow/report公开binding，`verification_transferred`始终为false；同ID旧version仍拒绝。定向EvidenceRecord新增 `target_claim_fingerprint`，覆盖ID/version/text/conditions/kind而不包含evidence IDs；empirical resolution对同card/run历史版本也要求指纹匹配，防止不同卡恰好使用C1时错误继承验证。
 
 同批修复允许pre-card请求仅绑定真实run/task，包括没有campaign的独立proposal；非空claim/issue/draw必须在冻结输入中可见。source_recheck必须使用其自身 `read_record` 的 `result.source_id`、非空content与 `arguments.record_id` 对上目标，不能只看顶层source_ids（真实read_record该字段为[]）。这批修改已通过255项整合测试；V3恢复后卡已保存；随后新颖性核查一次结构修复后仍有三个request目标均为null，最终INVALID_OUTPUT_AFTER_REPAIR，未产生accepted novelty。后续角色仍未完成。
 
 引用正确不等于科学判断正确。[V3_EVIDENCE_REVIEW](V3_EVIDENCE_REVIEW.md)记录了原作者IoU删除公式与集合定义不符、模型颠倒下采样/形态学操作顺序、章节标错，以及“稀疏大对象”与original/inference混写等问题。18条exact只证明摘录可定位，不能证明复合主张全部成立。
 
 卡保存暂停时V3子账户为163调用、人民币2.877053–2.887771、reserved=0；不是开发父账户总费用，也不是之后恢复的最终费用。eda3965恢复V3使用已有frame/shared/recheck/next/compose检查点，不重付这些已保存步骤；卡已保存不等于完成选择。最新新颖性暂停时V3子账为人民币4.529248–4.539975，与前述163调用的历史卡保存停点分开；当前没有accepted novelty。L2三入口、L3自然同卡和L4对照仍未全部完成。
+
+`0f66f56`另修复有native tools时遗漏JSON模式：所有语义请求统一发送response_format=json_object，保留thinking/max、384000及stream，不加入tool_choice，不修改预算或单次结构修复上限。`tests/test_runtime.py` 的 test_native_tool_reasoning_association_and_trace、test_native_json_output_invalid_or_empty_keeps_single_repair_policy覆盖完整请求与非法/空正文；实际双模型联合探针随后通过。这不会把原V3失败任务变为accepted，也不保证模型科学判断正确。
+
+`535357d`已落实claims必填、删除claim需旧version和非空说明、Runtime只核对明确结构化当前claim/issue外键；proposer自由文字不按ID猜测。read_record保留有正文来源的原文总长/完整度，另公开缓存范围；metadata-only明确无正文且重复本地读不能补出正文。对应 `tests/test_claim_targets.py`、`tests/test_runtime.py` 的 test_partial_source_cache_end_preserves_original_coverage、test_metadata_only_source_reads_expose_missing_body_without_claiming_completeness，详细原件/测试映射见 [CLAIM_AND_SOURCE_FIXES](CLAIM_AND_SOURCE_FIXES.md)。这些离线与安装结果不证明新run已避免空读循环或完成科研判断，L2/L3/L4未完成标识保持。

@@ -2,11 +2,12 @@
 
 本文件按层级分开工程契约、真实接口、自然研究卡贯穿和自动质量对照。自动判断不是人类认可，PROMISING 不是实验成功。
 
-截至2026-09-07本次冻结：HEAD为 `0f66f56`，263项工程测试与独立wheel通过；Flash/Pro的JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty在一次结构修复后仍因三个request目标全null而停为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty或科研裁决。明确标记的软件输入 `explicit_input.develop` / `explicit_input.run` 正在进行L2验证，尚无结果；L2未全部完成，L3未完成，L4未执行。
+截至2026-09-07本次更新：代码 `535357d` 的283项工程测试与独立wheel通过；较早0f66f56的Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty或科研裁决。明确标记的软件输入develop停于预算准入，独立run因反复读取空正文而在新请求边界由开发者暂停。新渲染主题自然链正在验证535357d的通用数据契约修复；L2未全部完成，L3未完成，L4未执行。
 
 ## L1：工程与安装包
 
-- 最近已提交并完成整套验证的快照：`0f66f56`，263 tests passed / 48.55s，远端日志 `work/tests-json-tools.log`。该HEAD独立wheel验证通过，日志为 `work/wheel-build-0f66f56.log`、`work/wheel-install-0f66f56.log`、`work/wheel-help-0f66f56.log`。源码归档构建后在独立 `.venv-wheel` 安装，从 `/tmp` 检查CLI、0.2.0版本、prompt/报告/配置资源，避免仓库cwd掩盖漏打包。
+- 最新代码快照：`535357d`，283 tests passed / 52.08s，日志 `work/tests-claim-source.log`。该HEAD经git archive构建wheel/sdist并独立安装，从 `/tmp` 验证CLI和包资源；日志 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`。Windows此前快照282 tests / 427.42s不作为最终283项的记录。
+- 历史快照：`0f66f56`，263 tests passed / 48.55s，远端日志 `work/tests-json-tools.log`。该HEAD独立wheel验证通过，日志为 `work/wheel-build-0f66f56.log`、`work/wheel-install-0f66f56.log`、`work/wheel-help-0f66f56.log`。源码归档构建后在独立 `.venv-wheel` 安装，从 `/tmp` 检查CLI、0.2.0版本、prompt/报告/配置资源，避免仓库cwd掩盖漏打包。
 - `2b8b79a` 固定comparison.boundaries与shuffle_seed，并追加公共请求归属说明；对应258 tests / 46.23s，日志 `work/tests-evaluation-ownership.log`。冻结相同材料和匿名顺序是工程能力，此时并未运行L4质量对照。
 - 历史快照 `eda3965`：255 tests / 47.29s，日志 `work/tests-claim-bindings.log`，独立wheel验证通过。它修复背景证据绑定与目标指纹，后续V3卡保存恢复成功。
 - 历史快照 `acc012a`：238 tests passed / 43.04s。
@@ -95,6 +96,18 @@ V3原最终回复不是JSON；一次格式修复后返回complete，但3个前�
 
 该novelty停点的V3子账为人民币4.529248–4.539975。它比前述卡保存历史停点晚，但仍不是100元父账户总费用，亦不包含随后两个独立联合probe或L2软件输入阶段的子账。
 
-后续2b8b79a与0f66f56的协议修复已通过离线检查及两模型联合真实probe，但没有重写V3的失败任务或宣称它已获得新颖性通过。`arc-vnext-validation-20260907.explicit_input.develop` 与 `.explicit_input.run` 使用明确标记的软件验证输入，正验证两个独立入口，当前尚无终态结果。它们不属于自然发现卡，因此即便完成也只能补足相应L2证据，不能替代L3。
+后续2b8b79a与0f66f56的协议修复已通过离线检查及两模型联合真实probe，但没有重写V3的失败任务或宣称它已获得新颖性通过。`arc-vnext-validation-20260907.explicit_input.develop` 与 `.explicit_input.run` 使用明确标记的软件验证输入，结果见下文。它们不属于自然发现卡，因此即便完成也只能补足相应L2证据，不能替代L3。
 
-剩余验收是：L2三个入口和影响具体争点的真实补证记录，L3自然同卡的选择/develop/run链，L4冻结同材料的真实对照与人工复核，以及原父账本最终费用汇总。本次没有运行L4，也没有以probe、exact引文数量或自动评分代称研究质量提升。
+## 独立L2输入的实际停点与535357d修复
+
+develop的import、fresh_verification、development、round1 proposer/skeptic已保存，moderator未完成时触发 `PAUSED_BUDGET`。子账花费4.106986–4.107017元，剩余15.892983元，低于下一Pro完整请求15.912元预留。没有assessment；不是科学否决。上界核查与可用性限制见 [BUDGET_ADMISSION_REVIEW](BUDGET_ADMISSION_REVIEW.md)。
+
+人工复核发现development原始响应漏了claims键，旧schema静默补[]后保存v2；skeptic仍把背景evidence的旧claim ID当当前目标。另一争点将IoU=.80扩大为边界带近全覆盖，原文不足以支持；NucVerse3D只读取90000/124840字符，缓存尾被误认全文尾。它们都是尚无moderator裁决的失败证据，详见 [L2_EVIDENCE_REVIEW](L2_EVIDENCE_REVIEW.md)。
+
+独立run停于导入。固定轨迹抽查发现连续215次零正文read_record；最近40次是20个metadata-only来源各读两次，未取得新原文。开发者临时在仅该run的下一笔预算INSERT准入处设暂停，允许已开始的 `call_c3532cc771304bff85d163e3aad6cb69` 完整返回、保存、结算后拒绝下一工具请求。进程退出后移除临时限制；账户和授权hash未变，全部调用SETTLED，reserved/unknown均0，完整性/FK检查通过。子账654调用、6.464293–6.464552元。保存原ERROR/IntegrityError原因后，运行标为 `PAUSED_PROTOCOL / metadata_source_empty_read_loop_development_pause`。
+
+暂停审计位于 `.arc-validation/artifacts/maintenance/pause-empty-read-validation-20260907.json` 及 `pause-empty-read-validation-20260907-close.json`。这是开发者根据轨迹实施的控制暂停，不是产品自动检测循环，也没有截断响应、伪造费用或重置预算。
+
+535357d使claims必填；删除复核需旧版本和非空说明；明确的结构化claim/issue引用限制在当前卡与ledger；read_record保留原文总长并区分缓存分页，对无正文来源明确要求补取。没有把自由文本强行解释为ID，没有添加固定调用次数或关键词停机规则。旧付费响应、卡与判断不补回不重写。详见 [CLAIM_AND_SOURCE_FIXES](CLAIM_AND_SOURCE_FIXES.md)。
+
+新渲染自然链 `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover` 按预登记主题与默认五次上限启动，使用新代码与新bundle，仍属原100元父账本。目前剩余验收为L2完整入口、L3自然同卡链、L4冻结同材料对照与人工复核，以及最终费用汇总；不能以离线修复证明真实科研链通过。
