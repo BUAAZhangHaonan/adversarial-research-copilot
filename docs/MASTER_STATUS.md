@@ -1,53 +1,39 @@
-# ARC master 当前实施与验证状态
+# ARC master 当前状态
 
-2026-09-07。g203 正式源码为 `/home/g203/zhanghaonan/adversarial-research-copilot`，只维护 master。原有细粒度提交保持完整；没有新建分支、压缩、重写或合并提交。旧 detached 工作目录保留真实研究档案。
+2026-09-07。正式源码为 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，仅维护master；所有修复保留细粒度提交，不新建分支、不压缩历史。
 
-## 已实现
+## 工程完成情况
 
-- 34cc012：正式改进需求默认由用户评估、实施。CodeX 仅能显式参与开发评估，正式服务不依赖 CodeX。
-- 2e152b4：read_record 单次上限启用 64000 字符；分页、预算暂停及恢复不重放通过实际 Runtime 离线回归。
-- abc8ee2：每个 Agent 任务工具参数和最终 JSON 各一次纠错机会，分别持久化计数。这不限制 CodeX 开发修复。
-- 4563a55：内容、条件或类型改变却遗漏 claim 递增时，runtime 机械派生版本并保存来源审计。
-- bd3db80：移除新版主张中的同目标旧版本证据引用，重新调查并重评受影响裁决；原始输出、旧卡、旧证据不变。正常的有界补证仍可继续。
+01f9b02：全套440项测试通过，96.08秒。wheel/sdist构建成功；wheel独立安装后从仓库外验证CLI、模块、64000字符上限、独立纠错额度和提示词资产。日志为 `work/tests-closeout-final.log`、`work/package-build-final.log`、`work/package-install.log`。没有额外文件哈希校验。
 
-详细行为见 [PROTOCOL_CORRECTION.md](PROTOCOL_CORRECTION.md)。[版本修复记录](CLAIM_VERSION_SIDE_TASK.md)和[读取上限记录](READ_LIMIT_SIDE_TASK.md)已经更新为实施说明；历史评估保存在 Git 历史和私有需求档案中，不再保留失效的待执行步骤。
+- 34cc012：正式需求由用户评估实施，CodeX只在显式开发评估中参与。
+- 2e152b4：read_record上限64000字符，分页、预算及恢复验证。
+- abc8ee2：工具参数与最终JSON各一次纠错。
+- 4563a55 / bd3db80：机械补齐遗漏版本，移除旧版本引用后由Agent重新补证。
+- bbdfcad：完整JSON对象前缀的结构错误一次性诊断，原文不裁剪、不改写。
+- 8688741：用户显式创建失败任务的新版本，成功角色及预算复用。
+- 2cc0384 / b09c859：允许同轮新争点的合法补证请求，并将最终问题/目标/判断分支传递到调查。
+- 01f9b02：对未应用的锚点变更修订提供显式纠正入口；原锚点、原卡、旧响应和拒绝诊断保留。
 
-## 当前验证
+## 真实验收
 
-源码 bd3db80 的 g203 全套离线测试 **402 passed in 88.87s**。日志：`work/tests-evidence-reselection-final.log`。sdist/wheel 构建及仓库外独立安装通过，确认 64000 schema、独立纠错计数、正式用户评估及补证角色资产可用。
+自然卡为 `card_52bce58017164c2b9594c418eb0cac7b`。原 discover 已完成并保留 MAIN_REPORT v1；CodeX已按授权选卡，未卡在人工选卡审核。
 
-上一轮自然卡真实输出的只读回放已经通过完整修订校验：补齐一个 conditions 改变后遗漏的版本增量，移除两条 v2 claim 对各自 v1 证据的引用。旧失败响应、原卡 v1、PAUSED_PROTOCOL 状态不变。这项回放验证的是修订协议，不是新一轮真实科研判断。
+当前 `natural_runtime_versions_v2.develop` 已保存v3，原问题锚点与v2完全一致。protocol_retry2已接受，随后证据重核也已接受：8条支持findings、1条contrary finding均明确绑定claim v3；14次成功工具调用，工具参数纠错0次、JSON纠错1次。页面级核验与ZIP内容级待核仍区分保留。
 
-同卡真实验证已于 2026-09-07 13:40:28 UTC 启动：`arc-vnext-validation-20260907.natural_runtime_versions_v2.develop`，源码 bd3db80。develop 完成后选择其卡版本进入同前缀的 run；当前还未收到最终结果，不能宣称三阶段通过。日志：`work/live-runtime-version-validation.log`；最终结果：`work/runtime-version-validation-result.json`。
+当前停在 `round1.moderator.evidence_reassessment` 的预算准入（PENDING），**不是新的协议失败**。develop上限25元，已结算上界10.578927元，剩余14.421073元，小于下一次Pro完整输出预留15.912元。run尚未创建，因此同卡三阶段链仍未全部通过。精确状态见 [CURRENT_VALIDATION_SNAPSHOT.json](CURRENT_VALIDATION_SNAPSHOT.json)。
 
-## 已定位的直接原因
+已向用户提出并等待选择：本轮develop/run各临时上限50元，共享原100元父账本（推荐），或保持25元逐次审批，或以当前预算停点结束真实验证。未把默认推荐当成授权，也未追加第二笔develop预算。获准后可从现检查点继续，无须重跑已完成角色。
 
-此前停点不是无解：developer 提示词笼统称 runtime 创建版本，代码却要求模型给每条改变的 claim 递增。真实输出中两条已写 v2，另一条只改变 conditions 却仍写 v1。版本修复后又暴露了两条旧版本证据引用不匹配。以上已经实现修复，并没有通过追加模型修复次数或改写旧响应冒充成功。
+最初失败是JSON尾随字符、claims字段错层及漏字段；随后定位到同轮新争点被错误拒绝、补证请求未向下游传递，以及新增方法细节写入冻结锚点。均已有对应修复或用户明确的纠正任务，不把它们称为科学否决。具体响应指针和真实补证效果见 [RUNTIME_VERSION_LIVE_RESULT.md](RUNTIME_VERSION_LIVE_RESULT.md)。
 
-64000 未启用是此前被我留作可选支线，不是确认存在技术障碍；用户选择后已经完成工程验证并启用。
+父账户始终为 `arc-vnext-validation-20260907`，总上限100元，历史花费不重置。当前已结算快照为57.412830–57.562384元，预留0、未知调用0、父级剩余42.437616元；分项见 [COST_REPORT.md](COST_REPORT.md)。develop已按授权从20追加至25元；run的20→25条件授权尚未使用。正式默认仍每阶段20元。
 
-## develop 与 run 的历史停点（纠正路径实施前）
-
-| 运行 | 原因 | 已修或仍缺什么 |
-|---|---|---|
-| 自然卡develop | read_record请求limit=30000，公开上限为24000；执行前被拒绝。 | 参数校验正确，但运行时直接暂停，没有一次受控参数纠正反馈。 |
-| 旧explicit develop | 冻结的CardDraft schema缺少后来新增的必填claims；恢复返回TASK_DEPENDENCY_CHANGED_FORK_REQUIRED。 | 防止旧协议被冒充新成功；追加预算不能解决依赖变化，需要明确的新版本验证。 |
-| explicit schema v2 develop | 首稿JSON字段错层；一次修复后，affected_claims列了4条，但真正变化仅2条。 | 精确差集规则此前未充分告知模型，a14da30已补入Markdown。旧任务已经用过一次结构修复，不能随意增加重试或手工删两项后改判成功。 |
-| 旧explicit run | metadata-only来源被反复空读。 | 535357d已补充缓存范围与无正文说明；后续验证没有把旧运行改成成功。 |
-| explicit schema v2 run | 0张GPU却有正GPU-hours触发隐藏的跨字段校验；一次修复稿又成为非法JSON。 | 97d4766已把可表达的资源规则公开到schema；没有修改旧失败输出。 |
-| 最新schema v3 run | read_record请求limit=52265，超过已公开的24000上限；执行前被拒绝。 | 新schema已经实际发送，但工具参数错误仍无纠正路径，故run未完成。 |
-
-原件与更详细的错误定位见仓库中的FINAL_RUN_PROTOCOL_REVIEW、NATURAL_DEVELOP_PROTOCOL_REVIEW、REAL_TARGETED_RETRIEVAL_REVIEW和L2_SCHEMA_FORK_PROTOCOL_REVIEW。保留这些历史审计用于定位问题，不把它们当作当前开发指令。
-
-## 费用与人工审核
-
-本轮新验证沿用原100元父账本，不重置已发生费用。启动前总计46.833939–46.983457元、剩余53.016543元、预留0、未知调用0；develop/run 新账户各20元。所有后续请求仍串行、完整输出预算准入，不切换模型或缩减输出上限。
-
-原自然 discover 已给出一张 MAIN_REPORT 卡，CodeX 已在开发验证中记录选卡理由并让它进入后续阶段。不存在需要等待人工审核才能继续的停点。科学结论仍可能降级为 NEEDS_EVIDENCE 或需要实验；这与工程协议暂停分别报告。
-
-L4 旧三组对照尚无完整匿名评价，不能以本轮工程测试或单卡贯穿宣称质量对照通过，更不能据此声称 ARC 优于 direct-Pro。原记录见 [L4_REPORT.md](L4_REPORT.md)。
+L4三组旧对照尚无完整匿名评价，保持未完成，不声称ARC优于直接Pro。实验、训练、论文写作及材料访问限制仍由人处理。详细边界见 [DELIVERY.md](DELIVERY.md) 与 [L4_REPORT.md](L4_REPORT.md)。
 
 ## 清理与提交边界
+
+已清理本轮g203 `.pytest_cache` 与 `work/package-install-check` 安装测试环境，保留440项测试日志、安装核验记录和wheel/sdist。
 
 已将9份针对废弃pipeline/chat-mode/YAML控制的旧计划从当前树删除；81个旧生成报告停止版本跟踪，但服务器原件保留，历史提交也可追溯。参考项目、输入文档、密钥及真实验证数据库/文献不属于本地测试垃圾，不删除或发布。
 

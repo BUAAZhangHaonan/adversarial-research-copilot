@@ -39,3 +39,14 @@ L4旧三组质量对照仍未完成匿名评价；本轮单卡真实链即使完
 protocol_retry1 未消耗工具参数或JSON纠错，响应结构已合法。运行时曾以 `evidence_request_issue_id_not_supplied_to_task` 拒绝其对本轮新建 `issue_sk_cw_1` 的请求。2cc0384 允许完整moderator裁决引用自己声明且指向当前主张的新争点；未知目标与主张不匹配仍拒绝。b09c859 将完整裁决中的问题、文献目标和判断分支传递给实际调查，并只采用最终重评裁决的请求。保存原响应的零新增调用复核通过；该代码快照436项测试通过（95.11秒）。
 
 恢复后，protocol_retry1 的结构化结果被接受，但 proposed_card_revision 的 problem_anchor.conditions 增加了外观距离统计、几何档位预注册和测量路径细节，触发 `problem_anchor_changed`，卡v3尚未保存。这与最初JSON错层和旧版本证据问题不同。用户明确选择保持原锚点，让Agent把这些内容放回方法/测量字段，创建新的显式纠正任务；不由CodeX直接改科研文本，也不把它当作已经批准的研究转向。
+
+
+## 当前实际终点
+
+01f9b02代码快照全套440项测试通过（96.08秒），最终wheel/sdist与仓库外独立安装验证通过。安装临时环境和pytest缓存已删除，核验记录为 `work/release-verification-current.json`。
+
+protocol_retry2已接受并保存同卡v3；v3的problem_anchor与v2完全一致。随后 `round1.moderator.evidence_recheck` 接受8条findings及1条contrary finding，均针对 `claim_d1c_measurement_ambiguity` v3；成功工具调用14次，工具参数纠错0次、JSON纠错1次。重核确认页面级资产定位及测量族判断的依据仍可用，指出bop25均值键的措辞精度问题；未把页面与README核验升格为ZIP内容或实验可行性已验证。
+
+后续 moderator.evidence_reassessment 已创建为PENDING，但完整输出预算未准入：develop已花10.578927元，25元限额下只剩14.421073元，不足预留15.912元。父账户累计57.412830–57.562384元、剩余42.437616元，预留0、未知0。当前唯一运行阻碍是阶段预算；暂无新的协议错误。run尚未启动，不能声明三阶段贯穿通过。
+
+用户已收到本轮两阶段各临时上限50元、父级仍100元的推荐选项，尚未收到该项追加答复。此前20→25元授权保持有效且develop已使用；没有自行第二次追加或清零旧费用。当前状态与原件指针见 [CURRENT_VALIDATION_SNAPSHOT.json](CURRENT_VALIDATION_SNAPSHOT.json)。
