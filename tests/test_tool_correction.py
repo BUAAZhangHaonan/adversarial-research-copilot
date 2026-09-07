@@ -31,6 +31,12 @@ def tool_response(*calls):
     return sse(finish='tool_calls', tools=list(calls))
 
 
+def native_raw(call_id, arguments_text):
+    call = native(call_id, {})
+    call['function']['arguments'] = arguments_text
+    return call
+
+
 def fixture(tmp_path, responses, *, amount='20', parameters=PARAMETERS):
     executed = []
 
@@ -262,7 +268,25 @@ async def test_json_repair_does_not_grant_a_second_tool_correction(tmp_path):
         await invoke(runtime, tool_profile=['read_record'])
     assert len(requests) == len(ledger.list_calls()) == 2 and not executed
     assert saved(store)['repair_count'] == 1
+    assert saved(store)['repair_kind'] == 'output_json'
+    assert not saved(store).get('tool_correction')
     assert store.get_task('task_fixture').accepted_result is None
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('arguments_text', ['["not", "an", "object"]', '{"record_id":'])
+async def test_unparseable_original_target_cannot_be_replaced(tmp_path, arguments_text):
+    runtime, store, ledger, requests, executed = fixture(tmp_path, [
+        tool_response(native_raw('bad_original', arguments_text)),
+        tool_response(native('replacement_call', CORRECTED)),
+    ])
+    with pytest.raises(RuntimePaused, match='TOOL_CORRECTION_TARGET_UNVERIFIABLE'):
+        await invoke(runtime, tool_profile=['read_record'])
+    assert not executed and len(requests) == len(ledger.list_calls()) == 2
+    assert not runtime.tool_trace('task_fixture')
+    assert store.get_task('task_fixture').accepted_result is None
+    assert saved(store)['tool_rejections'][0]['original_arguments'] == arguments_text
     await runtime.close()
 
 
@@ -278,7 +302,8 @@ async def test_complete_envelope_cannot_skip_required_correction(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_blocked_capability_request_can_decline_without_running_overlimit_tool(tmp_path):
+@pytest.mark.parametrize('arguments_text', [json.dumps(INVALID), '["not", "an", "object"]', '{"record_id":'])
+async def test_blocked_capability_request_can_decline_without_running_overlimit_tool(tmp_path, arguments_text):
     blocked = answer()
     blocked.update(result_status='blocked', result=None, note='Requested range exceeds the available tool limit.',
                    capability_requests=[{
@@ -293,7 +318,7 @@ async def test_blocked_capability_request_can_decline_without_running_overlimit_
                        'expected_impact': 'More source context per response; more model input tokens.',
                    }])
     runtime, store, ledger, requests, executed = fixture(tmp_path, [
-        tool_response(native('bad_original', INVALID)), sse(json.dumps(blocked)),
+        tool_response(native_raw('bad_original', arguments_text)), sse(json.dumps(blocked)),
     ])
     result = await invoke(runtime, tool_profile=['read_record'])
     assert result.result_status == 'blocked' and len(result.capability_requests) == 1
