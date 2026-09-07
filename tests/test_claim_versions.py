@@ -233,19 +233,26 @@ async def test_workflow_persists_derivation_and_resumes_after_saved_card_without
 
 
 @pytest.mark.asyncio
-async def test_increment_does_not_upgrade_retained_old_target_evidence(tmp_path):
+async def test_increment_removes_old_target_without_upgrading_evidence(tmp_path):
     store, original, run, runtime, evidence = workflow_case(tmp_path, keep_evidence=True)
     result = await WorkflowEngine(store, runtime, Settings()).execute(run.run_id)
-    assert result.status == 'PAUSED_PROTOCOL' and result.stop_reason == 'claim_evidence_version_mismatch'
+    assert result.status == 'COMPLETED'
     path = result.state['claim_version_derivations']['development']
     derived = json.loads(store.read_artifact(path))['derived_result']
     assert derived['proposed_revision']['claims'][0]['version'] == 2
-    assert derived['proposed_revision']['claims'][0]['evidence_ids'] == [evidence.evidence_id]
+    assert derived['proposed_revision']['claims'][0]['evidence_ids'] == []
     assert derived['evidence_review'][0]['claim_version'] == 2
     assert derived['evidence_review'][0]['still_applicable'] is True
     assert store.list_evidence(ids=[evidence.evidence_id])[0] == evidence
-    assert store.get_card(original.card_id).version == 1
-    assert not any(c['role'] == 'moderator' for c in runtime.calls)
+    assert store.get_card(original.card_id).version == 2
+    assert store.get_card(original.card_id, 1).draft.claims[0].evidence_ids == [evidence.evidence_id]
+    recheck = next(c for c in runtime.calls if c['task_id'].endswith('development.evidence_recheck'))
+    assert recheck['payload']['card']['draft']['claims'][0]['version'] == 2
+    assert recheck['payload']['fresh_verification_required'] is False
+    proposer = next(c for c in runtime.calls if c['role'] == 'proposer')
+    removal = proposer['payload']['claim_evidence_reselection']['development']
+    assert removal['removed_references'][0]['evidence_id'] == evidence.evidence_id
+    assert removal['evidence_review_status'] == 'original_proposal_not_current_evidence_applicability'
 
 
 @pytest.mark.asyncio

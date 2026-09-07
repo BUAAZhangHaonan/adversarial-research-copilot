@@ -369,7 +369,7 @@ async def test_selection_commit_also_commits_finished_draw(tmp_path,monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_changed_claim_cannot_inherit_old_version_evidence_in_develop(tmp_path):
+async def test_changed_claim_reselects_instead_of_inheriting_old_version_evidence_in_develop(tmp_path):
     from arc.schemas import Claim
     from arc.store import StateError
     store,_,_=research_store(tmp_path)
@@ -388,10 +388,14 @@ async def test_changed_claim_cannot_inherit_old_version_evidence_in_develop(tmp_
             return result
     runtime=ChangedClaim(store)
     result=await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
-    assert result.status=='PAUSED_PROTOCOL' and result.stop_reason=='claim_evidence_version_mismatch'
-    assert store.get_card(card.card_id).version==1
-    assert store.get_run(run.run_id).status!='COMPLETED'
-    assert not any(call['role']=='moderator' for call in runtime.calls)
+    assert result.status=='COMPLETED'
+    assert store.get_card(card.card_id).version==2
+    assert store.get_card(card.card_id).draft.claims[0].evidence_ids==[]
+    assert store.get_card(card.card_id,1).draft.claims[0].evidence_ids==['ev_synthetic']
+    recheck=next(call for call in runtime.calls if call['task_id'].endswith('development.evidence_recheck'))
+    assert recheck['payload']['card']['draft']['claims'][0]['version']==2
+    assert recheck['payload']['target_source_ids']==['src_synthetic']
+    assert any(call['role']=='moderator' for call in runtime.calls)
 
 
 @pytest.mark.asyncio

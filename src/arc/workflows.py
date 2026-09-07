@@ -10,7 +10,8 @@ from .schemas import RESULT_SCHEMAS, Subject, CardDraft, ProblemAnchor
 from .store import StateError
 from .runtime import RuntimePaused
 from .validation import (ProtocolViolation, validate_archive_comparisons, validate_selection,
-                         validate_revision, derive_claim_versions, PROPOSED_ISSUE_VERSION_CONTRACT)
+                         validate_revision, derive_claim_versions, remove_superseded_claim_evidence,
+                         PROPOSED_ISSUE_VERSION_CONTRACT)
 
 
 @dataclass
@@ -48,7 +49,8 @@ class WorkflowEngine:
         derived, changes, references = derive_claim_versions(
             original, result, prior_issues=payload.get('issues', []),
             new_issue_contract=payload.get('claim_version_contract') == PROPOSED_ISSUE_VERSION_CONTRACT)
-        if not changes:
+        derived, removed = remove_superseded_claim_evidence(self.store, derived)
+        if not changes and not removed:
             return derived
         tasks = [self.store.get_task(task_id) for task_id in self.trace_tasks(run_id, key)]
         audit = {'schema_version': 'arc.claim_versions.v1', 'run_id': run_id, 'task_key': key,
@@ -58,7 +60,12 @@ class WorkflowEngine:
                                   for task in tasks if task is not None],
                  'version_changes': changes, 'reference_updates': references,
                  'derived_result': data(derived), 'verification_transferred': False}
-        path = f'runs/{run_id}/claim-version-derivations/{key}.json'
+        suffix = '.evidence-reselection' if removed else ''
+        if removed:
+            audit['removed_evidence_refs'] = removed
+            audit['original_evidence_review'] = data(getattr(result, 'evidence_review', []))
+            audit['evidence_review_status'] = 'original_proposal_not_current_evidence_applicability'
+        path = f'runs/{run_id}/claim-version-derivations/{key}{suffix}.json'
         content = json.dumps(audit, ensure_ascii=False, sort_keys=True)
         try:
             previous = self.store.read_artifact(path)
@@ -71,7 +78,26 @@ class WorkflowEngine:
         if paths.get(key) != path:
             paths[key] = path
             self.checkpoint(run_id, claim_version_derivations=paths)
+        if removed:
+            removals = dict(self.store.get_run(run_id).state.get('claim_evidence_removals', {}))
+            removals[key] = {'removed_references': removed,
+                             'original_evidence_review': audit['original_evidence_review'],
+                             'evidence_review_status': audit['evidence_review_status']}
+            self.checkpoint(run_id, claim_evidence_removals=removals)
         return derived
+
+    async def recheck_removed_claim_evidence(self, run_id, key):
+        run = self.store.get_run(run_id)
+        removal = run.state.get('claim_evidence_removals', {}).get(key)
+        if not removal:
+            return None
+        task_key = key + '.evidence_recheck'
+        result = await self.investigate(run_id, task_key, [], fresh=False, extra={
+            'verification_target': 'superseded_claim_evidence_reselection',
+            'claim_evidence_recheck': removal,
+            'target_source_ids': sorted({item['source_id'] for item in removal['removed_references']}),
+        })
+        return result
 
     def context(self, run_id):
         run = self.store.get_run(run_id)
@@ -94,6 +120,7 @@ class WorkflowEngine:
             'sources': data(self.store.list_sources(ids=sorted(source_ids))),
             'constraints': run.config.get('constraints', {}),
             'input_provenance': run.state.get('input_provenance'),
+            'claim_evidence_reselection': run.state.get('claim_evidence_removals', {}),
         }
 
     async def call(self, run_id, key, role, task='INVOKE', payload=None,
@@ -474,6 +501,7 @@ class WorkflowEngine:
             self.store.update_run(run_id, card_version=card.version)
             self.checkpoint(run_id, developed_version=card.version,
                             change_summary=revision.change_summary)
+        await self.recheck_removed_claim_evidence(run_id, 'development')
         await self.debate(run_id)
 
     async def scope_change(self, run_id, change):
@@ -516,18 +544,24 @@ class WorkflowEngine:
                 **self.context(run_id), 'proposer': data(proposer), 'skeptic': data(skeptic),
                 'claim_version_contract': PROPOSED_ISSUE_VERSION_CONTRACT,
             })
-            if ruling.proposed_card_revision is not None:
-                run = self.store.get_run(run_id)
-                original_subject = run.state['task_inputs'][f'round{number}.moderator']['subject']
-                card = self.store.get_card(original_subject['card_id'], original_subject['card_version'])
-                if ruling.proposed_card_revision.problem_anchor != card.draft.problem_anchor:
-                    raise WorkflowPause('PAUSED_PROTOCOL', 'problem_anchor_changed')
-                ruling = self.revision_with_claim_versions(run_id, f'round{number}.moderator', card, ruling)
-                self.store.validate_claim_dependencies(card, ruling.proposed_card_revision)
-                revised = self.store.save_card(ruling.proposed_card_revision,
-                                                card_id=card.card_id, parent_version=card.version,
-                                                creation_key=f'{run_id}.round{number}.revision')
-                self.store.update_run(run_id, card_version=revised.version)
+            moderator_key = f'round{number}.moderator'
+            ruling = self.save_moderator_revision(run_id, moderator_key, ruling,
+                                                  creation_key=f'{run_id}.round{number}.revision')
+            rechecked = await self.recheck_removed_claim_evidence(run_id, moderator_key)
+            if rechecked is not None:
+                # The first ruling was based on references that were removed.
+                # Do not apply its issues or scientific judgment. One separately
+                # budgeted reassessment is allowed inside this bounded round.
+                reassessment_key = moderator_key + '.evidence_reassessment'
+                reassessed = await self.call(run_id, reassessment_key, 'moderator', payload={
+                    **self.context(run_id), 'proposer': data(proposer), 'skeptic': data(skeptic),
+                    'claim_version_contract': PROPOSED_ISSUE_VERSION_CONTRACT,
+                    'superseded_ruling': {'status': 'not_applied_after_evidence_removal', 'result': data(ruling)},
+                    'evidence_recheck': data(rechecked),
+                })
+                ruling = self.save_moderator_revision(run_id, reassessment_key, reassessed,
+                    creation_key=f'{run_id}.round{number}.evidence_reassessment.revision',
+                    reject_further_removal=True)
             self.store.apply_issues(run_id, ruling.updated_issues, ruling.issue_transitions,
                 event_key=f'{run_id}.round{number}',
                 state_patch={'rounds_completed': number, 'final_ruling': data(ruling)})
@@ -535,6 +569,23 @@ class WorkflowEngine:
             if await self.process_ruling(run_id, number, ruling):
                 return
         self.complete(run_id, 'max_rounds_reached')
+
+    def save_moderator_revision(self, run_id, key, ruling, *, creation_key, reject_further_removal=False):
+        if ruling.proposed_card_revision is None:
+            return ruling
+        run = self.store.get_run(run_id)
+        original_subject = run.state['task_inputs'][key]['subject']
+        card = self.store.get_card(original_subject['card_id'], original_subject['card_version'])
+        if ruling.proposed_card_revision.problem_anchor != card.draft.problem_anchor:
+            raise WorkflowPause('PAUSED_PROTOCOL', 'problem_anchor_changed')
+        ruling = self.revision_with_claim_versions(run_id, key, card, ruling)
+        if reject_further_removal and key in self.store.get_run(run_id).state.get('claim_evidence_removals', {}):
+            raise WorkflowPause('PAUSED_PROTOCOL', 'superseded_evidence_repeated_after_reassessment')
+        self.store.validate_claim_dependencies(card, ruling.proposed_card_revision)
+        revised = self.store.save_card(ruling.proposed_card_revision, card_id=card.card_id,
+            parent_version=card.version, creation_key=creation_key)
+        self.store.update_run(run_id, card_version=revised.version)
+        return ruling
 
     async def process_ruling(self, run_id, number, ruling):
         self.store.update_run(run_id, assessment=ruling.assessment)

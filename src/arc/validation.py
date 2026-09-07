@@ -61,6 +61,34 @@ def derive_claim_versions(original, result, *, prior_issues=(), new_issue_contra
     return derived, changes, references
 
 
+def remove_superseded_claim_evidence(store, result):
+    """Remove earlier same-claim targets in a copy, without rebinding evidence."""
+    derived = result.model_copy(deep=True)
+    draft = (derived.proposed_revision if isinstance(derived, DeveloperResult)
+             else derived.proposed_card_revision)
+    removed = []
+    if draft is None:
+        return derived, removed
+    evidence = {item.evidence_id: item for item in store.list_evidence(
+        ids=sorted({eid for claim in draft.claims for eid in claim.evidence_ids}))}
+    for claim in draft.claims:
+        retained = []
+        for evidence_id in claim.evidence_ids:
+            item = evidence.get(evidence_id)
+            if item is not None and item.claim_id == claim.claim_id and item.claim_version < claim.version:
+                removed.append({'claim_id': claim.claim_id, 'claim_version': claim.version,
+                                'evidence_id': evidence_id, 'evidence_claim_version': item.claim_version,
+                                'source_id': item.source_id,
+                                'evidence_verification_status': item.verification_status,
+                                'reason': 'superseded_same_claim_target'})
+            else:
+                # Unknown IDs, future versions and other-claim background references
+                # remain subject to the existing strict Store validation.
+                retained.append(evidence_id)
+        claim.evidence_ids = retained
+    return derived, removed
+
+
 def validate_role_targets(envelope: Envelope, payload: dict) -> None:
     """Check explicit role IDs against the frozen card and issue ledger only."""
     result = envelope.result
