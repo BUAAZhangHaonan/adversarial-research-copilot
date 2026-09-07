@@ -791,3 +791,37 @@ async def test_final_structural_diagnostics_persist_without_third_request(tmp_pa
                for e in saved['final_validation_errors'])
     assert len(requests) == 2 and store.get_task('task_fixture').accepted_result is None
     await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('target, issue_claim, expected', [
+    ('issue_new','claim1',None),
+    ('issue_missing','claim1','evidence_request_issue_id_not_supplied_to_task'),
+    ('issue_new','claim2','evidence_request_issue_claim_mismatch'),
+    ('issue_new','invented_claim','evidence_request_issue_id_not_supplied_to_task'),
+])
+async def test_completed_moderator_can_request_evidence_for_its_declared_new_issue(tmp_path,target,issue_claim,expected):
+    from arc.schemas import Envelope, ModeratorResult
+    from arc.store import StateError
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [])
+    raw = request_answer(claim_id='claim1', issue_id=target)
+    raw['result'] = {'assessment':'NEEDS_EVIDENCE','next_action':'RETRIEVE','stop_reason':None,
+        'concise_ruling':'The original study must be read before deciding.',
+        'updated_issues':[{'issue_id':'issue_new','claim_id':issue_claim,'claim_version':1,
+            'content':'Nearest prior work needs full-text comparison.','status':'needs_retrieval',
+            'evidence_ids':[],'resolution_criterion':'Read the original comparison.',
+            'change_this_round':'New objection from the current debate.','next_action':'RETRIEVE'}],
+        'issue_transitions':[{'issue_id':'issue_new','from_status':None,'to_status':'needs_retrieval',
+            'change_this_round':'New objection.','basis_evidence_ids':[],
+            'basis_argument':'The original comparison is missing.','resolution_reason':None}],
+        'decisive_evidence_ids':[],'proposed_card_revision':None,
+        'external_test_requirements':[],'direction_change':None}
+    envelope = Envelope[ModeratorResult].model_validate(raw)
+    payload = {'claim_ids':['claim1','claim2'], 'issues':[]}
+    if expected:
+        with pytest.raises(StateError,match=expected):
+            runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    else:
+        runtime._validate_semantics(envelope,payload,{'tool_trace':[]})
+    assert requests == [] and store.get_issues(SUBJECT['run_id']) == []
+    await runtime.close()

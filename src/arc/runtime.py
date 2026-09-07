@@ -310,7 +310,7 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
     def _validate_semantics(self, envelope, payload, state):
-        from .schemas import InvestigatorResult
+        from .schemas import InvestigatorResult, ModeratorResult
         from .store import StateError
         from .validation import validate_role_targets
         validate_role_targets(envelope, payload)
@@ -328,6 +328,18 @@ class Runtime:
             raise StateError('reference_not_supplied_to_task')
         for field in ('claim_id', 'issue_id', 'draw_id'):
             visible = reference_ids(payload, {field, field + 's'})
+            if field == 'issue_id' and isinstance(envelope.result, ModeratorResult):
+                # A completed moderator may create an issue and request evidence
+                # for it in the same ruling. Store gates still validate the issue
+                # transitions and claim version before executing the retrieval.
+                current_claims = reference_ids(payload, {'claim_id', 'claim_ids'})
+                declared = {issue.issue_id: issue for issue in envelope.result.updated_issues
+                            if issue.claim_id in current_claims}
+                for request in envelope.evidence_requests:
+                    issue = declared.get(request.issue_id)
+                    if issue is not None and request.claim_id not in (None, issue.claim_id):
+                        raise StateError('evidence_request_issue_claim_mismatch')
+                visible.update(declared)
             if any(getattr(request, field) and getattr(request, field) not in visible
                    for request in envelope.evidence_requests):
                 raise StateError(f'evidence_request_{field}_not_supplied_to_task')
@@ -364,7 +376,7 @@ class Runtime:
                 raise StateError('actual_search_trace_mismatch')
 
     def _normalize_search_provenance(self, envelope, record, state):
-        from .schemas import InvestigatorResult
+        from .schemas import InvestigatorResult, ModeratorResult
         if not isinstance(envelope.result, InvestigatorResult):
             return envelope
         derived = derive_investigator_searches(envelope, state['tool_trace'])
