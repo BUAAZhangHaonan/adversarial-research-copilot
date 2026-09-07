@@ -83,3 +83,22 @@ response finished; its empty-read history and fees are preserved. The rendering 
 the corrected bundle as a new run, not an in-place rewrite of an old task or a manual promotion.
 No holdout output informed these changes. Stage limits, models, effort and original parent
 remain unchanged.
+
+Before resuming rendering or starting L4, its saved investigation exposed a mistyped
+source ID in the model's mechanical search log. Commit `5e3830c` derives only that log
+from the current task's successful search trace, preserving the raw response and all
+research fields in an independently audited view. Its 290 tests and installed package
+passed. A guarded zero-new-call recovery then exposed actual duplicate search hits being
+subjected to scientific-reference uniqueness; that engineering defect is being corrected.
+The same pre-L4 contract audit identified an inline source-reading instruction, omitted
+inherited report evidence, and empty source reads passing the fresh-verification gate.
+These generic corrections must be tested before further paid validation. They do not
+promote any card, change the frozen topics/budgets/models, or tune on holdout results.
+
+Those corrections are committed as `bac3659512f2bae137b8a0241b71c64c17ff3549`,
+with 326 tests passed / 66.28s and independent wheel/sdist installation checks passed.
+Guarded rendering recovery then accepted and registered its 19 unchanged findings,
+using zero new model/tool calls and preserving repair_count=1. The parent remains
+1157 calls, CNY18.981215–18.992283, reserved=0. Audit:
+`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`.
+The natural run now resumes subsequent roles under its original stage and parent limits.
