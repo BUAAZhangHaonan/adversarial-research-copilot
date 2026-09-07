@@ -48,3 +48,14 @@ JSON 出现完整对象后多余字符时，第一次反馈同时包含语法错
 
 
 若 moderator 的 JSON 已接受但拟议卡片因 `problem_anchor_changed` 被拒绝应用，用户也可显式 retry-task：入口重新验证原锚点差异、当前卡与缓存/原响应一致，保存拒绝诊断和旧缓存，只撤销该逻辑任务的待应用结果缓存。原 TaskRecord 与原文保留，原卡不变；新任务收到精确原锚点，要求把实现细节放回对应字段。该例外不开放其他已接受任务的任意重跑，也不自动批准方向变更。
+
+
+## 固定材料对照的显式纠正
+
+```bash
+arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data retry-comparison-task SOURCE_RUN --system ARC --task-key compose --reason "修复已审阅的协议失败，保持冻结材料"
+```
+
+支持ARC的frame/family/compose/novelty/selection，direct-Pro的compose/novelty/selection，以及evaluator的judge。只为指定技术失败或blocked步骤创建新任务版本，成功步骤与候选不重抽；needs_evidence科学结果不能通过这个入口重抽。冻结材料、原提示词bundle、旧响应和费用保持不变，新任务接收结构化错误与原响应，工具仍禁用。
+
+已存在的验证父账户复用其明确授权，新对照账户使用settings.budget_cny（默认20元），不会将已有账户强行重置为100元或覆盖已批准的阶段额度。
