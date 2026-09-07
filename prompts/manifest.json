@@ -19,7 +19,8 @@
         "request_capability",
         "search_literature",
         "search_web"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "investigator.SCOPE_AUDIT": {
       "role": "investigator",
@@ -39,7 +40,8 @@
         "request_capability",
         "search_literature",
         "search_web"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "librarian.INVOKE": {
       "role": "librarian",
@@ -56,7 +58,8 @@
         "lookup_archive",
         "read_record",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "discovery.FRAME": {
       "role": "discovery",
@@ -77,7 +80,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "discovery.NEXT_DRAW": {
       "role": "discovery",
@@ -99,7 +103,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "discovery.COMPOSE": {
       "role": "discovery",
@@ -122,7 +127,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "novelty_examiner.INVOKE": {
       "role": "novelty_examiner",
@@ -142,7 +148,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "selector.INVOKE": {
       "role": "selector",
@@ -164,7 +171,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "developer.INVOKE": {
       "role": "developer",
@@ -185,7 +193,8 @@
         "request_capability",
         "search_literature",
         "search_web"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "proposer.INVOKE": {
       "role": "proposer",
@@ -205,7 +214,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "skeptic.INVOKE": {
       "role": "skeptic",
@@ -225,7 +235,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "moderator.INVOKE": {
       "role": "moderator",
@@ -245,7 +256,8 @@
         "search_literature",
         "search_web",
         "request_capability"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "reporter.INVOKE": {
       "role": "reporter",
@@ -258,7 +270,8 @@
       ],
       "task_template": "tasks/invoke.md",
       "repair_template": "tasks/repair_structure.md",
-      "tools": []
+      "tools": [],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "evaluator.INVOKE": {
       "role": "evaluator",
@@ -272,7 +285,8 @@
       ],
       "task_template": "tasks/invoke.md",
       "repair_template": "tasks/repair_structure.md",
-      "tools": []
+      "tools": [],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     },
     "developer.IMPORT": {
       "role": "developer",
@@ -293,7 +307,8 @@
         "request_capability",
         "search_literature",
         "search_web"
-      ]
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     }
   },
   "tools": {

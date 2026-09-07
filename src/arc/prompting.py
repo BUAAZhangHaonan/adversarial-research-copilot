@@ -103,6 +103,8 @@ class PromptLoader:
         for entry in self.manifest["prompts"].values():
             self.registered_files.update(entry["system"])
             self.registered_files.update([entry["task_template"], entry["repair_template"]])
+            if entry.get("tool_repair_template"):
+                self.registered_files.add(entry["tool_repair_template"])
         self.registered_files.update(self.manifest["tools"].values())
         self.registered_files.update(self.manifest["reports"].values())
         for name in sorted(self.registered_files):
@@ -155,7 +157,8 @@ class PromptLoader:
                              previous_response_json=_json(repair["previous_response"]),
                              validation_errors_json=_json(repair["validation_errors"]))
         sources = {"manifest.json": self.manifest_text}
-        for name in entry["system"] + [entry["task_template"], entry["repair_template"]] + [self.manifest["tools"][n] for n in names]:
+        recovery_templates = [entry['tool_repair_template']] if entry.get('tool_repair_template') else []
+        for name in entry["system"] + [entry["task_template"], entry["repair_template"]] + recovery_templates + [self.manifest["tools"][n] for n in names]:
             sources.update(self._dependencies(name))
         messages = [{"role": "system", "content": "\n\n".join(self.env.get_template(name).render(**variables).rstrip() for name in entry["system"])},
                     {"role": "user", "content": self.env.get_template(task_template).render(**variables)}]
@@ -176,6 +179,16 @@ class PromptLoader:
                       previous_response: Any, validation_errors: Any) -> RenderedPrompt:
         return render_repair(snapshot, data, schema=schema, previous_response=previous_response,
                              validation_errors=validation_errors)
+
+    @staticmethod
+    def render_tool_correction(snapshot: RenderedPrompt, failures: list[dict]) -> str:
+        manifest = json.loads(snapshot.sources['manifest.json'])
+        name = manifest['prompts'][snapshot.prompt_id].get('tool_repair_template')
+        if not name or name not in snapshot.sources:
+            raise ValueError('TOOL_CORRECTION_TEMPLATE_UNAVAILABLE_FORK_REQUIRED')
+        env = Environment(loader=DictLoader(snapshot.sources), undefined=StrictUndefined,
+                          autoescape=False, keep_trailing_newline=True)
+        return env.get_template(name).render(failures_json=_json(failures))
 
 
 def render_repair(snapshot: RenderedPrompt, data: dict[str, Any], *, schema: dict[str, Any],

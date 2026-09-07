@@ -17,7 +17,7 @@ from uuid import uuid4
 from openai import AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 
-from .mcp_client import model_schema, validate_arguments
+from .mcp_client import ToolArgumentError, model_schema, validate_arguments
 from .pricing import PriceBook
 from .budget import BudgetExceeded
 
@@ -278,7 +278,7 @@ class Runtime:
                 raise ValueError('TASK_PROMPT_SNAPSHOT_HASH_MISMATCH')
             if state is not None:
                 active = snapshot
-                if state['repair_count']:
+                if state.get('repair_snapshot_path'):
                     active = RenderedPrompt.from_snapshot(json.loads(self.store.read_artifact(state['repair_snapshot_path'])))
                     if active.source_hashes != snapshot.source_hashes or active.sources != snapshot.sources:
                         raise ValueError('REPAIR_SNAPSHOT_SOURCE_MISMATCH')
@@ -484,6 +484,8 @@ class Runtime:
                      'prompt_manifest': rendered.source_hashes}
             self._checkpoint(record, state)
         while True:
+            if state.get('tool_correction_failure'):
+                raise RuntimePaused('PAUSED_PROTOCOL', state['tool_correction_failure'])
             for trace in state['tool_trace']:
                 ledger_call = self.ledger.get_call(trace['call_id'])
                 if ledger_call['state'] != 'SETTLED':
@@ -503,16 +505,37 @@ class Runtime:
                 raise RuntimePaused('PAUSED_PROTOCOL', record.error)
             message = response['message']
             if finish == 'tool_calls':
-                if not message.get('tool_calls') or not functions or state['repair_count']:
+                if not message.get('tool_calls') or not functions or state.get('repair_snapshot_path'):
                     raise RuntimePaused('PAUSED_PROTOCOL', 'UNEXPECTED_TOOL_CALLS')
                 if not state.get('assistant_appended'):
                     state['messages'].append(message)
                     state['assistant_appended'] = True
                     self._checkpoint(record, state, 'RESPONSE_SAVED')
-                completed_ids = {t['tool_call_id'] for t in state['tool_trace']}
+                self._prepare_tool_batch(record, state, message['tool_calls'], profile, response['call_id'])
+                completed_ids = {t['tool_call_id'] for t in state['tool_trace']
+                                 if t['parent_call_id'] == response['call_id']}
+                rejected_ids = {t['tool_call_id'] for t in state.get('tool_rejections', [])
+                                if t['parent_call_id'] == response['call_id']}
+                correction = state.get('tool_correction')
+                failures = ({item['tool_call_id']: item for item in correction['failures']}
+                            if correction and correction['original_response_id'] == response['call_id'] else {})
                 for tool_call in message['tool_calls']:
-                    if tool_call['id'] in completed_ids: continue
+                    if tool_call['id'] in completed_ids or tool_call['id'] in rejected_ids: continue
+                    if tool_call['id'] in failures:
+                        rejected = {'status': 'rejected_before_execution',
+                                    'parent_call_id': response['call_id'], **failures[tool_call['id']]}
+                        state.setdefault('tool_rejections', []).append(rejected)
+                        state['messages'].append({'role': 'tool', 'tool_call_id': tool_call['id'],
+                                                  'content': encoded(rejected)})
+                        self._checkpoint(record, state, 'RESPONSE_SAVED')
+                        continue
                     await self._execute_tool(record, state, tool_call, profile, response['call_id'])
+                if correction and correction['original_response_id'] == response['call_id']:
+                    # The feedback and the request boundary become durable together.
+                    state['messages'].append({'role': 'user', 'content': correction['instruction']})
+                    correction['phase'] = 'awaiting'
+                elif correction and correction.get('corrected_response_id') == response['call_id']:
+                    correction['phase'] = 'completed'
                 state['response'] = None
                 state['assistant_appended'] = False
                 self._checkpoint(record, state, 'PENDING')
@@ -534,6 +557,7 @@ class Runtime:
                     previous_response=message.get('content'), validation_errors=errors)
                 state['messages'] = repaired.messages
                 state['repair_count'] = 1
+                state['repair_kind'] = 'output_json'
                 state['response'] = None
                 state['tools'] = []
                 state['prompt_hash'] = repaired.prompt_hash
@@ -545,6 +569,11 @@ class Runtime:
                 self._checkpoint(record, state, 'PENDING')
                 continue
             try:
+                correction = state.get('tool_correction')
+                if correction and correction['phase'] == 'awaiting':
+                    if envelope.result_status != 'blocked' or not envelope.capability_requests:
+                        self._pause_tool_correction(record, state, 'TOOL_CORRECTION_REQUIRED')
+                    correction['phase'] = 'declined'
                 if envelope.task_id != task_id or envelope.subject.model_dump(mode='json') != subject_data:
                     raise ValueError('SUBJECT_OR_TASK_MISMATCH')
                 envelope = self._normalize_search_provenance(envelope, record, state)
@@ -562,6 +591,91 @@ class Runtime:
                 record.error = None
             self._checkpoint(record, state, 'ACCEPTED' if envelope.result_status == 'complete' else 'PAUSED_EXTERNAL')
             return envelope
+
+    def _pause_tool_correction(self, record, state, reason):
+        state['tool_correction_failure'] = reason
+        record.error = reason
+        self._checkpoint(record, state, 'PAUSED_PROTOCOL')
+        raise RuntimePaused('PAUSED_PROTOCOL', reason)
+
+    def _inspect_tool_arguments(self, call, profile):
+        name = call['function']['name']
+        if name not in profile:
+            raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_NOT_ALLOWED')
+        raw = call['function']['arguments']
+        try:
+            arguments = json.loads(raw)
+        except ValueError:
+            return None, [{'path': [], 'validator': 'json', 'expected': 'object'}]
+        try:
+            validate_arguments(self.tools[name].parameters, arguments)
+        except ToolArgumentError as exc:
+            return arguments, exc.details
+        except RuntimeError as exc:
+            # URL/access-policy failures are not permission to request a new target.
+            raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_ARGUMENTS_INVALID') from exc
+        return arguments, []
+
+    def _prepare_tool_batch(self, record, state, calls, profile, response_id):
+        correction = state.get('tool_correction')
+        inspected = [self._inspect_tool_arguments(call, profile) for call in calls]
+        is_correction = correction and (correction['phase'] == 'awaiting' or
+            correction.get('corrected_response_id') == response_id)
+        if is_correction:
+            if len(calls) != len(correction['failures']):
+                self._pause_tool_correction(record, state, 'TOOL_CORRECTION_CALLS_MISMATCH')
+            for call, (arguments, errors), original in zip(calls, inspected, correction['failures']):
+                if call['function']['name'] != original['name']:
+                    self._pause_tool_correction(record, state, 'TOOL_CORRECTION_TARGET_CHANGED')
+                if errors:
+                    self._pause_tool_correction(record, state, 'TOOL_ARGUMENTS_INVALID_AFTER_CORRECTION')
+                before = original['arguments']
+                editable = [tuple(path) for error in original['errors']
+                            for path in error.get('editable_paths', [error['path']])]
+                if isinstance(before, dict):
+                    def differences(left, right, path=()):
+                        if isinstance(left, dict) and isinstance(right, dict):
+                            for key in left.keys() | right.keys():
+                                if key not in left or key not in right:
+                                    yield path + (key,)
+                                else:
+                                    yield from differences(left[key], right[key], path + (key,))
+                        elif isinstance(left, list) and isinstance(right, list) and len(left) == len(right):
+                            for index, (a, b) in enumerate(zip(left, right)):
+                                yield from differences(a, b, path + (index,))
+                        elif type(left) is not type(right) or left != right:
+                            yield path
+                    for changed in differences(before, arguments):
+                        if not any(changed[:len(path)] == path for path in editable):
+                            self._pause_tool_correction(record, state, 'TOOL_CORRECTION_TARGET_CHANGED')
+                else:
+                    # No parsed target exists to compare. A blocked improvement request remains available.
+                    self._pause_tool_correction(record, state, 'TOOL_CORRECTION_TARGET_UNVERIFIABLE')
+            correction['corrected_response_id'] = response_id
+            correction['corrected_tool_call_ids'] = [call['id'] for call in calls]
+            correction['phase'] = 'executing'
+            self._checkpoint(record, state, 'RESPONSE_SAVED')
+            return
+        failures = [{'tool_call_id': call['id'], 'name': call['function']['name'],
+                     'arguments': arguments, 'original_arguments': call['function']['arguments'],
+                     'errors': errors, 'parameters': model_schema(self.tools[call['function']['name']].parameters)}
+                    for call, (arguments, errors) in zip(calls, inspected) if errors]
+        if not failures:
+            return
+        # Preparing a partially executed batch is idempotent on recovery.
+        if correction and correction['original_response_id'] == response_id:
+            return
+        if state['repair_count']:
+            self._pause_tool_correction(record, state, 'TOOL_ARGUMENTS_INVALID_AFTER_CORRECTION')
+        try:
+            instruction = self.loader.render_tool_correction(self._load_prompt_snapshot(record), failures)
+        except ValueError as exc:
+            raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
+        state['repair_count'] = 1
+        state['repair_kind'] = 'tool_arguments'
+        state['tool_correction'] = {'phase': 'preparing', 'original_response_id': response_id,
+                                    'failures': failures, 'instruction': instruction}
+        self._checkpoint(record, state, 'RESPONSE_SAVED')
 
     async def _model_request(self, record, state, config, on_admitted):
         if state.get('pending_model'):
@@ -688,7 +802,8 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_ARGUMENTS_INVALID') from exc
         if tool.cost_upper_cny is None or not tool.cost_basis:
             raise RuntimePaused('PAUSED_EXTERNAL', 'COST_UNOBSERVABLE')
-        local_read = tool.service == 'local' and name in {'read_record', 'lookup_archive', 'request_capability'} and tool.cost_upper_cny == 0
+        local_read = (tool.service == 'local' and name in {'read_record', 'lookup_archive', 'request_capability'}
+                      and tool.cost_upper_cny == 0)
         if state.get('pending_tool'):
             call_id = state['pending_tool']
             metadata = self.ledger.get_call(call_id)['metadata']
