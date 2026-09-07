@@ -1,7 +1,0 @@
-roles:
-  proposer: deepseek-v4-flash
-  skeptic: deepseek-v4-flash
-  moderator: deepseek-v4-pro
-  pipeline_writer: deepseek-v4-flash
-  pipeline_reviewer: deepseek-v4-pro
-  pipeline_moderator: deepseek-v4-pro

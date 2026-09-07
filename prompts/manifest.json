@@ -1,0 +1,307 @@
+{
+  "version": "arc.prompts.v1",
+  "prompts": {
+    "investigator.INVOKE": {
+      "role": "investigator",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/investigator.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "request_capability",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "investigator.SCOPE_AUDIT": {
+      "role": "investigator",
+      "task": "SCOPE_AUDIT",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/investigator.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "request_capability",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "librarian.INVOKE": {
+      "role": "librarian",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/librarian.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "lookup_archive",
+        "read_record"
+      ]
+    },
+    "discovery.FRAME": {
+      "role": "discovery",
+      "task": "FRAME",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/discovery.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "lookup_archive",
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "discovery.NEXT_DRAW": {
+      "role": "discovery",
+      "task": "NEXT_DRAW",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/discovery.md",
+        "common/selection_examples.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "lookup_archive",
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "discovery.COMPOSE": {
+      "role": "discovery",
+      "task": "COMPOSE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/discovery.md",
+        "common/selection_examples.md",
+        "common/resource_policy.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "lookup_archive",
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "novelty_examiner.INVOKE": {
+      "role": "novelty_examiner",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/novelty_examiner.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "selector.INVOKE": {
+      "role": "selector",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/selector.md",
+        "common/selection_examples.md",
+        "common/resource_policy.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "developer.INVOKE": {
+      "role": "developer",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/developer.md",
+        "common/resource_policy.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "request_capability",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "proposer.INVOKE": {
+      "role": "proposer",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/proposer.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "skeptic.INVOKE": {
+      "role": "skeptic",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/skeptic.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "moderator.INVOKE": {
+      "role": "moderator",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/moderator.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "search_literature",
+        "search_web"
+      ]
+    },
+    "reporter.INVOKE": {
+      "role": "reporter",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/reporter.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": []
+    },
+    "evaluator.INVOKE": {
+      "role": "evaluator",
+      "task": "INVOKE",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/evaluator.md",
+        "common/selection_examples.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": []
+    },
+    "developer.IMPORT": {
+      "role": "developer",
+      "task": "IMPORT",
+      "system": [
+        "common/research_policy.md",
+        "common/evidence_policy.md",
+        "common/output_protocol.md",
+        "roles/developer.md",
+        "common/resource_policy.md"
+      ],
+      "task_template": "tasks/invoke.md",
+      "repair_template": "tasks/repair_structure.md",
+      "tools": [
+        "read_paper",
+        "read_record",
+        "read_web",
+        "request_capability",
+        "search_literature",
+        "search_web"
+      ]
+    }
+  },
+  "tools": {
+    "search_literature": "tools/search_literature.md",
+    "read_paper": "tools/read_paper.md",
+    "search_web": "tools/search_web.md",
+    "read_web": "tools/read_web.md",
+    "read_record": "tools/read_record.md",
+    "lookup_archive": "tools/lookup_archive.md",
+    "request_capability": "tools/request_capability.md"
+  },
+  "reports": {
+    "overview": "reports/overview.md",
+    "card": "reports/card.md",
+    "records": "reports/records.md",
+    "trace": "reports/trace.md",
+    "cost": "reports/cost.md",
+    "capabilities": "reports/capabilities.md"
+  }
+}

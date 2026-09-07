@@ -1,508 +1,174 @@
+"""Stage boundaries are explicit CLI actions, not model decisions."""
 from __future__ import annotations
-
-import os
+import asyncio
 import json
-from typing import Optional
+from decimal import Decimal
 from pathlib import Path
-
+from typing import Optional
+from uuid import uuid4
+import hashlib
+from importlib.resources import files
 import typer
-import requests
-from rich.console import Console
+from dotenv import load_dotenv
+from .config import load_settings, Settings
 
-# Auto-load .env if present
-try:
-    from dotenv import load_dotenv
-    load_dotenv()  # project .env
-    load_dotenv(Path.home() / ".env", override=False)  # user-wide .env (e.g. DEEPXIV_TOKEN)
-except ImportError:
-    pass
-from rich.table import Table
+app = typer.Typer(help='ARC：发现研究卡、展开方案、压力测试。每个阶段默认结束即停。', no_args_is_help=True)
 
-from arc.llm_client import LLMClient
-from arc.model_registry import load_registry, load_runtime_roles, resolve_role_model, role_api_ready, set_role_model
-from arc.run_paths import resolve_run_dir, sanitize_model_suffix
-from arc.runners.debate_runner import run_debate
-from arc.runners.develop_runner import run_develop
-from arc.runners.pipeline_runner import run_pipeline
-from arc.topic_refiner import build_topic_refine_report, refine_research_topic
+@app.callback()
+def root(ctx: typer.Context, data_dir: Optional[Path] = typer.Option(None),
+         config: Optional[Path] = typer.Option(None), env_file: Optional[Path] = typer.Option(None)):
+    if env_file:
+        load_dotenv(env_file, override=False)
+    ctx.obj = load_settings(config, data_dir=data_dir)
 
-app = typer.Typer(help="ARC - Adversarial Research Copilot")
-models_app = typer.Typer(help="Model registry and role mapping")
-app.add_typer(models_app, name="models")
-console = Console()
+def services(settings):
+    from .store import Store
+    from .budget import BudgetLedger
+    root = settings.data_dir.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return Store(root / 'arc.sqlite', artifact_root=root / 'artifacts'), BudgetLedger(root / 'arc.sqlite')
 
+def new_run(settings, mode, *, topic=None, card_id=None, version=None,
+            budget='20', parent=None, run_id=None, campaign_id=None, input_text=None,
+            parent_card_id=None, parent_card_version=None):
+    store, ledger = services(settings)
+    run_id = run_id or f'run_{uuid4().hex}'
+    amount = Decimal(str(budget))
+    if amount <= 0:
+        raise typer.BadParameter('budget_cny must be positive')
+    if mode in ('develop', 'run'):
+        if not card_id and not input_text:
+            raise typer.BadParameter('--card is required')
+        if card_id:
+            version = store.get_card(card_id, version).version
+    ledger.create_account(run_id, str(amount), parent_id=parent)
+    if mode == 'discover':
+        campaign = store.create_campaign(topic, max_draws=settings.draws,
+            budget_account_id=run_id, campaign_id=campaign_id,
+            parent_card_id=parent_card_id, parent_card_version=parent_card_version)
+        campaign_id = campaign.campaign_id
+    prompt_hash = hashlib.sha256(files('arc_prompt_assets').joinpath('manifest.json').read_bytes()).hexdigest()
+    code_hash = hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path(__file__).parent.glob('*.py')))).hexdigest()
+    state = {}
+    if input_text:
+        from .schemas import SourceRecord
+        source = store.register_source(SourceRecord(title='用户导入的研究问题', url=None,
+            source_type='user_material', access_status='retrieved', content_origin='original'), content=input_text)
+        state = {'imported_input': input_text, 'source_ids': [source.source_id], 'input_origin': 'user_proposal'}
+    return store.create_run(mode, campaign_id=campaign_id, card_id=card_id,
+        card_version=version, budget_account_id=run_id, config=settings.model_dump(mode='json'), run_id=run_id,
+        prompt_version=prompt_hash, code_version='arc-0.2.0:' + code_hash, state=state)
 
-def _ensure_known_model(role: str, model: str, registry) -> str:
-    if model in registry.models:
-        return model
-    alias_key = f"{role}_default"
-    fallback = registry.aliases.get(alias_key)
-    if fallback and fallback in registry.models:
-        console.print(
-            f"[yellow]Warning:[/yellow] unknown model '{model}' for role '{role}', fallback to '{fallback}'."
-        )
-        return fallback
-    if registry.models:
-        first = next(iter(registry.models.keys()))
-        console.print(
-            f"[yellow]Warning:[/yellow] unknown model '{model}' for role '{role}', fallback to '{first}'."
-        )
-        return first
-    raise typer.BadParameter("No model available in registry. Please check configs/models.yaml")
-
-
-@app.command()
-def run(
-    idea_file: str = typer.Argument(...,
-                                    help="Path to idea markdown/text file"),
-    proposer: Optional[str] = typer.Option(None, help="Model for Proposer"),
-    skeptic: Optional[str] = typer.Option(None, help="Model for Skeptic"),
-    moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
-    output_dir: str = typer.Option("reports", help="Output directory"),
-    resume: bool = typer.Option(
-        False, help="Resume from most recent run if run_state.json is available"),
-    gpt_effort: str = typer.Option(
-        "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option(
-        "medium", help="GPT output verbosity: low|medium|high"),
-    prompt_language: str = typer.Option(
-        "en", help="Prompt language for iterative discussion: en|zh"),
-) -> None:
-    os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
-    os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
-    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
-
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-    proposer_model = resolve_role_model(
-        "proposer", registry, runtime, proposer)
-    skeptic_model = resolve_role_model("skeptic", registry, runtime, skeptic)
-    moderator_model = resolve_role_model(
-        "moderator", registry, runtime, moderator)
-
-    report_file, state_file = run_debate(
-        idea_file=idea_file,
-        proposer_model=proposer_model,
-        skeptic_model=skeptic_model,
-        moderator_model=moderator_model,
-        output_dir=output_dir,
-        resume=resume,
-    )
-    console.print(f"[bold green]Report:[/bold green] {report_file}")
-    console.print(f"[bold green]State:[/bold green] {state_file}")
-
+async def execute(settings, run_id):
+    from .bootstrap import make_runtime
+    from .reports import render_run
+    from .workflows import WorkflowEngine
+    store, ledger = services(settings)
+    run = store.get_run(run_id)
+    frozen = Settings.model_validate(run.config)
+    runtime = await make_runtime(store, ledger, run, frozen)
+    try:
+        await WorkflowEngine(store, runtime, frozen).execute(run_id)
+    except Exception as exc:
+        status, reason = getattr(exc, 'status', None), getattr(exc, 'reason', None)
+        if status in {'PAUSED_BUDGET', 'PAUSED_EXTERNAL', 'PAUSED_PROTOCOL'}:
+            store.update_run(run_id, status=status, stop_reason=reason or type(exc).__name__)
+        else:
+            store.update_run(run_id, status='ERROR', stop_reason=type(exc).__name__)
+            raise
+    finally:
+        render_run(store, run_id, settings.data_dir.resolve() / 'reports' / run_id)
+        close = getattr(runtime, 'close', None)
+        if close:
+            await close()
+    run = store.get_run(run_id)
+    typer.echo(json.dumps({'run_id': run_id, 'status': run.status, 'assessment': run.assessment,
+        'stop_reason': run.stop_reason, 'cost': ledger.summary(run.budget_account_id)}, ensure_ascii=False, default=str))
+    return run
 
 @app.command()
-def pipeline(
-    topic: str = typer.Argument(..., help="Research topic"),
-    proposer: Optional[str] = typer.Option(
-        None,
-        help="Model for generation stages (default: proposer)",
-    ),
-    skeptic: Optional[str] = typer.Option(
-        None,
-        help="Model for novelty check / review (default: skeptic)",
-    ),
-    moderator: Optional[str] = typer.Option(
-        None,
-        help="Model for debate moderator",
-    ),
-    output_dir: str = typer.Option("reports", help="Output directory"),
-    resume: bool = typer.Option(
-        False, help="Resume from most recent run if pipeline_state.json is available"),
-    strict_gates: bool = typer.Option(
-        True,
-        "--strict-gates/--no-strict-gates",
-        help="Enforce mandatory pipeline gates (novelty-check, debate-runner)",
-    ),
-    checkpoint: bool = typer.Option(
-        False, help="Ask for confirmation after each completed stage"),
-    gpt_effort: str = typer.Option(
-        "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option(
-        "medium", help="GPT output verbosity: low|medium|high"),
-) -> None:
-    os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
-    os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
+def discover(ctx: typer.Context, topic: str, draws: Optional[int] = typer.Option(None, min=1, max=5),
+             budget_cny: Optional[str] = typer.Option(None)):
+    settings = ctx.obj.model_copy(update={'draws': draws}) if draws is not None else ctx.obj
+    run = new_run(settings, 'discover', topic=topic, budget=budget_cny or settings.budget_cny)
+    asyncio.run(execute(settings, run.run_id))
 
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-    writer_model = resolve_role_model(
-        "pipeline_writer", registry, runtime, proposer)
-    reviewer_model = resolve_role_model(
-        "pipeline_reviewer", registry, runtime, skeptic)
-    pipeline_moderator_model = resolve_role_model(
-        "pipeline_moderator", registry, runtime, moderator)
+@app.command()
+def develop(ctx: typer.Context, card: Optional[str] = typer.Option(None),
+            version: Optional[int] = typer.Option(None, min=1), budget_cny: Optional[str] = typer.Option(None),
+            question: Optional[str] = typer.Option(None), proposal: Optional[Path] = typer.Option(None)):
+    text = explicit_input(card, question, proposal)
+    run = new_run(ctx.obj, 'develop', card_id=card, version=version,
+                  budget=budget_cny or ctx.obj.budget_cny, input_text=text)
+    asyncio.run(execute(ctx.obj, run.run_id))
 
-    state_file, memo_file = run_pipeline(
-        topic=topic,
-        proposer_model=writer_model,
-        skeptic_model=reviewer_model,
-        moderator_model=pipeline_moderator_model,
-        output_dir=output_dir,
-        resume=resume,
-        strict_gates=strict_gates,
-        human_checkpoint=checkpoint,
-    )
-    console.print(f"[bold green]Pipeline state:[/bold green] {state_file}")
-    console.print(f"[bold green]Final memo:[/bold green] {memo_file}")
+@app.command(name='run')
+def pressure_test(ctx: typer.Context, card: Optional[str] = typer.Option(None),
+                  version: Optional[int] = typer.Option(None, min=1), budget_cny: Optional[str] = typer.Option(None),
+                  question: Optional[str] = typer.Option(None), proposal: Optional[Path] = typer.Option(None)):
+    text = explicit_input(card, question, proposal)
+    run = new_run(ctx.obj, 'run', card_id=card, version=version,
+                  budget=budget_cny or ctx.obj.budget_cny, input_text=text)
+    asyncio.run(execute(ctx.obj, run.run_id))
 
+def explicit_input(card, question, proposal):
+    if sum(value is not None for value in (card, question, proposal)) != 1:
+        raise typer.BadParameter('choose exactly one of --card, --question, --proposal')
+    return proposal.read_text(encoding='utf-8') if proposal is not None else question
 
-@app.command("explain-outputs")
-def explain_outputs(
-    run_dir: Optional[str] = typer.Option(
-        None, help="Run directory path, e.g. reports/20260323_191404"),
-    output_dir: str = typer.Option("reports", help="Reports root directory"),
-) -> None:
-    root = Path(output_dir)
-    target: Optional[Path] = None
-    if run_dir:
-        candidate = Path(run_dir)
-        target = candidate if candidate.is_absolute() else Path.cwd() / candidate
-    else:
-        marker = root / "LATEST_RUN"
-        if marker.exists():
-            try:
-                name = marker.read_text(encoding="utf-8").strip()
-                if name:
-                    target = root / name
-            except Exception:
-                target = None
+@app.command()
+def status(ctx: typer.Context, run_id: str):
+    store, ledger = services(ctx.obj)
+    run = store.get_run(run_id)
+    typer.echo(json.dumps({'run': run.model_dump(mode='json'),
+        'issues': [i.model_dump(mode='json') for i in store.get_issues(run_id)],
+        'budget': ledger.summary(run.budget_account_id)}, ensure_ascii=False, indent=2, default=str))
 
-    if target is None or not target.exists() or not target.is_dir():
-        raise typer.BadParameter(
-            "Cannot find run directory. Provide --run-dir or ensure reports/LATEST_RUN exists.")
+@app.command()
+def resume(ctx: typer.Context, run_id: str, add_budget_cny: Optional[str] = typer.Option(None)):
+    store, ledger = services(ctx.obj)
+    run = store.get_run(run_id)
+    if add_budget_cny is not None:
+        ledger.add_budget(run.budget_account_id, add_budget_cny, reason='explicit_cli_budget_addition')
+    asyncio.run(execute(ctx.obj, run_id))
 
-    index_file = target / "OUTPUT_INDEX.md"
-    if index_file.exists():
-        console.print(f"[bold green]Output index:[/bold green] {index_file}")
-        console.print(index_file.read_text(encoding="utf-8"))
-        return
+@app.command(name='import-card')
+def import_card(ctx: typer.Context, path: Path):
+    """显式导入用户研究卡 JSON；不编造证据，不自动判通过。"""
+    from .schemas import CardDraft
+    store, _ = services(ctx.obj)
+    card = store.save_card(CardDraft.model_validate_json(path.read_text(encoding='utf-8')))
+    typer.echo(json.dumps({'card_id': card.card_id, 'version': card.version}, ensure_ascii=False))
 
-    files = sorted([p.name for p in target.iterdir() if p.is_file()])
-    table = Table(title=f"Artifacts in {target}")
-    table.add_column("file")
-    table.add_column("purpose")
-    purpose_map = {
-        "TOPIC.txt": "Input research task",
-        "REFERENCES.md": "Unified references with abstracts",
-        "LITERATURE_MAP.md": "Literature mapping",
-        "IDEA_REPORT.md": "Candidate ideas",
-        "FINAL_PROPOSAL.md": "Final proposal",
-        "EVIDENCE_TABLE.md": "Claim-evidence table",
-        "EXPERIMENT_PLAN.md": "Experiment plan",
-        "RESEARCH_DECISION_MEMO.md": "Final discussion memo",
-        "AUTO_REVIEW.md": "Auto-review logs",
-        "pipeline_state.json": "Pipeline state",
-    }
-    for f in files:
-        table.add_row(f, purpose_map.get(f, "auxiliary artifact"))
-    console.print(table)
+@app.command(name='test-e2e')
+def test_e2e(ctx: typer.Context, campaign: str = typer.Option('ARC_VNEXT_VALIDATION'),
+             total_budget_cny: str = typer.Option('100'), allow_stage_transition: bool = typer.Option(False),
+             topic: str = typer.Option('拥挤小目标实例分割中，边界错误与实例合并错误是否需要不同的测量与干预')):
+    if not allow_stage_transition:
+        raise typer.BadParameter('--allow-stage-transition is required')
+    if not 0 < Decimal(total_budget_cny) <= 100:
+        raise typer.BadParameter('development parent must be within CNY 100')
+    from .evaluation import run_e2e
+    asyncio.run(run_e2e(ctx.obj, campaign, topic, total_budget_cny))
 
+@app.command(name='test-compare')
+def test_compare(ctx: typer.Context, source_run: str = typer.Option(...)):
+    """开发用：冻结同材料比较，自动评价不代表人类认可。"""
+    from .evaluation import run_comparison
+    asyncio.run(run_comparison(ctx.obj, source_run))
 
-@app.command("develop")
-def develop(
-    topic: str = typer.Argument(..., help="Problem statement to develop into a plan"),
-    proposer: Optional[str] = typer.Option(None, help="Model for Proposer"),
-    skeptic: Optional[str] = typer.Option(None, help="Model for Skeptic"),
-    moderator: Optional[str] = typer.Option(None, help="Model for Moderator"),
-    output_dir: str = typer.Option("reports", help="Output directory"),
-    resume: bool = typer.Option(False, help="Resume from latest run directory"),
-    min_rounds_before_stop: Optional[int] = typer.Option(
-        None,
-        help="Minimum rounds before judge is allowed to stop (default: configs/develop.yaml)",
-    ),
-    max_rounds: Optional[int] = typer.Option(
-        None,
-        help="Hard cap on total debate rounds across review cycles. 0 = unlimited. (default: configs/develop.yaml)",
-    ),
-    export_best_consensus: Optional[bool] = typer.Option(
-        None,
-        "--export-best-consensus/--no-export-best-consensus",
-        help="Generate BEST_CONSENSUS.md automatically (default: configs/develop.yaml)",
-    ),
-    gpt_effort: str = typer.Option(
-        "medium", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option(
-        "high", help="GPT output verbosity: low|medium|high"),
-    prompt_language: str = typer.Option(
-        "en", help="Prompt language for develop iteration: en|zh"),
-    max_review_cycles: Optional[int] = typer.Option(
-        None, help="Maximum review cycles (outer loop). 0 = unlimited. (default: configs/develop.yaml)"),
-    max_inner_rounds: Optional[int] = typer.Option(
-        None, help="Maximum inner debate rounds per review cycle. 0 = unlimited. (default: configs/develop.yaml)"),
-    drift_interval: Optional[int] = typer.Option(
-        None, help="Run drift monitor every N inner rounds. (default: configs/develop.yaml)"),
-) -> None:
-    os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
-    os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
-    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
-
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-    proposer_model = resolve_role_model("proposer", registry, runtime, proposer)
-    skeptic_model = resolve_role_model("skeptic", registry, runtime, skeptic)
-    moderator_model = resolve_role_model("moderator", registry, runtime, moderator)
-    proposer_model = _ensure_known_model("proposer", proposer_model, registry)
-    skeptic_model = _ensure_known_model("skeptic", skeptic_model, registry)
-    moderator_model = _ensure_known_model("moderator", moderator_model, registry)
-
-    transcript_file, state_file = run_develop(
-        topic=topic,
-        proposer_model=proposer_model,
-        skeptic_model=skeptic_model,
-        moderator_model=moderator_model,
-        output_dir=output_dir,
-        resume=resume,
-        min_rounds_before_stop=min_rounds_before_stop,
-        max_rounds=max_rounds,
-        export_best_consensus=export_best_consensus,
-        prompt_language=prompt_language,
-        max_review_cycles=max_review_cycles,
-        max_inner_debate_rounds=max_inner_rounds,
-        drift_check_interval=drift_interval,
-    )
-    console.print(f"[bold green]Chat transcript:[/bold green] {transcript_file}")
-    console.print(f"[bold green]Chat state:[/bold green] {state_file}")
-    consensus_file = transcript_file.parent / "BEST_CONSENSUS.md"
-    if consensus_file.exists():
-        console.print(f"[bold green]Best consensus:[/bold green] {consensus_file}")
-
-
-@app.command("chat-mode", hidden=True)
-def chat_mode_deprecated(**kwargs) -> None:
-    """Deprecated alias for `arc develop`."""
-    console.print("[yellow]`arc chat-mode` is deprecated; use `arc develop`.[/yellow]")
-    develop(**kwargs)
-
-
-@app.command("discover")
-def discover(
-    topic: str = typer.Argument(..., help="Research field or rough topic to mine for novel problems"),
-    proposer: Optional[str] = typer.Option(
-        None, help="Generator model (default: proposer role, deepseek-v4-flash)"),
-    moderator: Optional[str] = typer.Option(
-        None, help="Judge model (default: moderator role, deepseek-v4-pro)"),
-    output_dir: str = typer.Option("reports", help="Output directory"),
-    resume: bool = typer.Option(False, help="Resume from latest discover run if in progress"),
-    papers: Optional[int] = typer.Option(
-        None, help="Reranked paper pool size (default: configs/discover.yaml)"),
-    deep_read: Optional[int] = typer.Option(
-        None, help="Top papers to deep-read (default: configs/discover.yaml)"),
-    ideas: Optional[int] = typer.Option(
-        None, help="Candidate ideas to compose (default: configs/discover.yaml)"),
-    stress_test: bool = typer.Option(
-        False, "--stress-test/--no-stress-test",
-        help="Run develop-mode stress tests on top KEEP ideas after the report"),
-    stress_rounds: Optional[int] = typer.Option(
-        None, help="Max rounds per stress-test debate (default: configs/discover.yaml)"),
-    prompt_language: str = typer.Option("en", help="Prompt language: en|zh"),
-) -> None:
-    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
-
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-    generator_model = resolve_role_model("proposer", registry, runtime, proposer)
-    judge_model = resolve_role_model("moderator", registry, runtime, moderator)
-    generator_model = _ensure_known_model("proposer", generator_model, registry)
-    judge_model = _ensure_known_model("moderator", judge_model, registry)
-
-    from arc.runners.discover_runner import run_discover
-
-    report_file, state_file = run_discover(
-        topic=topic,
-        generator_model=generator_model,
-        judge_model=judge_model,
-        output_dir=output_dir,
-        resume=resume,
-        papers=papers,
-        deep_read=deep_read,
-        ideas=ideas,
-        stress_test=stress_test,
-        stress_rounds=stress_rounds,
-        prompt_language=prompt_language,
-    )
-    console.print(f"[bold green]Discovery report:[/bold green] {report_file}")
-    console.print(f"[bold green]Discover state:[/bold green] {state_file}")
-
-
-@app.command("refine-topic")
-def refine_topic_cmd(
-    topic: str = typer.Argument(..., help="Raw research problem statement"),
-    proposer: Optional[str] = typer.Option(
-        None, help="Writer model (default: pipeline_writer role)"),
-    skeptic: Optional[str] = typer.Option(
-        None, help="Reviewer model (default: pipeline_reviewer role)"),
-    output_dir: str = typer.Option("reports", help="Output directory"),
-    rounds: int = typer.Option(2, help="Refinement rounds"),
-    run_pipeline_after: bool = typer.Option(
-        False, help="Start pipeline with refined topic after refinement"),
-    gpt_effort: str = typer.Option(
-        "high", help="GPT reasoning effort: none|minimal|low|medium|high|xhigh"),
-    gpt_verbosity: str = typer.Option(
-        "medium", help="GPT output verbosity: low|medium|high"),
-    prompt_language: str = typer.Option(
-        "en", help="Prompt language for iterative refinement: en|zh"),
-) -> None:
-    os.environ["ARC_GPT_REASONING_EFFORT"] = gpt_effort
-    os.environ["ARC_GPT_VERBOSITY"] = gpt_verbosity
-    os.environ["ARC_PROMPT_LANGUAGE"] = prompt_language
-
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-    writer_model = resolve_role_model(
-        "pipeline_writer", registry, runtime, proposer)
-    reviewer_model = resolve_role_model(
-        "pipeline_reviewer", registry, runtime, skeptic)
-    moderator_model = resolve_role_model(
-        "pipeline_moderator", registry, runtime, None)
-
-    run_dir = resolve_run_dir(output_dir, resume=False,
-                              state_file_name="topic_refine_state.json",
-                              model_suffix=sanitize_model_suffix(writer_model, reviewer_model))
-    client = LLMClient()
-    refined, history = refine_research_topic(
-        client=client,
-        writer_model=writer_model,
-        reviewer_model=reviewer_model,
-        topic=topic,
-        rounds=rounds,
-        prompt_language=prompt_language,
-    )
-
-    original_file = run_dir / "TOPIC_RAW.md"
-    refined_file = run_dir / "TOPIC_REFINED.md"
-    report_file = run_dir / "TOPIC_REFINEMENT_REPORT.md"
-    state_file = run_dir / "topic_refine_state.json"
-
-    original_file.write_text(topic.strip() + "\n", encoding="utf-8")
-    refined_file.write_text(refined.strip() + "\n", encoding="utf-8")
-    report_file.write_text(build_topic_refine_report(
-        topic, refined, history), encoding="utf-8")
-    state_file.write_text(
-        json.dumps(
-            {
-                "status": "completed",
-                "writer_model": writer_model,
-                "reviewer_model": reviewer_model,
-                "rounds": len(history),
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-    console.print(f"[bold green]Refined topic:[/bold green] {refined}")
-    console.print(f"[bold green]Artifacts:[/bold green] {run_dir}")
-
-    if run_pipeline_after:
-        pipeline_state, memo = run_pipeline(
-            topic=refined,
-            proposer_model=writer_model,
-            skeptic_model=reviewer_model,
-            moderator_model=moderator_model,
-            output_dir=output_dir,
-            resume=False,
-            strict_gates=True,
-            human_checkpoint=False,
-        )
-        console.print(
-            f"[bold green]Pipeline state:[/bold green] {pipeline_state}")
-        console.print(f"[bold green]Final memo:[/bold green] {memo}")
-
-
-@models_app.command("list")
-def models_list() -> None:
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-
-    table = Table(title="Available models")
-    table.add_column("name")
-    table.add_column("provider")
-    table.add_column("endpoint")
-    table.add_column("base_url_env")
-    table.add_column("api_key_env")
-    for name, spec in registry.models.items():
-        table.add_row(name, spec.provider, spec.endpoint,
-                      spec.base_url_env, spec.api_key_env)
-    console.print(table)
-
-    role_table = Table(title="Current role mapping")
-    role_table.add_column("role")
-    role_table.add_column("model")
-    for role, model in runtime.model_dump().items():
-        ready, reason = role_api_ready(model, registry)
-        status = "ready" if ready else reason
-        role_table.add_row(role, f"{model} ({status})")
-    console.print(role_table)
-
-
-@models_app.command("set")
-def models_set(
-    role: str = typer.Argument(
-        ..., help="Role: proposer|skeptic|moderator|pipeline_writer|pipeline_reviewer|pipeline_moderator"),
-    model: str = typer.Argument(..., help="Model name from registry"),
-) -> None:
-    registry = load_registry()
-    valid_roles = {
-        "proposer",
-        "skeptic",
-        "moderator",
-        "pipeline_writer",
-        "pipeline_reviewer",
-        "pipeline_moderator",
-    }
-    if role not in valid_roles:
-        raise typer.BadParameter(f"Unknown role: {role}")
-
-    cfg = set_role_model(role=role, model_name=model, registry=registry)
-    console.print(f"[green]Updated[/green] {role} -> {getattr(cfg, role)}")
-
-
-@models_app.command("doctor")
-def models_doctor(
-    online: bool = typer.Option(
-        False, help="Run real API smoke tests for mapped role models"),
-) -> None:
-    registry = load_registry()
-    runtime = load_runtime_roles(registry)
-
-    table = Table(title="Model doctor")
-    table.add_column("role")
-    table.add_column("model")
-    table.add_column("config")
-    table.add_column("online")
-
-    client = LLMClient() if online else None
-    for role, model in runtime.model_dump().items():
-        ready, reason = role_api_ready(model, registry)
-        online_result = "skipped"
-        if online and ready and client is not None:
-            try:
-                _ = client.chat(
-                    model=model,
-                    system_prompt="You are a concise assistant.",
-                    user_prompt="Return exactly: OK",
-                    temperature=0.0,
-                )
-                online_result = "ok"
-            except requests.exceptions.HTTPError as e:
-                status = e.response.status_code if e.response is not None else "?"
-                body = ""
-                if e.response is not None:
-                    body = (e.response.text or "").replace("\n", " ")[:80]
-                online_result = f"http:{status}:{body}" if body else f"http:{status}"
-            except Exception as e:
-                online_result = f"fail:{type(e).__name__}"
-        elif online and not ready:
-            online_result = "not-configured"
-
-        table.add_row(
-            role, model, reason if not ready else "ready", online_result)
-
-    console.print(table)
-
-
-if __name__ == "__main__":
-    app()
+@app.command(name='restart-direction')
+def restart_direction(ctx: typer.Context, run_id: str, approve_scope_change: bool = typer.Option(False)):
+    """用户明确批准后，从新的 discover 开始，不继承通过状态。"""
+    if not approve_scope_change:
+        raise typer.BadParameter('--approve-scope-change is required')
+    store, _ = services(ctx.obj)
+    changes = store.get_scope_changes(run_id)
+    if len(changes) != 1:
+        raise typer.BadParameter('one frozen scope change is required')
+    change = changes[0].model_dump(mode='json')
+    run = new_run(ctx.obj, 'discover', topic=change['proposed_problem_anchor']['question'], budget=ctx.obj.budget_cny,
+        parent_card_id=change['parent_card_id'], parent_card_version=change['parent_card_version'])
+    store.update_run(run.run_id, state={'direction_parent_run': run_id, 'direction_source_event': change,
+        'source_ids': change['original_sources_revisited']})
+    asyncio.run(execute(ctx.obj, run.run_id))

@@ -1,0 +1,6 @@
+draws: 5
+max_rounds: 6
+budget_cny: '20'
+reasoning_effort: max
+archive_window: 8
+allow_stage_transition: false

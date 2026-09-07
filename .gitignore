@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.so
 .venv/
+.venv64/
 venv/
 .env
 .pytest_cache/
@@ -11,5 +12,17 @@ htmlcov/
 *.log
 reports/
 *.db
+*.sqlite
+*.sqlite-*
+.arc/
+.arc-validation/
+work/
+dist/
+build/
+*.tar.gz
+*.whl
+artifacts/
 *.egg-info/
 .zcode/
+
+.venv-wheel/

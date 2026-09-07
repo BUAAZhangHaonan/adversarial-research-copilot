@@ -1,0 +1,6 @@
+{
+  "search_literature": {"service": "scholartrace", "method": "query", "origin": "metadata", "cost_upper_cny": null, "cost_basis": "COST_UNOBSERVABLE"},
+  "read_paper": {"service": "scholaranalysis", "method": "get_paper_text", "origin": "original", "cost_upper_cny": "0", "cost_basis": "SERVICE_AUDIT_LOCAL_MINERU_NO_PAID_API"},
+  "search_web": {"service": "webresearch", "method": "web_search", "origin": "metadata", "cost_upper_cny": "0", "cost_basis": "SERVICE_AUDIT_DETERMINISTIC_WEB_SEARCH"},
+  "read_web": {"service": "webresearch", "method": "fetch_page", "origin": "original", "cost_upper_cny": "0", "cost_basis": "SERVICE_AUDIT_HTTP_FETCH"}
+}
