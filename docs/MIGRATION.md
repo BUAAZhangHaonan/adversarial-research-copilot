@@ -13,4 +13,4 @@
 第一版统一 Flash/Pro、显式 max，生产提示词只在 `prompts/` 中维护。
 
 运行日志、原始模型消息、文献和数据库默认私有且被 gitignore 排除；不要发布到 GitHub。
-本次实现位于任务分支，不改写主分支历史，也不自动推送或合并。
+按2026-09-07用户要求，全部实现保留原细粒度提交快进到master，后续仅维护master，不再新建分支。原验证目录作为detached HEAD档案保留；当前状态见[MASTER_STATUS.md](MASTER_STATUS.md)。

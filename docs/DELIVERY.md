@@ -1,5 +1,7 @@
 # ARC 项目交付说明
 
+本文是6a350bc时点的历史交付记录；当前master归并、发布及未完成项见[MASTER_STATUS.md](MASTER_STATUS.md)。
+
 ARC已按任务书重构为研究idea抽卡、方案展开与可行性压力测试工具。实现位于g203隔离分支；实验执行和论文写作由人完成。工程验证通过；最终保存状态显示L2入口执行完成1/3，L3：E2E记录为stopped_at_develop，selected_card=card_52bce58017164c2b9594c418eb0cac7b；未记录完整自然同卡链。执行完成不等于idea得到科学认可。
 
 ## 实现与位置
