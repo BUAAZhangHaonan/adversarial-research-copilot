@@ -1,46 +1,53 @@
 # ARC master 当前状态
 
-2026-09-08。正式源码为 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，仅维护master；所有修复保留细粒度提交，不新建分支、不压缩历史。
+2026-09-08，快照 2026-09-07T18:57:22.498690+00:00。正式源码位于 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，只维护master，改动按问题细分提交并推送。
 
-## 工程完成情况
+同一自然卡 discover → develop → run 三阶段执行完成。
 
-01f9b02：全套440项测试通过，96.08秒。wheel/sdist构建成功；wheel独立安装后从仓库外验证CLI、模块、64000字符上限、独立纠错额度和提示词资产。日志为 `work/tests-closeout-final.log`、`work/package-build-final.log`、`work/package-install.log`。没有额外文件哈希校验。
+| 阶段 | 状态 | 卡版本 | 判断 | 结束原因 |
+|---|---|---:|---|---|
+| discover | COMPLETED | 1 | — | no_distinct_direction |
+| develop | COMPLETED | 5 | PROMISING | experiment_required |
+| run | COMPLETED | 7 | PROMISING | experiment_required |
 
-- 34cc012：正式需求由用户评估实施，CodeX只在显式开发评估中参与。
-- 2e152b4：read_record上限64000字符，分页、预算及恢复验证。
-- abc8ee2：工具参数与最终JSON各一次纠错。
-- 4563a55 / bd3db80：机械补齐遗漏版本，移除旧版本引用后由Agent重新补证。
-- bbdfcad：完整JSON对象前缀的结构错误一次性诊断，原文不裁剪、不改写。
-- 8688741：用户显式创建失败任务的新版本，成功角色及预算复用。
-- 2cc0384 / b09c859：允许同轮新争点的合法补证请求，并将最终问题/目标/判断分支传递到调查。
-- 01f9b02：对未应用的锚点变更修订提供显式纠正入口；原锚点、原卡、旧响应和拒绝诊断保留。
+`COMPLETED`表示有界研究流程执行到结束；`PROMISING`和实验交接不表示idea已经实验验证。全文未核验、资产内容级核验和真正的实验结果须保留在卡片限制及后续研究工作中。
 
-## 真实验收
+## 实现与工程验证
 
-自然卡为 `card_52bce58017164c2b9594c418eb0cac7b`。原 discover 已完成并保留 MAIN_REPORT v1；CodeX已按授权选卡，未卡在人工选卡审核。
+源码验证 06de446：全套 480 项测试通过（103.44秒）；wheel/sdist构建、仓库外独立安装、CLI与提示词资源核验通过。日志及核验记录为 work/tests-final-reference-diagnostics.log、work/package-build-final.log、work/package-install.log、work/release-verification-current.json。
 
-当前 `natural_runtime_versions_v2.develop` 已保存v3，原问题锚点与v2完全一致。protocol_retry2已接受，随后证据重核也已接受：8条支持findings、1条contrary finding均明确绑定claim v3；14次成功工具调用，工具参数纠错0次、JSON纠错1次。页面级核验与ZIP内容级待核仍区分保留。
+- 34cc012：正式需求由用户评估实施，CodeX仅参与显式开发评估。
+- 2e152b4 / abc8ee2：read_record上限64000字符，分页与恢复；工具参数和JSON各一次纠错。
+- 4563a55 / bd3db80：机械补齐遗漏的主张版本，移除旧版本引用，再由Agent重新选择或补充证据。
+- bbdfcad / 8688741：一次性结构诊断、保留原失败的显式任务新版本。
+- 2cc0384 / b09c859：同轮新争点的合法请求及最终补证请求向下游传递。
+- 01f9b02：冻结锚点误写的显式纠正入口，保留原锚点与原响应。
+- 0fb45fd / 344ef67 / e5b85bb：COMPOSE同响应新主张的请求、已授权父预算复用、固定材料对照的显式纠正版本。
+- 1aa8107：真实读取确认只有元数据后，允许Agent撤回错误引文并保持未决；仍保留verified引文、未读取或未披露限制的输出拒绝。
+- 6b19f4e / 5c395dc：定位争点关闭依据的具体版本错误；卡已保存后的显式应用纠正，仅修争点依据与状态，保留卡片并支持再次显式纠正。
+- c410055：报告区分当前未完成任务与历史失败；已完成阶段保留原错误及追踪入口，不再误报当前阻塞。
+- 06de446：固定材料纠正反馈指出无效引用的完整字段路径、原值和合法引用目录，不猜测证据替换。
 
-当前停在 `round1.moderator.evidence_reassessment` 的预算准入（PENDING），**不是新的协议失败**。develop上限25元，已结算上界10.578927元，剩余14.421073元，小于下一次Pro完整输出预留15.912元。run尚未创建，因此同卡三阶段链仍未全部通过。精确状态见 [CURRENT_VALIDATION_SNAPSHOT.json](CURRENT_VALIDATION_SNAPSHOT.json)。
+原失败包括JSON尾随字符/字段错层、合法新争点请求被拒、方法细节写入冻结锚点，以及元数据来源撤回被错误拦截；随后争点关闭仍引用旧版证据的失败，通过明确诊断和应用纠正任务处理。均保留对应修复和原始记录。不是未递增版本且不给修改机会，也不是等待用户选卡。CodeX已按开发授权选定自然卡，并保持原研究问题。
 
-2026-09-08用户已授权自主分配剩余228元账户余额，本页上一段预算停点现已恢复。父账户累计限额调整至285.562384元（原已花上界57.562384 + 新增最多228），本轮两个阶段共享该边界，不再受旧25元阶段上限阻挡。Pro重评已从同一检查点继续；真实最终结果待当前运行结束后更新。
+## 对照与费用
 
-最初失败是JSON尾随字符、claims字段错层及漏字段；随后定位到同轮新争点被错误拒绝、补证请求未向下游传递，以及新增方法细节写入冻结锚点。均已有对应修复或用户明确的纠正任务，不把它们称为科学否决。具体响应指针和真实补证效果见 [RUNTIME_VERSION_LIVE_RESULT.md](RUNTIME_VERSION_LIVE_RESULT.md)。
+三组固定材料对照完成 3/3；逐组科学缺陷、正式selection和匿名自动评价见[L4报告](L4_REPORT.md)。本次匿名自动偏好：rendering → direct-Pro；segmentation → ARC；conflict_holdout → direct-Pro。仅有三个固定案例，尚不能证明ARC普遍优于直接Pro。
 
-父账户仍为 `arc-vnext-validation-20260907`，历史花费不重置；当前新增228元授权见 [预算授权记录](BUDGET_EXTENSION_AUTHORIZATION.md)。当前已结算快照为57.412830–57.562384元，预留0、未知调用0、父级剩余42.437616元；分项见 [COST_REPORT.md](COST_REPORT.md)。旧20→25阶段条件授权已由9月8日自主分配授权替代。正式默认仍每阶段20元。
+父账本累计结算 84.810721–84.960337 元；新增228元授权后追加花费上界 27.397953 元，剩余 200.602047 元，预留0、未知调用0。历史花费未重置。 用户所述“当天61元”为账户/日期口径，不能直接等同项目累计账本。完整分项见[费用报告](COST_REPORT.md)。生产默认仍每阶段20元；本次开发共享原已花57.562384元加新增228元的累计限额285.562384元。
 
-L4三组旧对照尚无完整匿名评价，保持未完成，不声称ARC优于直接Pro。实验、训练、论文写作及材料访问限制仍由人处理。详细边界见 [DELIVERY.md](DELIVERY.md) 与 [L4_REPORT.md](L4_REPORT.md)。
+非arXiv全文获取需求及候选方案见[能力支线](CAPABILITY_FOLLOWUPS.md)。正式版本由用户评估实施；CodeX不在生产环路。
 
-## 清理与提交边界
+## 清理与原件
 
-已清理本轮g203 `.pytest_cache` 与 `work/package-install-check` 安装测试环境，保留440项测试日志、安装核验记录和wheel/sdist。
+已清理废弃计划、旧生成报告的版本跟踪和本轮g203测试缓存/安装临时环境，保留必要测试日志与安装包。参考项目、输入材料、密钥及真实数据库/响应不属于测试垃圾，不删除或推送。
 
-已将9份针对废弃pipeline/chat-mode/YAML控制的旧计划从当前树删除；81个旧生成报告停止版本跟踪，但服务器原件保留，历史提交也可追溯。参考项目、输入文档、密钥及真实验证数据库/文献不属于本地测试垃圾，不删除或发布。
+以下三处Windows临时副本永久删除曾被自动审批以 blocked by policy 拒绝，未绕过，仍未删除：
 
-上一轮本地清理盘点为下列三处，当时共15150个文件、456905914字节；本轮继续使用已保留的源码镜像，数量未重新盘点。永久删除被执行环境的自动审批以`blocked by policy`拒绝；没有换工具绕过。因此这些本地产物仍未删除，清理不应记成完成：
+- `E:\OneDrive\文档\Playground\work\arc-vnext`
+- `E:\OneDrive\文档\Playground\work\arc-vnext-source.tar`
+- `C:\Users\zhn19\Documents\Codex\2026-09-06\new-chat\outputs\delivery-6a350bc`
 
-- `E:\OneDrive\文档\Playground\work\arc-vnext`：临时源码镜像、两个测试环境、缓存和fixture，正式修改已在g203 master。
-- `E:\OneDrive\文档\Playground\work\arc-vnext-source.tar`：旧源码传输包。
-- `C:\Users\zhn19\Documents\Codex\2026-09-06\new-chat\outputs\delivery-6a350bc`：旧分支交付副本；当前状态以本文件及远程master为准。
+本次没有额外文件哈希或SHA256校验。既有运行时检查点身份与来源定位机制保留。
 
-本次没有进行文件哈希或SHA256校验；仅使用Git状态/提交关系、文本差异和文件存在性等必要检查。既有运行时用于检查点身份和证据定位的内部机制未因本次运维请求而重构。
+研究原件保留于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation`。逐条实现映射见[IMPLEMENTATION_AUDIT](IMPLEMENTATION_AUDIT.md)，真实任务指针见[当前快照](CURRENT_VALIDATION_SNAPSHOT.json)。

@@ -1,23 +1,23 @@
 # ARC 当前交付说明
 
-ARC 的范围是研究 idea 抽卡、方案展开与可行性压力测试。实验执行和论文写作由人完成；PROMISING 只表示值得继续调查。当前源码在 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，只维护并推送 master。
+ARC聚焦研究idea抽卡、方案展开与可行性压力测试；实验和论文由人完成。正式源码在g203，唯一master。
 
-## 实现与验证
+同一自然卡 discover → develop → run 三阶段执行完成。
 
-- 三个独立入口 discover/develop/run，各阶段默认结束即停；最多五次发现机会、不可变卡版本、主张与争点、来源登记、预算与恢复、中文档案和报告均保留。
-- 仅 DeepSeek V4 Flash/Pro，语义调用 max、完整输出上限 384000；默认每阶段20元。本次开发沿用原父账本，9月8日起按新增最多228元授权继续收尾，追加范围见[授权记录](BUDGET_EXTENSION_AUTHORIZATION.md)。
-- 工具读取上限64000字符；工具参数与最终JSON各有一次纠错。正文或条件改变后机械递增漏填版本，移除旧版本证据引用，再让Agent重新取证。
-- 协议失败可由用户显式创建任务新版本，保留原失败、已完成角色和同一账本。正式改进需求由用户评估和实施，CodeX只在开发中按授权参与。
-- 最新代码验证：01f9b02，440项测试通过（96.08秒）。wheel/sdist构建成功，wheel独立安装后从仓库外验证CLI注册、源码功能和提示词资源；未做额外哈希校验。
+| 阶段 | 状态 | 卡版本 | 判断 | 结束原因 |
+|---|---|---:|---|---|
+| discover | COMPLETED | 1 | — | no_distinct_direction |
+| develop | COMPLETED | 5 | PROMISING | experiment_required |
+| run | COMPLETED | 7 | PROMISING | experiment_required |
 
-最新真实同卡链、费用和研究结论见[当前状态](MASTER_STATUS.md)、[真实续跑](RUNTIME_VERSION_LIVE_RESULT.md)、[费用报告](COST_REPORT.md)。[早期验收记录](E2E_REPORT.md)保留原失败和历史快照，不代表当前执行状态。
+源码验证 06de446：全套 480 项测试通过（103.44秒）；wheel/sdist构建、仓库外独立安装、CLI与提示词资源核验通过。日志及核验记录为 work/tests-final-reference-diagnostics.log、work/package-build-final.log、work/package-install.log、work/release-verification-current.json。
 
-L4三组旧对照尚无完整匿名评价，保持未完成，不能据此声称ARC优于直接Pro。任务书允许在预算及材料受限时交付实际完成范围；不通过重复抽卡改写旧失败。[L4原记录](L4_REPORT.md)。
+逐条任务书的实体/证据/版本、提示词资产、SQLite与档案、预算/模型/MCP、三个工作流、中文报告和CLI实现映射见[逐条审计](IMPLEMENTATION_AUDIT.md)。后续协议修复见[当前状态](MASTER_STATUS.md)、[协议纠正](PROTOCOL_CORRECTION.md)，均保留细粒度Git历史。
 
-## 文档与保留边界
+仅使用DeepSeek V4 Flash/Pro，语义调用max、完整输出上限384000。read_record支持64000字符；工具参数与JSON各一次纠错。改动后的claim移除旧版本引用后重新补证；正式能力需求由用户评估实施。
 
-[逐条实现审计](IMPLEMENTATION_AUDIT.md)及[执行清单](IMPLEMENTATION_CHECKLIST.md)保留早期映射；后续修复以当前状态和细粒度Git提交为准。[参考项目比较](reference-review-notes.md)、[运行用法](../README.md)、[协议纠正](PROTOCOL_CORRECTION.md)。
+三组固定材料对照完成 3/3，结果及科学边界见[L4报告](L4_REPORT.md)。本次匿名自动偏好：rendering → direct-Pro；segmentation → ARC；conflict_holdout → direct-Pro。仅有三个固定案例，尚不能证明ARC普遍优于直接Pro。 父账本累计结算 84.810721–84.960337 元；新增228元授权后追加花费上界 27.397953 元，剩余 200.602047 元，预留0、未知调用0。历史花费未重置。
 
-原始研究数据库、文献、模型响应与工具结果保留在 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation`，不作为测试垃圾删除或推送。旧分支已移除；该历史目录为detached研究档案。当前交付不依赖旧分支bundle或旧MANIFEST。
+PROMISING是调查价值判断，流程执行完成不等于实验有效、新颖性已证明或论文可发表。非arXiv原文获取作为[可选支线](CAPABILITY_FOLLOWUPS.md)保留，缺失正文不冒充已验证证据。
 
-旧计划和过期生成报告的版本跟踪已清理。三处Windows临时副本的永久删除曾被自动审批拒绝，仍未删除，具体路径见[当前状态](MASTER_STATUS.md)；未绕过拒绝或宣称清理完成。没有执行训练、实验或论文生成。
+旧计划和旧报告跟踪已清理；g203研究数据库、文献、模型响应及参考项目保留。三处Windows临时副本删除被自动审批拒绝，未删除，具体路径见[当前状态](MASTER_STATUS.md)。没有执行训练、实验或论文生成，也未做额外哈希校验。
