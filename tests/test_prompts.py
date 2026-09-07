@@ -81,6 +81,26 @@ def test_registered_developer_import_preserves_user_question_provenance():
     assert 'Do not invent a replacement question' in system
 
 
+def test_existing_card_affected_claims_exact_difference_is_visible_without_overriding_import():
+    from arc.schemas import Claim
+    loader=PromptLoader(ASSETS)
+    rendered=loader.render('developer.INVOKE',DATA,schema=SCHEMA)
+    system=rendered.messages[0]['content']
+    addition=system.split('## Exact affected claims when revising an existing card',1)[1]
+    assert 'applies only when revising an existing original research card' in addition
+    assert 'exactly the set of IDs whose complete Claim object differs' in addition
+    assert 'every added claim, every deleted claim' in addition
+    assert 'Do not include unchanged claims' in addition
+    assert 'including version-only or evidence-only changes and changes to list order' in addition
+    for field in Claim.model_fields:
+        assert f'`{field}`' in addition
+    assert 'For a deleted claim, use its original claim version' in addition
+    assert 'use its proposed claim version' in addition
+    imported=loader.render('developer.IMPORT',DATA,schema=SCHEMA).messages[0]['content']
+    assert 'developer.IMPORT has no previous ARC card' in imported
+    assert 'affected_claims and evidence_review refer only to actual supplied registered claims' in imported
+
+
 def test_investigator_searches_copy_actual_trace_identity_and_coverage():
     rendered=PromptLoader(ASSETS).render('investigator.INVOKE',DATA,schema=SCHEMA)
     assert 'Include every successful search trace exactly once' in rendered.messages[0]['content']

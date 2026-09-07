@@ -26,3 +26,5 @@
 `explicit_input_schema_v2.run.import`的首稿通过了当时公布的JSON Schema，却违反既有Pydantic规则：0张GPU与正GPU-hours不一致。一次格式修复又产生非法JSON，真实暂停和原件均保留，见[L2协议审计](L2_SCHEMA_FORK_PROTOCOL_REVIEW.md)。这属于开发用例暴露的协议实现缺口，不是留出主题的科学结果调参。
 
 在正在执行的v2 develop结束后，将既有资源单位、GPU配置及0 GPU工时约束同步到公布schema，不改变原校验标准。完整工程测试与独立wheel安装通过后，用原`explicit_input.run`完全相同的输入进行一次`explicit_input_schema_v3.run`实际验证，独立默认20元账户仍归原100元父账户。记录代码提交、输入hash和原run；不复用旧科学判断、不修改原输出。该验证仅用于修复后的run入口，遇到新的暂停保留停点，不增加修复次数或额外预算，也不重跑留出对照。
+
+v2 develop最终停于`AFFECTED_CLAIMS_COVERAGE`：它列出全部四条主张，但只有两条实际变化。原有验证器要求精确差集，提示词却没有说明“不含未变项”，因此在同一批修复中将该既有规则追加至developer Markdown，只适用于已有原卡的修订，不改变IMPORT语义或校验标准。旧稿与失败记录保留，不直接修剪列表后重判成功；后续仍是上段唯一v3 run验证。
