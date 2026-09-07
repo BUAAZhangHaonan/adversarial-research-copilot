@@ -21,4 +21,12 @@ V3的共享调查、COMPOSE及novelty在原生工具循环后多次返回非JSON
 
 原件保存在隔离目录 `/home/g203/zhanghaonan/arc-vnext-20260907` 的 `.arc-validation/artifacts/runs/<run_id>/joint-protocol-audit.json`；汇总日志为 `work/live-joint-probe.log`。本次只读核对了日志及两份审计文件路径，未为文档重新发请求。两个子账各有三条调用记录，其中两条模型请求、一条本地工具调用；费用区间不是正式发票或父账本总费用。
 
-相邻提交 `2b8b79a` 另冻结comparison.boundaries与shuffle_seed，并追加公共EvidenceRequest归属说明；这不等于执行了L4。V3卡虽已保存，旧novelty仍因一次修复后三个request目标全null而 `INVALID_OUTPUT_AFTER_REPAIR`，子账4.529248–4.539975元，没有accepted novelty或科学裁决。明确标记的 `explicit_input.develop/run` 正在验证L2入口，尚无结果；L3未完成，L4未执行。联合协议成功只关闭这里的参数组合验证，后续科研判断仍须完整schema、原文与目标归属检查，分层结果见 [E2E_REPORT](E2E_REPORT.md)。
+相邻提交 `2b8b79a` 另冻结comparison.boundaries与shuffle_seed，并追加公共EvidenceRequest归属说明；这不等于执行了L4。V3卡虽已保存，旧novelty仍因一次修复后三个request目标全null而 `INVALID_OUTPUT_AFTER_REPAIR`，子账4.529248–4.539975元，没有accepted novelty或科学裁决。上述联合probe时，L2明确输入仍在验证，L3未完成、L4未执行；后续状态以 [E2E_REPORT](E2E_REPORT.md) 为准。联合协议成功只关闭这里的参数组合验证，后续科研判断仍须完整schema、原文与目标归属检查。
+
+## 后续固定材料任务的空正文失败
+
+2026-09-07的L4分割案例中，ARC FRAME首次调用`call_82f4d131de9f41b6a5fca6a7dd588846`返回`finish_reason=stop`，但正文为空。保存的2078个SDK解析chunks包含2077个null content和1个空字符串，正文共0字符；reasoning共4129字符。两者逐delta拼接都与saved message完全相同，未发现遗漏或异常delta形状；这里没有独立HTTP wire抓包，不扩大证据范围。
+
+usage为prompt=213448、completion=2076、reasoning=2076、total=215524。请求及返回别名均为Flash，thinking enabled、effort=max、max_tokens=384000、JSON模式与stream/include_usage均存在，未提供tools/tool_choice。模型输出被保存后仅进行一次格式修复；修复返回blocked，说明空响应没有可保留的科学判断，任务为PAUSED_EXTERNAL/frozen_material_blocked，未伪造FrameResult或重新开展研究来补齐格式。
+
+只读核对记录为`work/empty-frame-audit.json`，SHA256为`a4688cd0e9d2208f231400578b9f94e13ba451e788a49a5307ce93f8880adeed`，含request/state原件路径与hash。该事实说明这次SDK可见响应确实为空，不能用单次结果估算故障率，或推断由输入长度、模型版本等具体因素导致。

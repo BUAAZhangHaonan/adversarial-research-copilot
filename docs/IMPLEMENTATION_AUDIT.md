@@ -14,9 +14,9 @@
 
 Flash/Pro均已完成JSON、native tools、thinking/max、384000输出上限和stream的联合真实探针。每模型两次模型请求、一次实际read_record、repair_count=0，最终finish_reason=stop，均为COMPLETED。它们共用原100元父账户；实际请求ID、工具ID、费用及原件指针见 [JSON_TOOL_PROTOCOL](JSON_TOOL_PROTOCOL.md) 与 [E2E_REPORT](E2E_REPORT.md)。该读取是run元数据，不能代替影响科研争点的新证据。
 
-L2显式软件输入develop当前为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡。Rendering自然run的shared_investigation已在bac3659下零新增调用恢复为ACCEPTED并登记19条findings，后续抽卡已resume，仍待结果；恢复明细见下文。
+L2显式软件输入develop当前为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡。Rendering自然run的shared_investigation已在bac3659下零新增调用恢复为ACCEPTED并登记19条findings，随后自然卡v1已保存，draw1.novelty在PENDING时因阶段预留不足暂停，selector未执行；最新停点见下文。
 
-V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty。L2三入口尚未全部完成，L3自然同卡和L4同材料对照仍未完成；已有工程测试和联合探针不能关闭这些验收项。
+V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty。L2三入口尚未全部完成，L3自然同卡未完成；L4同材料对照已按计划启动，尚无结果。已有工程测试和联合探针不能关闭这些验收项。
 
 ## 十八项决定逐条对应
 
@@ -115,7 +115,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 | 判断边界 | replaced；`tests/test_selection.py` 六类测试及 test_required_knowledge_gates_cannot_be_marked_not_applicable、test_not_applicable_is_allowed_only_for_stitching_check；`tests/test_contracts.py`：test_reasonable_unperformed_experiment_can_be_promising_handoff。 | 合成例验证门槛，不验证实际科学判断正确。 |
 | 预算 | replaced；`tests/test_budget.py`：test_five_draws_share_one_stage_budget_and_resume、test_parent_includes_all_child_stages_and_own_calls、test_unknown_attempt_preserves_reservation_and_retry_is_separate；`tests/test_pricing.py`：test_tariff_boundary_and_reasoning_is_not_double_billed、test_missing_cache_and_usage_keep_conservative_upper；`tests/test_mcp.py`：test_unobservable_cost_blocks_before_session。 | 已知服务上界不能冒称正式逐请求发票。 |
 | 完成当前回复 | replaced；`tests/test_runtime.py`：test_budget_admission_precedes_draw_callback_and_no_dynamic_shortening、test_nonempty_invalid_finish_never_accepted_or_repaired；`tests/test_pricing.py`：test_full_context_joint_upper_covers_both_long_input_and_long_output。 | 不故意烧光20元制造真实边界；完整读取在mock精确测。 |
-| 恢复 | replaced（离线）；`tests/test_workflows.py`：test_resume_reuses_proposer_skeptic_and_long_context_tail；`tests/test_runtime.py`：test_successful_tool_reused_after_next_request_budget_pause、test_response_saved_before_validation_recovers_locally_after_long_pause、test_corrupt_snapshot_refuses_resume_without_new_model_request；`tests/test_prompts.py`：test_resumed_repair_uses_frozen_markdown_not_live_templates。 | blocked：真实断SSH与实际等待超过24小时尚无独立验收记录；旧时间戳测试只证明没有时间硬过期。已有真实检查点恢复单独记于E2E_REPORT。 |
+| 恢复 | replaced（离线）；`tests/test_workflows.py`：test_resume_reuses_proposer_skeptic_and_long_context_tail；`tests/test_runtime.py`：test_successful_tool_reused_after_next_request_budget_pause、test_response_saved_before_validation_recovers_locally_after_long_pause、test_corrupt_snapshot_refuses_resume_without_new_model_request；`tests/test_prompts.py`：test_resumed_repair_uses_frozen_markdown_not_live_templates。 | confirmed_fixed：work/ssh-detached-verification.json证明启动SSH正常退出后独立进程继续完成真实响应/repair并开始下一任务。blocked：实际超过24小时、强制断网及provider断流恢复仍未实测；旧时间戳测试只证明没有时间硬过期。 |
 | 证据 | confirmed_fixed / replaced；`tests/test_mcp.py`：test_strict_arguments_and_untrusted_urls；`tests/test_store.py`：test_missing_or_invented_source_and_excerpt_are_rejected、test_secondary_analysis_cannot_be_marked_original_or_verified、test_source_mirrors_share_canonical_identity_not_independent_evidence、test_same_named_claims_on_different_cards_cannot_transfer_target_evidence；`tests/test_selection.py`：test_covered_work_cannot_borrow_verified_evidence_from_another_source。 | exact摘录不证明复合主张成立，见V3_EVIDENCE_REVIEW。 |
 | 上下文 | replaced；`tests/test_workflows.py`：test_context_contains_only_relevant_evidence_not_entire_archive、test_resume_reuses_proposer_skeptic_and_long_context_tail；`tests/test_store.py`：test_full_original_preserves_decisive_condition_at_long_document_end、test_same_chinese_title_does_not_collide_and_archive_is_paginated；`tests/test_runtime.py`：test_native_tool_reasoning_association_and_trace、test_service_adapter_registers_original_without_truncating_paper。 | 没有量化声称中文召回率或实际token节省。 |
 | 提示词 | replaced；`tests/test_prompts.py`：test_unregistered_or_missing_resources_fail_before_invocation、test_duplicate_manifest_and_undefined_variables_fail、test_data_is_never_a_template_and_repair_retains_semantic_contract、test_ast_checks_dict_tool_descriptions_and_raw_messages；`tests/test_runtime.py`：test_repair_cannot_invent_reference。 | AST只扫描生产ARC，不扫描第三方references。 |
@@ -155,7 +155,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 | D6 全部Markdown | already_fixed（附录A、B4/B5、生产AST）；完整来源hash/安装资源验证如下。 |
 | D7 两模型真实max | confirmed_fixed（B17及E2E_REPORT两次真实probe）；没有比较不同思考强度优劣。 |
 | D8 阶段/父预算/完整回复 | replaced（§11预算/回复行）；blocked（最终累计费用与外部未知费用的完整交付仍待记录）。 |
-| D9 恢复不偷换成功 | confirmed_fixed / replaced（§11恢复/证据行、V2拒绝和V3独立recheck）；真实>24h/断SSH证据尚缺。 |
+| D9 恢复不偷换成功 | confirmed_fixed / replaced（§11恢复/证据行、V2拒绝和V3独立recheck）；启动SSH正常退出后的独立进程存活已实测；实际>24h、强制断网/provider断流恢复仍未验证。 |
 | D10 转向单事件 | replaced（test_scope_change_audits_original_freezes_once_and_does_not_develop_branch、test_scope_change_cannot_claim_original_revisit_without_read_trace）。 |
 | D11 来源/成本/权限 | replaced（§11证据/安全行、B3/B5）；源可定位与科学论证成立分别报告。 |
 | D12 中文报告/无假证明 | already_fixed（`tests/test_reports.py` 的 test_report_preserves_state_judgments_versions_and_costs、test_later_stage_reports_final_assessment_instead_of_old_selection）；blocked（真实最终卡/费用报告和L4人审尚未关闭）。 |
@@ -174,7 +174,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 附录 B5 的完整输入/恢复检查有直接测试：tests/test_runtime.py 的 test_nested_existing_input_evidence_manifest_and_actual_dependency_snapshot、test_corrupt_snapshot_refuses_resume_without_new_model_request、test_changed_sdk_environment_requires_explicit_fork；tests/test_prompts.py 的 test_production_prompt_boundary 扫描 ARC AST，test_ast_boundary_rejects_illegal_calls_and_ignores_third_party 明确排除第三方目录。这些检查与单纯搜索提示词关键字不同。
 
-§11 的“超过24小时”恢复使用旧日期和重建 runtime 的离线模拟：test_response_saved_survives_parse_failure_and_old_date、test_response_saved_before_validation_recovers_locally_after_long_pause。它们不证明已经等候24小时，也不证明已实际切断SSH再连接。SSH存活性需结合独立进程启动方式和真实运行记录；现有表格不把它列为已完成实测。
+§11 的“超过24小时”恢复使用旧日期和重建 runtime 的离线模拟：test_response_saved_survives_parse_failure_and_old_date、test_response_saved_before_validation_recovers_locally_after_long_pause。它们不证明已经等候24小时。独立的work/ssh-detached-verification.json现已记录启动SSH正常退出后，从新连接观察ARC继续完成响应并开始下一任务；该精确定义的SSH退出存活已实测，不扩大为强制断网或provider流式断流恢复。
 
 IMPLEMENTATION_CHECKLIST 的 D1 勾选代表已提交版本的替换实现与离线工程检查，不能代替 §11 全部真实场景；E0、E1a、E1b分别记录计划、协议探针和三入口数据传递。具体测试版本、运行状态与费用以 E2E_REPORT 和最终账本报告为准，不用历史测试数量推断待提交修复的结果。
 
@@ -229,4 +229,20 @@ V3原最终回复不是JSON；仅一次格式修复后返回complete，但3个�
 
 `bac3659`的禁止新增模型/工具动作恢复已通过：shared_investigation为 `ACCEPTED`，error=None，19条findings已登记；原始raw及除actual_searches外的研究字段完全不变，repair_count=1，new_model_or_tool_calls=0。恢复窗口父账本保持1157调用、人民币18.981215–18.992283、reserved=0。审计路径相对于 `.arc-validation/artifacts/`：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`；normalization审计hash为 `16cd9bf3476c7e3c032d3b24b245708b2fe9c1e63d5847a625d40a8f5be540e4`。该账本快照不包含随后已恢复的自然抽卡新增调用。
 
-上述恢复是真实本地恢复证据，不是重新生成科研内容，也不关闭L2/L3/L4。后续自然抽卡已resume；本次只勾选工程与已完成的受控恢复，完整流程、质量对照、实际断SSH/超过24小时以及最终父账本结算仍缺相应验收记录。
+上述恢复是真实本地恢复证据，不是重新生成科研内容，也不关闭L2/L3/L4。后续自然抽卡已到卡保存及新颖性预算准入暂停；本次只勾选工程与已完成的受控恢复，完整流程、质量对照、实际超过24小时、强制断网/provider断流恢复以及最终父账本结算仍缺相应验收记录；启动SSH正常退出后的独立进程存活另已实测。
+
+## 最新自然阶段与报告验证边界
+
+Rendering自然run已保存 `card_52bce58017164c2b9594c418eb0cac7b` v1，共10条claims，题目为T-LESS固定场景外观/几何覆盖轴正交归因。frame/shared/archive/next/compose/card_archive均为ACCEPTED；draw1.novelty仍为PENDING，run停为 `PAUSED_BUDGET / budget_not_admitted`，没有accepted novelty，selector未执行。
+
+该阶段子账为140调用、人民币4.209140–4.209176、reserved=0；剩余15.790824低于下一次Pro完整请求15.912预留。这是请求发起前的预算准入暂停，并未花完20元，也不是科研否决。父入口快照为1231调用、人民币21.887283–21.898374、reserved=0、remaining=78.101626；父余额不替代阶段独立上限，未将父账户剩余挪给该阶段。
+
+E2E_RESULT记录L2 discover为PAUSED_BUDGET、L3为not_completed、selected_card=null。L4已按EVAL_PLAN于2026-09-07 08:11:25 UTC启动，顺序为segmentation V3、rendering、固定conflict holdout；目前仅记录运行中，无评价结果。L2/L3/L4均不关闭。
+
+真实报告在隔离目录重建的审计为 `work/report-check-bac3659/arc-vnext-validation-20260907.explicit_input.develop/AUDIT_RESULT.json`：7条引用均属于同一run，跨run引用数为0；研究记录hash及PAUSED_BUDGET状态保持不变。因此，本次真实重建只证明所观察报告重建不改变研究状态；跨run链接真实分支未观测，目前仅有 `tests/test_reports.py` 的 test_cross_run_report_resolves_only_referenced_inherited_evidence 等真实Store离线回归证据。
+
+## 启动SSH退出后的独立进程存活
+
+真实独立进程验证见 `work/ssh-detached-verification.json`。2026-09-07 08:11:25 UTC通过nohup启动PID 3797713，启动SSH正常exit 0（退出码由主线程当时观察，审计文件明确未独立重采）。08:13:11与08:14:06 UTC的新连接均观察到PPID=1、SID=3797713，启动launcher已退出。首个ARC.frame原始请求 `call_82f4d131de9f41b6a5fca6a7dd588846` 与唯一repair `call_d83ed0a8652e4413b50fa5eeb88a6c6a` 均已完整返回并SETTLED，随后direct-Pro.compose的 `call_89dc686a52714b32aa5c72d343ff7f55` 实际进入IN_FLIGHT。它证明独立ARC进程在启动SSH正常退出后继续工作；不证明强制断网、provider流式断流恢复或实际超过24小时。
+
+验收状态为confirmed_fixed（独立进程跨启动SSH正常退出继续运行）。首个frame的PAUSED_EXTERNAL不影响该进程存活证据，也不能被写成接受了科研frame或完成了L4。实际24小时仍未验证，L2/L3/L4未关闭。

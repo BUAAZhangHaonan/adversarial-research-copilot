@@ -4,7 +4,7 @@
 
 本文件按层级分开工程契约、真实接口、自然研究卡贯穿和自动质量对照。自动判断不是人类认可，PROMISING 不是实验成功。本报告中的独立原文复核由Codex检查已保存材料完成，也不代表人类研究者认可。
 
-截至2026-09-07本次更新：Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty一次结构修复后仍为INVALID_OUTPUT_AFTER_REPAIR，没有accepted novelty。明确标记的软件输入develop停于预算准入，独立run因反复空读在新请求边界由开发者暂停。Rendering shared_investigation在bac3659下由已保存响应与实际搜索trace恢复为ACCEPTED；原raw及研究字段不改，只机械派生actual_searches，未新增模型/工具调用。后续自然抽卡已resume，结果尚待；L2未全部完成，L3未完成，L4未执行。
+截至2026-09-07本次更新：Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty一次结构修复后仍为INVALID_OUTPUT_AFTER_REPAIR，没有accepted novelty。明确标记的软件输入develop停于预算准入，独立run因反复空读在新请求边界由开发者暂停。Rendering shared_investigation在bac3659下由已保存响应与实际搜索trace恢复为ACCEPTED；原raw及研究字段不改，只机械派生actual_searches，未新增模型/工具调用。随后自然卡v1已保存，draw1.novelty在PENDING时因阶段预留不足停为PAUSED_BUDGET，selector未执行。L4已按计划启动，首个segmentation ARC.frame技术暂停，direct-Pro在冻结快照中仍运行，尚无完整对照结果；L2未全部完成，L3未完成，L4未完成。
 
 ## L1：工程与安装包
 
@@ -128,6 +128,22 @@ Task `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.shared_inv
 
 `bac3659`的禁止新增模型/工具动作恢复已通过：shared_investigation为 `ACCEPTED`，error=None，19条findings已登记；原始raw及除actual_searches外的研究字段完全不变，repair_count=1，new_model_or_tool_calls=0。恢复窗口父账本保持1157调用、人民币18.981215–18.992283、reserved=0。审计路径相对于 `.arc-validation/artifacts/`：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`；normalization审计hash为 `16cd9bf3476c7e3c032d3b24b245708b2fe9c1e63d5847a625d40a8f5be540e4`。该账本快照不包含随后已恢复的自然抽卡新增调用。
 
-后续自然抽卡已resume，尚无本次文档可关闭的完整阶段结果。19条摘录登记仍不代表全部科学、许可或可行性主张成立。
+上述零调用恢复后，自然抽卡继续至卡保存；最新预算停点如下。19条摘录登记仍不代表全部科学、许可或可行性主张成立。
 
 L2完整入口、L3自然同卡链、L4同材料对照和最终费用汇总仍未完成。只恢复机械检索记录不能作为科学通过或完成整个discover的依据。
+
+## Rendering自然卡的预算停点与L4启动
+
+Rendering自然run已保存 `card_52bce58017164c2b9594c418eb0cac7b` v1，共10条claims，题目为T-LESS固定场景外观/几何覆盖轴正交归因。frame/shared/archive/next/compose/card_archive均为ACCEPTED；draw1.novelty仍为PENDING，run停为 `PAUSED_BUDGET / budget_not_admitted`，没有accepted novelty，selector未执行。
+
+该阶段子账为140调用、人民币4.209140–4.209176、reserved=0；剩余15.790824低于下一次Pro完整请求15.912预留。这是请求发起前的预算准入暂停，并未花完20元，也不是科研否决。父入口快照为1231调用、人民币21.887283–21.898374、reserved=0、remaining=78.101626；父余额不替代阶段独立上限，未将父账户剩余挪给该阶段。
+
+E2E_RESULT记录L2 discover为PAUSED_BUDGET、L3为not_completed、selected_card=null。L4已按EVAL_PLAN于2026-09-07 08:11:25 UTC启动，顺序为segmentation V3、rendering、固定conflict holdout；目前仅记录运行中，无评价结果。L2/L3/L4均不关闭。
+
+真实报告在隔离目录重建的审计为 `work/report-check-bac3659/arc-vnext-validation-20260907.explicit_input.develop/AUDIT_RESULT.json`：7条引用均属于同一run，跨run引用数为0；研究记录hash及PAUSED_BUDGET状态保持不变。因此，本次真实重建只证明所观察报告重建不改变研究状态；跨run链接真实分支未观测，目前仅有 `tests/test_reports.py` 的 test_cross_run_report_resolves_only_referenced_inherited_evidence 等真实Store离线回归证据。
+
+## 启动SSH退出后的独立进程存活与L4首个技术停点
+
+真实独立进程验证见 `work/ssh-detached-verification.json`。2026-09-07 08:11:25 UTC通过nohup启动PID 3797713，启动SSH正常exit 0（退出码由主线程当时观察，审计文件明确未独立重采）。08:13:11与08:14:06 UTC的新连接均观察到PPID=1、SID=3797713，启动launcher已退出。首个ARC.frame原始请求 `call_82f4d131de9f41b6a5fca6a7dd588846` 与唯一repair `call_d83ed0a8652e4413b50fa5eeb88a6c6a` 均已完整返回并SETTLED，随后direct-Pro.compose的 `call_89dc686a52714b32aa5c72d343ff7f55` 实际进入IN_FLIGHT。它证明独立ARC进程在启动SSH正常退出后继续工作；不证明强制断网、provider流式断流恢复或实际超过24小时。
+
+该首个segmentation V3对照的ARC.frame首次正文为空，唯一repair返回blocked，最终 `PAUSED_EXTERNAL / frozen_material_blocked`，没有accepted frame；ARC子账为人民币1.323994–1.323996。这个记录是技术失败，不是科研否决。08:14:06 UTC冻结快照中direct-Pro仍运行，尚无完整对照或质量评价结果；后续L4结果另行记录。
