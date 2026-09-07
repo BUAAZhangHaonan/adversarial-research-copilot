@@ -11,7 +11,7 @@ from arc.budget import BudgetLedger
 from arc.cli import app
 from arc.config import Settings
 from arc.retrying import prepare_task_retry
-from arc.schemas import TaskRecord
+from arc.schemas import Envelope, ModeratorResult, Subject, TaskRecord
 from arc.store import StateError
 from arc.workflows import WorkflowEngine, WorkflowPause
 from tests.test_selection import research_draft, research_store
@@ -76,6 +76,7 @@ def test_prepare_preserves_failure_science_budget_and_frozen_input(tmp_path):
     old_inputs = copy.deepcopy(run.state['task_inputs'])
     retry = prepare_task_retry(store, ledger, run.run_id, KEY, REASON)
     assert snapshot(store, ledger, run, card) == before
+
     updated = store.get_run(run.run_id)
     assert updated.status == 'RUNNING' and updated.stop_reason is None
     assert updated.budget_account_id == 'stage'
@@ -96,6 +97,103 @@ def test_prepare_preserves_failure_science_budget_and_frozen_input(tmp_path):
     assert repair['previous_successful_tools'][0]['status'] == 'completed'
     with pytest.raises(StateError, match='PROTOCOL_PAUSE'):
         prepare_task_retry(store, ledger, run.run_id, KEY, REASON)
+
+
+def accepted_anchor_failure(store, run, card, *, key=KEY, changed_anchor=True):
+    """A schema-valid model result rejected before saving its proposed card."""
+    source = failed_task(store, run.run_id, key)
+    result = ScriptedRuntime(store).reply('moderator', 'INVOKE', {}, source.task_id)
+    result['proposed_card_revision'] = card.draft.model_dump(mode='json')
+    if changed_anchor:
+        result['proposed_card_revision']['problem_anchor']['conditions'].append(
+            'New measurement details belong in the method, not the frozen anchor.')
+    envelope = Envelope[ModeratorResult](schema_version='arc.v1', task_id=source.task_id,
+        subject=Subject(campaign_id=None, run_id=run.run_id,
+                        card_id=card.card_id, card_version=card.version),
+        result_status='complete', result=ModeratorResult.model_validate(result),
+        evidence_requests=[], capability_requests=[], note=None)
+    saved = json.loads(store.read_artifact(source.response_artifact_path))
+    saved['response']['message']['content'] = envelope.model_dump_json()
+    saved['tool_trace'][0]['result']['record'] = 'Read by ' + key
+    source.response_artifact_path = store.save_artifact(
+        f'tests/{source.task_id}.accepted.json', json.dumps(saved))
+    source.status = 'ACCEPTED'
+    source.error = None
+    source.accepted_result = envelope.model_dump(mode='json')
+    store.put_task(source)
+    state = copy.deepcopy(store.get_run(run.run_id).state)
+    state[KEY] = copy.deepcopy(result)
+    if key != KEY:
+        state[key] = copy.deepcopy(result)
+    state[KEY + '_trace_tasks'] = [source.task_id]
+    state[KEY + '_evidence_requests'] = [{'preserve_in_audit': True}]
+    state['round1.proposer'] = {'already_completed': True}
+    store.update_run(run.run_id, status='PAUSED_PROTOCOL',
+        stop_reason='problem_anchor_changed', state=state)
+    return source, result
+
+
+@pytest.mark.asyncio
+async def test_anchor_application_retry_keeps_accepted_history_and_executes_new_task(tmp_path):
+    store, ledger, run, card = setup_case(tmp_path)
+    first = prepare_task_retry(store, ledger, run.run_id, KEY, REASON)
+    source, result = accepted_anchor_failure(store, run, card, key=first['replacement_key'])
+    before = snapshot(store, ledger, run, card)
+    source_before = source.model_dump(mode='json')
+    source_raw = store.read_artifact(source.response_artifact_path)
+    state_before = copy.deepcopy(store.get_run(run.run_id).state)
+    retry = prepare_task_retry(store, ledger, run.run_id, KEY,
+        'User requests preserving the frozen anchor and relocating measurement details.')
+    assert retry['replacement_key'] == KEY + '.protocol_retry2'
+    assert retry['source_task_id'] == source.task_id
+    assert snapshot(store, ledger, run, card) == before
+    assert store.get_task(source.task_id).model_dump(mode='json') == source_before
+    assert store.read_artifact(source.response_artifact_path) == source_raw
+    state = store.get_run(run.run_id).state
+    assert all(k not in state for k in (KEY, KEY + '_trace_tasks', KEY + '_evidence_requests'))
+    assert state[first['replacement_key']] == result
+    assert state['task_inputs'] == state_before['task_inputs']
+    assert state['round1.proposer'] == state_before['round1.proposer']
+    audit = json.loads(store.read_artifact(retry['audit_path']))
+    assert audit['application_failure']['type'] == 'problem_anchor_changed'
+    assert audit['application_failure']['expected'] == card.draft.problem_anchor.model_dump(mode='json')
+    assert audit['application_failure']['submitted'] == result['proposed_card_revision']['problem_anchor']
+    assert audit['superseded_cached_result'] == result
+    assert audit['protocol_retry']['validation_errors'] == [audit['application_failure']]
+    assert json.loads(audit['protocol_retry']['unaccepted_response']) == source.accepted_result
+    reads = [t['result']['record'] for t in audit['protocol_retry']['previous_successful_tools']]
+    assert 'Already read original source.' in reads
+    assert 'Read by ' + first['replacement_key'] in reads
+    runtime = ScriptedRuntime(store)
+    engine = WorkflowEngine(store, runtime, Settings())
+    corrected = await engine.call(run.run_id, KEY, 'moderator', payload={'must_not_override': True})
+    assert len(runtime.calls) == 1
+    assert runtime.calls[0]['task_id'] == f"{run.run_id}.{retry['replacement_key']}"
+    assert 'must_not_override' not in runtime.calls[0]['payload']
+    assert corrected.proposed_card_revision is None
+    assert store.get_run(run.run_id).state[KEY] == corrected.model_dump(mode='json')
+    assert store.get_task(source.task_id).model_dump(mode='json') == source_before
+    assert store.read_artifact(source.response_artifact_path) == source_raw
+    assert snapshot(store, ledger, run, card) == before
+
+
+@pytest.mark.parametrize('change', ['other_stop_reason', 'unchanged_anchor', 'mismatched_cache'])
+def test_anchor_application_retry_rejects_unrelated_or_inconsistent_state(tmp_path, change):
+    store, ledger, run, card = setup_case(tmp_path)
+    source, _ = accepted_anchor_failure(store, run, card, changed_anchor=change != 'unchanged_anchor')
+    if change == 'other_stop_reason':
+        store.update_run(run.run_id, stop_reason='unknown_evidence_id')
+    elif change == 'mismatched_cache':
+        state = copy.deepcopy(store.get_run(run.run_id).state)
+        state[KEY]['concise_ruling'] = 'Not the accepted source result.'
+        store.update_run(run.run_id, state=state)
+    before = snapshot(store, ledger, run, card)
+    run_before = store.get_run(run.run_id)
+    with pytest.raises(StateError):
+        prepare_task_retry(store, ledger, run.run_id, KEY, REASON)
+    assert snapshot(store, ledger, run, card) == before
+    assert store.get_run(run.run_id) == run_before
+    assert store.get_task(source.task_id) == source
 
 
 @pytest.mark.parametrize('change, expected', [
