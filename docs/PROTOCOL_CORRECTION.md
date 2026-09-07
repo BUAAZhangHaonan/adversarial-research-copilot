@@ -29,3 +29,5 @@ CodeX 检查实现与约束后，通过 `requirements review` 记录推荐、需
 - 需求测试覆盖 CLI 登记→评估→导出、结果完整或 blocked 均登记、恢复幂等、评估不改变预算和运行状态。
 
 真实自然卡的新版本验证使用旧100元父账本，develop/run 各20元，先 develop 完成才选择其版本进入 run。不会因协议改动把旧失败改为通过；实时及最终结果以 [MASTER_STATUS.md](MASTER_STATUS.md) 为准。
+
+本轮真实复验最终因claim版本依赖错误暂停，未触发工具越界；完整结果及已登记的优先改进见[复验报告](PROTOCOL_CORRECTION_LIVE_RESULT.md)。
