@@ -1,9 +1,41 @@
 """Structural evidence gates, never keyword-based scientific scoring."""
-from .schemas import LibrarianResult, SelectorResult, DeveloperResult
+from .schemas import LibrarianResult, SelectorResult, DeveloperResult, ProposerResult, SkepticResult, Envelope
 
 
 class ProtocolViolation(ValueError):
     """A typed response violates a cross-record research contract."""
+
+
+def validate_role_targets(envelope: Envelope, payload: dict) -> None:
+    """Check explicit role IDs against the frozen card and issue ledger only."""
+    result = envelope.result
+    if not isinstance(result, (ProposerResult, SkepticResult)):
+        return
+    card = payload.get('card')
+    if card is not None and (card.get('card_id'), card.get('version')) != (
+        envelope.subject.card_id, envelope.subject.card_version
+    ):
+        raise ProtocolViolation('ROLE_TARGET_CARD_SUBJECT_MISMATCH')
+    claims = {claim['claim_id'] for claim in card['draft']['claims']} if card else set()
+    supplied_issues = payload.get('issues', [])
+    issues = {issue['issue_id']: issue for issue in supplied_issues}
+    if len(issues) != len(supplied_issues):
+        raise ProtocolViolation('ROLE_TARGET_DUPLICATE_ISSUE_ID')
+    if isinstance(result, ProposerResult):
+        # claims_defended/narrowed/withdrawn are prose, not ID fields.
+        for response in result.issue_responses:
+            if response.issue_id not in issues:
+                raise ProtocolViolation('PROPOSER_ISSUE_NOT_IN_CURRENT_LEDGER')
+    else:
+        for criticism in result.criticisms:
+            if criticism.issue_id is not None:
+                issue = issues.get(criticism.issue_id)
+                if issue is None:
+                    raise ProtocolViolation('SKEPTIC_ISSUE_NOT_IN_CURRENT_LEDGER')
+                if criticism.claim_id != issue['claim_id']:
+                    raise ProtocolViolation('SKEPTIC_ISSUE_CLAIM_MISMATCH')
+            elif criticism.claim_id not in claims:
+                raise ProtocolViolation('SKEPTIC_CLAIM_NOT_IN_CURRENT_CARD')
 
 
 def validate_archive_comparisons(result: LibrarianResult, records, store=None):
@@ -78,6 +110,10 @@ def validate_revision(store, original, revision: DeveloperResult):
     reviews = {r.claim_id: r for r in revision.evidence_review}
     if len(reviews) != len(revision.evidence_review) or not changed.issubset(reviews):
         raise ProtocolViolation('CLAIM_REVIEW_COVERAGE')
+    for claim_id in old.keys() - new.keys():
+        review = reviews[claim_id]
+        if review.claim_version != old[claim_id].version or not review.explanation.strip():
+            raise ProtocolViolation('DELETED_CLAIM_REVIEW_VERSION_OR_EXPLANATION')
     for claim_id in changed & new.keys():
         review = reviews[claim_id]
         if review.claim_version != new[claim_id].version or not review.explanation:

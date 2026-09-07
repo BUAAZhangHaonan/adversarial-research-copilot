@@ -116,8 +116,15 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
         content = result.pop('content', None)
         if content is not None:
             offset, limit = arguments.get('offset', 0), arguments.get('limit', 12000)
+            more_cached = offset + limit < len(content)
             result.update(content=content[offset:offset+limit], content_offset=offset,
-                          content_total_chars=len(content), more_content=offset+limit < len(content))
+                          cached_content_chars=len(content), more_cached_content=more_cached,
+                          requires_source_fetch=result.get('content_complete') is False and not more_cached)
+        elif 'source_type' in result and 'access_status' in result:
+            # Search metadata can be opened as metadata, but it is never a body.
+            # Old records may have defaulted content_complete to true without text.
+            result.update(content=None, content_complete=False, cached_content_chars=0,
+                          more_cached_content=False, requires_source_fetch=True)
         return result
     tools['read_record'] = BoundTool('read_record', {'type': 'object', 'properties': {
         'record_id': {'type': 'string'}, 'version': {'type': ['integer', 'null'], 'minimum': 1},
@@ -186,7 +193,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     doi=item.get('doi'), version=None,
                     source_type='paper' if name in {'read_paper', 'search_literature'} else 'web_unclassified',
                     access_status='retrieved' if text else 'metadata_only', content_origin=origin,
-                    content_complete=item.get('content_complete', True),
+                    content_complete=item.get('content_complete', bool(text)),
                     content_total_chars=item.get('content_total_chars', len(text) if text else None),
                     representation_id=item.get('representation_id')), content=text)
                 source_ids.append(source.source_id)
@@ -262,6 +269,8 @@ class Runtime:
 
     def _validate_semantics(self, envelope, payload, state):
         from .store import StateError
+        from .validation import validate_role_targets
+        validate_role_targets(envelope, payload)
         self.store.validate_references(envelope)
         keys = EVIDENCE_REF_KEYS | SOURCE_REF_KEYS
         if reference_ids(envelope, keys) - reference_ids([payload, state['tool_trace']], keys):

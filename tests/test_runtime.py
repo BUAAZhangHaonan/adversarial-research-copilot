@@ -312,7 +312,64 @@ async def test_service_adapter_registers_original_without_truncating_paper(tmp_p
     assert store.get_record(source.source_id)['content']==text
     assert result['sources'][0]['content'] is None and result['sources'][0]['content_requires_read_record']
     excerpt=await tools['read_record'].handler({'record_id':source.source_id,'offset':len(text)-30,'limit':30},{})
-    assert excerpt['content'].endswith('DECISIVE_FINAL_SENTENCE') and not excerpt['more_content']
+    assert excerpt['content'].endswith('DECISIVE_FINAL_SENTENCE') and not excerpt['more_cached_content']
+    assert excerpt['content_complete'] and not excerpt['requires_source_fetch']
+    assert excerpt['content_total_chars']==source.content_total_chars
+    assert excerpt['cached_content_chars']==len(text)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('offset,limit,more_cached,fetch', [(0,24000,True,False), (68000,24000,False,True), (90000,1000,False,True)])
+async def test_partial_source_cache_end_preserves_original_coverage(tmp_path,offset,limit,more_cached,fetch):
+    from arc.runtime import build_tools
+    from arc.schemas import SourceRecord
+    store=Store(tmp_path/'state.sqlite')
+    tail='TRUNCATED_EQUATION___'
+    text='x'*(90000-len(tail))+tail
+    assert len(text)==90000
+    source=store.register_source(SourceRecord(title='Partial original fixture',url='https://example.org/paper',
+        source_type='paper',access_status='retrieved',content_origin='original',
+        content_complete=False,content_total_chars=124840),text)
+    before=store.get_source(source.source_id).model_dump(mode='json')
+    result=await build_tools(store)['read_record'].handler({'record_id':source.source_id,'offset':offset,'limit':limit},{})
+    assert result['content']==text[offset:offset+limit]
+    assert result['content_total_chars']==124840 and result['content_complete'] is False
+    assert result['cached_content_chars']==90000 and result['content_offset']==offset
+    assert result['more_cached_content'] is more_cached and result['requires_source_fetch'] is fetch
+    assert 'more_content' not in result
+    assert store.get_source(source.source_id).model_dump(mode='json')==before
+
+
+@pytest.mark.asyncio
+async def test_unknown_original_length_is_not_replaced_with_cache_length(tmp_path):
+    from arc.runtime import build_tools
+    from arc.schemas import SourceRecord
+    store=Store(tmp_path/'state.sqlite')
+    source=store.register_source(SourceRecord(title='Unknown total fixture',url='https://example.org/unknown',
+        source_type='paper',access_status='retrieved',content_origin='original',
+        content_complete=False,content_total_chars=None),'partial')
+    result=await build_tools(store)['read_record'].handler({'record_id':source.source_id},{})
+    assert result['content_total_chars'] is None and result['cached_content_chars']==7
+    assert result['requires_source_fetch'] and not result['more_cached_content']
+
+
+@pytest.mark.asyncio
+async def test_metadata_only_source_reads_expose_missing_body_without_claiming_completeness(tmp_path):
+    from arc.runtime import build_tools
+    from arc.schemas import SourceRecord
+    store=Store(tmp_path/'state.sqlite')
+    # Reproduce old metadata records which incorrectly defaulted to complete.
+    source=store.register_source(SourceRecord(title='Metadata fixture',url='https://example.org/metadata',
+        source_type='paper',access_status='metadata_only',content_origin='metadata',content_complete=True))
+    before=store.get_source(source.source_id).model_dump(mode='json')
+    tool=build_tools(store)['read_record']
+    for offset in (0,3000):
+        result=await tool.handler({'record_id':source.source_id,'offset':offset,'limit':3000},{})
+        assert result['content'] is None and result['content_complete'] is False
+        assert result['content_total_chars'] is None and result['cached_content_chars']==0
+        assert result['requires_source_fetch'] and not result['more_cached_content']
+        assert result['content_origin']=='metadata' and result['access_status']=='metadata_only'
+    assert store.get_source(source.source_id).model_dump(mode='json')==before
 
 
 @pytest.mark.asyncio
@@ -330,6 +387,7 @@ async def test_service_search_snippet_stays_metadata(tmp_path):
     source=store.get_source(result['source_ids'][0])
     assert source.content_origin=='metadata' and source.access_status=='metadata_only'
     assert source.content_path is None and source.source_type=='web_unclassified'
+    assert source.content_complete is False and source.content_total_chars is None
 
 
 @pytest.mark.asyncio

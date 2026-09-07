@@ -16,6 +16,7 @@ def card_payload():
         "minimal_test":{"intervention":"改变噪声","controls":["固定数据"],"measurements":["误差"],"positive_controls":["已知信号"],"outcome_interpretations":[{"outcome":"误差改变","interpretation":"支持测量解释","validity_limit":"阳性对照正常"}],"confounds_not_yet_ruled_out":[]},
         "resources":{"gpu_type":"RTX 3090","gpu_memory_gb_assumption":24,"gpu_count":1,"training_gpu_hours_range":None,"inference_gpu_hours_range":{"lower":1,"upper":2,"unit":"GPU-hours"},"wall_hours_range":{"lower":1,"upper":3,"unit":"hours"},"workload_assumptions":{"model_size":"1B","precision":"fp16","sequence_length":1024,"data_amount":"1000 cases","steps":None,"parallelism":"one GPU","non_gpu_steps":"data reading"},"estimate_basis":"synthetic estimate","uncertainty":"range only"},
         "risks":{"decisive_risks":[],"missing_prerequisites":[],"reopen_conditions":[]},
+        "claims":[],
     }
 
 def selection_payload():

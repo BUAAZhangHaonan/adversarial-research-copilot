@@ -218,7 +218,7 @@ class CardDraft(StrictModel):
     minimal_test: MinimalTest
     resources: ResourceEstimate
     risks: CardRisks
-    claims: list[Claim] = Field(default_factory=list)
+    claims: list[Claim]
 
     @model_validator(mode="after")
     def unique_claims(self):

@@ -25,7 +25,8 @@ def test_spec_assets_are_exact():
         actual=(ROOT/path).read_text(encoding='utf-8')
         additions={'prompts/roles/developer.md':'\n## IMPORT: preserve an explicitly supplied user question or proposal\n',
                    'prompts/roles/investigator.md':'\n## Mechanical search trace mapping\n',
-                   'prompts/common/output_protocol.md':'\n## Evidence request ownership\n'}
+                   'prompts/common/output_protocol.md':'\n## Evidence request ownership\n',
+                   'prompts/tools/read_record.md':'\n## Cached source coverage\n'}
         if path in additions:
             assert actual.startswith(body)
             assert actual[len(body):].startswith(additions[path])
@@ -57,6 +58,17 @@ def test_request_ownership_is_visible_to_every_semantic_role():
         assert 'Nullable fields do not permit all three to be null for an existing card.' in system
         assert 'scoped to the actual task_id and subject.run_id' in system
         assert 'Never invent an identifier' in system
+
+
+def test_cached_source_coverage_is_in_the_actual_tool_description():
+    loader=PromptLoader(ASSETS)
+    rendered=loader.render('skeptic.INVOKE',DATA,schema=SCHEMA,tool_profile=['read_record'])
+    description=rendered.tool_descriptions['read_record']
+    assert 'more_cached_content only says whether another local page exists' in description
+    assert 'Exhausting the cache does not establish that the full source was read' in description
+    assert 'read_record cannot retrieve the missing original text' in description
+    assert 'Repeating read_record on that unchanged source cannot produce body text' in description
+    assert 'tools/read_record.md' in rendered.source_hashes
 
 
 def test_registered_developer_import_preserves_user_question_provenance():
