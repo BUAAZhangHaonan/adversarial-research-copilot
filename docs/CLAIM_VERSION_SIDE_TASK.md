@@ -1,106 +1,23 @@
-# 版本协议修复：当前实施与历史评估
+# 版本协议修复实施说明
 
-2026-09-07 更新：用户已要求直接推进修复，本项已进入当前主线开发，不再等待用户创建支线。原始评估保留在下方，仅用于追溯当时的决定。
+本项已按用户要求并入 master，不再等待用户创建支线。原始需求 `cap_arc-vnext-validation-20260907.natural_tool_correction_v1.develop.codex.claim-version-review` 及早期评估保存在私有需求档案和 Git 历史中；早期“只澄清提示词”的建议已经被当前实现替代。
 
-实际版本方案已在 4563a55 实现：text、conditions 或 kind 改变但遗漏递增时，runtime 派生新 claim 版本，同步明确属于该新版的 review/新争点元数据；正确递增保持不变。原始响应和既有争点目标不改，派生记录可追溯。
+## 原因与修复
 
-真实旧输出只读回放确认原版本错误已消除，同时发现两条新版 claim 仍引用同一 claim 的 v1 证据。用户明确选择“从新版主张移除旧引用，让 Agent 重新选择或补充证据”。该实现包含目标证据移除审计、补证及裁决重评，不自动把旧证据升级为新版本支持。
+旧真实输出改变了三条 claim，其中一条只改 conditions 却保留 v1。提示词说 runtime 创建版本，代码却要求模型逐条递增，职责不清晰。
 
-最终代码与真实验证状态见 [MASTER_STATUS.md](MASTER_STATUS.md)。以下“先只澄清提示词”“可选未来支线”和 CodeX 默认评估模板都是历史内容，已由上述用户决定及正式用户评估流程替代。
+4563a55 将遗漏的递增交给 runtime：text、conditions 或 kind 改变但仍提交原版本时，派生 original + 1；模型已给出的合法新版本保留。明确属于新版的 evidence_review 和新争点元数据随之同步。既有争点、科研正文、原始响应及验证状态不改，倒退版本和模糊目标仍严格拒绝。
 
----
+只读回放进一步发现两条 v2 claim 仍带各自 v1 的定向证据。用户选择“从新版主张移除旧引用，让 Agent 重新选择或补充证据”。bd3db80 已实现：
 
-# 能力与改进需求
+- 扫描全部提议主张，包括模型已经正确递增的主张，移除同 ID 更旧版本的证据引用；不改旧证据、原卡和原始响应。
+- 在派生审计记录移除的 EID、源版本、当前版本及来源；旧 applicability 判断不转移为新版验证。
+- develop 保存新版后，执行稳定的 evidence_recheck 任务，由 Agent 针对当前版本重新选取或补充证据。
+- moderator 裁决受到引用移除影响时，先补证再进入一次重评链，原裁决不生效。正常有界补证仍可继续；再次带入旧引用不会自动开启无限重评。
+- 预算暂停和中断恢复不重复创建卡片、执行已完成角色或登记同一证据；缺支持可以保留 NEEDS_EVIDENCE。
 
-需求：cap_arc-vnext-validation-20260907.natural_tool_correction_v1.develop.codex.claim-version-review
+## 验证
 
-运行：arc-vnext-validation-20260907.natural_tool_correction_v1.develop
+旧真实输出只读回放通过：一个遗漏增量自动补齐、两条旧引用移除，原响应、原卡及旧失败状态均未改变。402项远程完整测试通过；独立安装包含新版角色资产。
 
-来源任务：arc-vnext-validation-20260907.natural_tool_correction_v1.develop.development
-
-状态：reviewed
-
-## 原始需求
-
-{
-  "blocked_question": "develop修复JSON后仍因一个改写conditions的claim未递增版本而暂停，如何减少版本协议失误？",
-  "needed_operation": "developer claim revision contract",
-  "input_fields": [
-    "original card claims",
-    "proposed_revision.claims",
-    "affected_claims",
-    "evidence_review"
-  ],
-  "required_output": "保留科研文本、正确表达claim版本和证据依赖的方案修订",
-  "provenance_needs": "原卡v1和失败原文保留；不得把旧claim证据自动升级为新claim支持",
-  "cost_visibility_needs": "当前任务已经用完一次纠正；新版本验证仍须计入原100元父账本，不重置费用",
-  "acceptance_example": "claim_d1c_measurement_ambiguity的conditions变化时提出递增版本，并使evidence_review对应相同版本；未改变claim不无故递增",
-  "current_limitation": "Store按text/conditions/kind变化强制递增claim.version；developer.md却笼统说runtime创建IDs和versions，没有明确卡版本与claim版本的责任区别。当前两条变化claim正确提出v2，另一条conditions变化仍为v1，导致changed_claim_requires_new_version",
-  "proposed_change": "澄清claim版本及同目标旧证据的修订协议，在明确的新运行版本中验证；本次不改旧输出",
-  "rationale": "CodeX在真实失败后登记此需求；这不是DeepSeek主动提出的需求，也不是预算问题。JSON修复已成功，问题位于后续卡版本依赖校验",
-  "alternatives": [
-    "先补齐Markdown职责：改动text/conditions/kind必须递增claim.version，review对应新版本，旧目标证据重新核对；改动范围小且保留现有严格校验",
-    "把claim版本完全改由runtime分配：长期职责更集中，但必须同步处理evidence_review、目标证据失效和卡事务，需要较大的独立设计与回归"
-  ],
-  "expected_impact": "减少可避免的版本元数据失误；不能保证模型之后所有科研输出通过，也不能把旧任务修复额度追加为无限重试"
-}
-
-## CodeX 评估交付模板
-
-请核对上述实际限制与相关实现，评估提议是否合理，比较当前替代方案，推荐最小可行选项。
-将评估写为 JSON，字段为 assessment（recommended / needs_information / not_recommended）、
-rationale、recommended_option（无建议时为 null）、implementation_scope（列表）、validation_plan（列表）。
-本步骤仅评估，不执行变更。用 arc requirements review 记录评估。
-
-
-## 已记录的 CodeX 评估
-
-{
-  "assessment": "recommended",
-  "implementation_scope": [
-    "明确runtime分配ResearchCard版本，而当前接口要求developer提出合法Claim版本：text、conditions或kind变化时递增；同时对应evidence_review",
-    "说明修改claim后同一claim旧版本的目标证据不能原样继承；需要重新核对，不自动改为新版本证据",
-    "保留旧失败及JSON修复记录；不手动改accepted_result、不重置次数；在原100元父账本下验证新的运行版本"
-  ],
-  "rationale": "已逐项核对最终响应：3条claim变化，其中default_confound与gap_logical提出v2，measurement_ambiguity仅改变conditions但仍v1。现有校验正确保护证据版本；提示词的runtime负责versions表述过宽。推荐先澄清职责并在新版本复验，避免在本轮手工改写模型输出。原claim v1仍完整，run尚未启动。",
-  "recommended_option": "优先实施Markdown协议澄清和版本边界回归，然后显式新建运行版本复验；保留现有版本/证据校验。",
-  "validation_plan": [
-    "离线覆盖仅conditions变化且未递增被拒、合法递增、未变化保留版本、review与证据版本不匹配被拒",
-    "检查Markdown不再把卡版本与claim版本职责混为一谈，完整测试通过",
-    "新任务验证同一自然卡；记录最终状态、实际费用、仍未解决的协议问题。若develop未完成，不把run标成通过"
-  ]
-}
-
-
-## 用户执行支线交付模板
-
-用户决定采用后，可将以下文本交给 CodeX；本文件没有创建或启动任何任务。
-
-基于需求 cap_arc-vnext-validation-20260907.natural_tool_correction_v1.develop.codex.claim-version-review，请实施已评估选项：优先实施Markdown协议澄清和版本边界回归，然后显式新建运行版本复验；保留现有版本/证据校验。
-
-实施范围：
-
-
-- 明确runtime分配ResearchCard版本，而当前接口要求developer提出合法Claim版本：text、conditions或kind变化时递增；同时对应evidence_review
-
-- 说明修改claim后同一claim旧版本的目标证据不能原样继承；需要重新核对，不自动改为新版本证据
-
-- 保留旧失败及JSON修复记录；不手动改accepted_result、不重置次数；在原100元父账本下验证新的运行版本
-
-
-完成验证：
-
-
-- 离线覆盖仅conditions变化且未递增被拒、合法递增、未变化保留版本、review与证据版本不匹配被拒
-
-- 检查Markdown不再把卡版本与claim版本职责混为一谈，完整测试通过
-
-- 新任务验证同一自然卡；记录最终状态、实际费用、仍未解决的协议问题。若develop未完成，不把run标成通过
-
-
-交付修改文件、验证结果及未完成项。保留原研究记录；不得把能力改善当成科研证据。
-
-
-
-登记、评估和导出均不授权安装工具、修改服务、放宽工具限制或增加预算。
-实际执行前，由用户明确选择执行范围；涉及新增费用或服务权限时单独取得授权。
+新的真实 develop 已保存卡片 v2，并实际触发定向补证：模型本次正确递增版本，runtime 移除了 measurement_ambiguity 主张的两条 v1 引用。完整阶段结果和费用以 [MASTER_STATUS.md](MASTER_STATUS.md) 为准，不能把进入补证或离线通过写成最终科研验收成功。

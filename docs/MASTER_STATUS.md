@@ -10,7 +10,7 @@
 - 4563a55：内容、条件或类型改变却遗漏 claim 递增时，runtime 机械派生版本并保存来源审计。
 - bd3db80：移除新版主张中的同目标旧版本证据引用，重新调查并重评受影响裁决；原始输出、旧卡、旧证据不变。正常的有界补证仍可继续。
 
-详细行为见 [PROTOCOL_CORRECTION.md](PROTOCOL_CORRECTION.md)。[版本修复记录](CLAIM_VERSION_SIDE_TASK.md)和[读取上限记录](READ_LIMIT_SIDE_TASK.md)保留历史评估，并已注明当前用户决定；它们不是仍待启动的支线。
+详细行为见 [PROTOCOL_CORRECTION.md](PROTOCOL_CORRECTION.md)。[版本修复记录](CLAIM_VERSION_SIDE_TASK.md)和[读取上限记录](READ_LIMIT_SIDE_TASK.md)已经更新为实施说明；历史评估保存在 Git 历史和私有需求档案中，不再保留失效的待执行步骤。
 
 ## 当前验证
 
