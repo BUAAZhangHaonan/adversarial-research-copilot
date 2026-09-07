@@ -150,7 +150,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
         return result
     tools['read_record'] = BoundTool('read_record', {'type': 'object', 'properties': {
         'record_id': {'type': 'string'}, 'version': {'type': ['integer', 'null'], 'minimum': 1},
-        'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 24000}},
+        'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 64000}},
         'required': ['record_id'], 'additionalProperties': False}, read_record, Decimal(0), 'LOCAL_SQLITE_READ')
 
     async def request_capability(arguments, metadata):
