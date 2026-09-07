@@ -69,12 +69,10 @@ def validate_arguments(parameters: dict, arguments: dict) -> None:
                                 [{'path': [], 'validator': 'type', 'expected': 'object'}])
     # Omitted additionalProperties in MCP does not authorize ARC metadata.
     allowed = set(parameters.get('properties', {}))
-    if set(arguments) - allowed:
-        raise ToolArgumentError('TOOL_ARGUMENTS_UNDECLARED',
-            [{'path': [key], 'validator': 'additionalProperties', 'expected': False}
-             for key in sorted(set(arguments) - allowed)])
+    undeclared = [{'path': [key], 'validator': 'additionalProperties', 'expected': False}
+                  for key in sorted(set(arguments) - allowed)]
     errors = list(Draft202012Validator(parameters).iter_errors(arguments))
-    if errors:
+    if errors or undeclared:
         def details(error):
             path = list(error.absolute_path)
             editable = [path]
@@ -90,8 +88,8 @@ def validate_arguments(parameters: dict, arguments: dict) -> None:
                 editable = []
             return {'path': path, 'validator': error.validator,
                     'expected': error.validator_value, 'editable_paths': editable}
-        raise ToolArgumentError('TOOL_ARGUMENTS_SCHEMA',
-                                [details(error) for error in errors])
+        raise ToolArgumentError('TOOL_ARGUMENTS_UNDECLARED' if undeclared else 'TOOL_ARGUMENTS_SCHEMA',
+                                undeclared + [details(error) for error in errors])
     def check(value):
         if isinstance(value, dict):
             for item in value.values(): check(item)

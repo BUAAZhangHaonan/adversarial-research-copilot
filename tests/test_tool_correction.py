@@ -108,6 +108,27 @@ async def test_second_invalid_argument_stops_without_execution_or_third_request(
 
 
 @pytest.mark.asyncio
+async def test_mixed_unknown_limit_and_required_errors_are_corrected_together(tmp_path):
+    invalid = {'record_id': INVALID['record_id'], 'limit': INVALID['limit'],
+               'undeclared': 'remove this field'}
+    runtime, store, ledger, requests, executed = fixture(tmp_path, [
+        tool_response(native('bad_original', invalid)),
+        tool_response(native('corrected_call', CORRECTED)),
+        sse(json.dumps(answer())),
+    ])
+    assert (await invoke(runtime, tool_profile=['read_record'])).result.value == 'valid'
+    feedback = [m for m in requests[1]['messages'] if m['role'] == 'tool']
+    errors = json.loads(feedback[0]['content'])['errors']
+    assert {'additionalProperties', 'maximum', 'required'} <= {e['validator'] for e in errors}
+    assert any(e['path'] == ['limit'] and e['expected'] == 24000 for e in errors)
+    assert [args for args, _ in executed] == [CORRECTED]
+    assert len(requests) == 3 and len(ledger.list_calls()) == 4
+    assert saved(store)['repair_count'] == 1
+    assert len(saved(store)['tool_rejections']) == 1
+    await runtime.close()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize('replacement', [
     {**CORRECTED, 'record_id': 'another_source'},
     {**CORRECTED, 'offset': 0},
