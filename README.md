@@ -50,7 +50,10 @@ SQLite 保存状态、版本、争点、来源索引和预算；原文、模型�
 直接针对主张的证据仍绑定其 ID 和版本。旧版本证据不能直接用于新版主张，也不能靠背景引用关闭经验争点。
 
 每个 run 输出 `REPORT.md`、单卡详情、`PROMPT_TRACE_INDEX.md` 和 `COST_REPORT.md`。
-缺少工具能力时输出 `MCP_REQUIREMENTS.md`。原始 reasoning 只用于协议恢复与私有调试，不进入报告。
+缺少工具能力或提出改进需求时输出 `MCP_REQUIREMENTS.md`，保留待 CodeX 评估的原需求。
+`requirements list/review/export` 支持比较方案并导出用户执行说明；不会自动改限额或创建任务。
+使用说明见[改进需求流程](docs/CAPABILITY_REQUESTS.md)，[64K 字符读取支线](docs/READ_LIMIT_SIDE_TASK.md)是已评估但未执行的实例。
+原始 reasoning 只用于协议恢复与私有调试，不进入报告。
 真正的新问题只产生一个冻结建议；明确批准后用 `restart-direction RUN_ID --approve-scope-change`
 从新 seed 重新开始，不继承旧通过状态。
 
@@ -60,7 +63,11 @@ SQLite 保存状态、版本、争点、来源索引和预算；原文、模型�
 模型 SDK 禁用自动重试，使用原生 Chat Completions streaming/tool calls，保存完整 reasoning/tool关联。
 正文非空不等于成功；截断、非法结束或不完整对象不能参与科研判断。
 
-格式错误最多修复一次。调查引文无法对应原文时，原任务保留为失败；可另开一次受同一预算约束的
+每任务的最终 JSON 结构错误和工具参数错误共享一次纠正机会。非法工具参数执行前被拒绝，
+错误字段及实际 schema 反馈给模型；只允许修改报错字段，原工具、目标和合法字段保持不变。
+纠正成功后可以继续正常调用工具；再次失败即暂停。无法核对原目标的非法 JSON 参数可提交
+blocked 改进需求；不能通过任意替换目标继续执行。详见[协议纠正](docs/PROTOCOL_CORRECTION.md)。
+调查引文无法对应原文时，原任务保留为失败；可另开一次受同一预算约束的
 原文复核，重新读取已登记材料，逐字校验后才登记证据。复核仍失败就暂停，不自动改写引文或科研结论。
 
 每次付费请求前按官方完整输出上限预留。正在进行的回复自然完成，额度不足只暂停下一次请求。
