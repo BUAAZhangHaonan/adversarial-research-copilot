@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 
 from arc.budget import BudgetLedger
 from arc.cli import app
-from arc.comparison_retry import prepare_comparison_retry
+from arc.comparison_retry import frozen_reference_diagnostics, prepare_comparison_retry
 from arc.evaluation import VALIDATION_PARENT, _frozen_call, run_comparison
 from arc.schemas import TaskRecord
 from arc.store import StateError
@@ -210,3 +210,57 @@ async def test_retry_audit_serializes_value_error_diagnostic_context(tmp_path, m
     audit = json.loads(store.read_artifact(entry['audit_path']))
     assert audit['protocol_retry']['validation_errors'] == [
         {'type': 'value_error', 'ctx': {'error': 'invalid relation'}}]
+
+
+def test_reference_feedback_locates_all_bad_ids_without_guessing_claim_prefix_mapping():
+    material = {'sources': [{'source_id': 'src_real'}], 'evidence': [
+        {'evidence_id': 'ev_registered', 'claim_id': 'claim_same_suffix', 'source_id': 'src_real'}]}
+    result = {'result': {'card_candidate': {'claims': [
+        {'claim_id': 'claim_same_suffix', 'evidence_ids': ['ev_same_suffix', 'ev_registered']}],
+        'closest_work_delta': {'source_ids': ['src_missing']}}}}
+    raw = json.dumps(result)
+    before = copy.deepcopy(material)
+    errors, catalog = frozen_reference_diagnostics(raw, material)
+    assert [(e['loc'], e['submitted_value']) for e in errors] == [
+        (['result', 'card_candidate', 'claims', 0, 'evidence_ids', 0], 'ev_same_suffix'),
+        (['result', 'card_candidate', 'closest_work_delta', 'source_ids', 0], 'src_missing')]
+    assert all(e['feedback_only'] and 'replacement' not in e for e in errors)
+    assert catalog == {'evidence': material['evidence'], 'source_ids': ['src_real']}
+    assert json.loads(raw) == result and material == before
+    from arc.runtime import reference_ids, EVIDENCE_REF_KEYS
+    assert reference_ids({'errors': errors, 'catalog': catalog}, EVIDENCE_REF_KEYS) == {'ev_registered'}
+    assert frozen_reference_diagnostics('not JSON', material) == ([], None)
+
+
+@pytest.mark.asyncio
+async def test_semantic_reference_failure_retry_receives_field_and_frozen_registry(tmp_path, monkeypatch):
+    settings, store, source, calls, ledger, run, task = await setup_failed_comparison(tmp_path, monkeypatch)
+    from tests.test_selection import research_draft
+    from arc.schemas import ComposeResult, Envelope, Subject
+    draft = research_draft()
+    draft.motivation.evidence_ids = ['ev_invented_from_claim_id']
+    envelope = Envelope[ComposeResult](schema_version='arc.v1', task_id=task.task_id,
+        subject=Subject(run_id=run.run_id, campaign_id=run.campaign_id,
+                        card_id=run.card_id, card_version=run.card_version),
+        result_status='complete', result=ComposeResult(card_candidate=draft,
+            composition_reason='Original scientific content.', unresolved_prerequisites=[]),
+        evidence_requests=[], capability_requests=[], note=None)
+    saved = json.loads(store.read_artifact(task.response_artifact_path))
+    raw = envelope.model_dump_json()
+    saved['response']['message']['content'] = raw
+    store.save_artifact(task.response_artifact_path, json.dumps(saved))
+    task.error = 'unknown_evidence_id'
+    store.put_task(task)
+    before = task.model_dump(mode='json')
+    entry = prepare_comparison_retry(store, ledger, source.run_id, 'ARC', 'compose', REASON)
+    retry = json.loads(store.read_artifact(entry['audit_path']))['protocol_retry']
+    assert retry['previous_error'] == 'unknown_evidence_id'
+    assert retry['validation_errors'] == [{
+        'type': 'reference_not_in_frozen_material',
+        'loc': ['result', 'card_candidate', 'motivation', 'evidence_ids', 0],
+        'reference_kind': 'evidence', 'submitted_value': 'ev_invented_from_claim_id',
+        'msg': 'The supplied frozen material does not contain this reference ID.', 'feedback_only': True}]
+    assert retry['frozen_reference_catalog']['evidence'][0]['evidence_id'] == 'ev_synthetic'
+    assert retry['unaccepted_response'] == raw
+    assert store.get_task(task.task_id).model_dump(mode='json') == before
+    assert json.loads(store.read_artifact(task.response_artifact_path)) == saved

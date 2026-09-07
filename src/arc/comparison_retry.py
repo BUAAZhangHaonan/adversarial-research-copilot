@@ -17,6 +17,45 @@ COMPARISON_TASKS = {
 }
 
 
+def frozen_reference_diagnostics(raw, material):
+    """Locate invalid reference values without editing or suggesting a replacement."""
+    from .runtime import EVIDENCE_REF_KEYS, SOURCE_REF_KEYS
+    try:
+        response = json.loads(raw)
+    except ValueError:
+        return [], None
+    evidence = material.get('evidence', [])
+    sources = material.get('sources', [])
+    allowed = {'evidence': {item['evidence_id'] for item in evidence},
+               'source': {item['source_id'] for item in sources}}
+    errors = []
+
+    def visit(value, path):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                kind = 'evidence' if key in EVIDENCE_REF_KEYS else 'source' if key in SOURCE_REF_KEYS else None
+                if kind is not None:
+                    references = list(enumerate(item)) if isinstance(item, list) else [(None, item)]
+                    for index, reference in references:
+                        if isinstance(reference, str) and reference not in allowed[kind]:
+                            errors.append({'type': 'reference_not_in_frozen_material',
+                                'loc': path + [key] + ([index] if index is not None else []),
+                                'reference_kind': kind, 'submitted_value': reference,
+                                'msg': 'The supplied frozen material does not contain this reference ID.',
+                                'feedback_only': True})
+                else:
+                    visit(item, path + [key])
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, path + [index])
+
+    visit(response, [])
+    catalog = {'evidence': [{k: item.get(k) for k in ('evidence_id', 'claim_id', 'source_id')}
+                            for item in evidence],
+               'source_ids': sorted(allowed['source'])} if errors else None
+    return errors, catalog
+
+
 def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, reason):
     """Record one user request; only execution creates the new physical task."""
     if system not in ('ARC', 'direct-Pro', 'evaluator') or task_key not in COMPARISON_TASKS or not reason.strip():
@@ -31,7 +70,7 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
     if any(c['state'] not in ('SETTLED', 'NOT_SENT') for c in ledger.list_calls(run.budget_account_id)):
         raise StateError('COMPARISON_RETRY_HAS_UNSETTLED_CALLS')
     frozen_path = f'evaluations/{source_run_id}/evidence.json'
-    store.read_artifact(frozen_path)
+    material = json.loads(store.read_artifact(frozen_path)).get('material', {})
     retries = dict(run.state.get('comparison_task_retries', {}))
     history = list(retries.get(task_key, []))
     previous_key = history[-1]['replacement_key'] if history else task_key
@@ -71,6 +110,8 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
             Envelope[schema].model_validate_json(raw)
         except ValidationError as exc:
             errors = output_validation_errors(raw, Envelope[schema], exc)
+    reference_errors, reference_catalog = frozen_reference_diagnostics(raw, material)
+    errors = [*errors, *reference_errors]
     replacement_key = f'{task_key}.protocol_retry{len(history) + 1}'
     path = f'evaluations/{source_run_id}/task-retries/{system}.{replacement_key}.json'
     audit = {'source_run_id': source_run_id, 'run_id': run_id, 'system': system,
@@ -84,6 +125,8 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
             'previous_error': source.error or run.stop_reason,
             'validation_errors': errors, 'unaccepted_response': raw,
             'previous_successful_tools': []}}
+    if reference_catalog is not None:
+        audit['protocol_retry']['frozen_reference_catalog'] = reference_catalog
     audit = json.loads(json.dumps(audit, ensure_ascii=False, default=str))
     try:
         previous = json.loads(store.read_artifact(path))
