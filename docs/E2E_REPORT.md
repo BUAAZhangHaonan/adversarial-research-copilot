@@ -1,5 +1,34 @@
 # 真实验收记录
 
+<!-- ARC_CURRENT_DELIVERY_SUMMARY:BEGIN -->
+## 当前交付摘要
+
+本节来自最终保存文件；下方带日期、提交或历史停点的记录保留原样。当前结果优先查看 [交付说明](DELIVERY.md)、[最终状态快照](VALIDATION_SNAPSHOT.json)、[费用报告](COST_REPORT.md) 和 [同材料对照](L4_REPORT.md)。
+
+- 已测代码提交：`a14da30f31a1541b9a5732c6aa3b85ab9dc689f9`；342 项测试通过，用时 65.59 秒。独立包验证记录：`work/release-verification.json`。
+- 费用快照时间：`2026-09-07T10:36:14.234815+00:00`；父账户 `arc-vnext-validation-20260907`，限额 100.000000 元，已结算估计 45.154048–45.303543 元，预留 0.000000 元，未知调用 0，剩余 54.696457 元。不是供应商发票。
+
+- [x] F 当前工程交付：已测提交、测试与包验证记录、wheel/sdist、要求的交付文档和静止账本快照已落地。
+- L2：下表只统计真实入口执行完成记录。它不单独证明全部入口及争点补证验收通过；还需在交付说明/E2E记录中核对新增动作对应的 issue、证据与判断变化。
+- L3：本摘要不从 MAIN_REPORT、单阶段 COMPLETED 或人工输入完成推断自然同卡贯穿。完整卡版本链和最终结果以交付说明为准；协议失败不是科学否决。
+- L4：本摘要不从候选生成或 schema 接受推断质量对照通过。同材料双方、留出、匿名评价及未完成项以同材料对照报告为准；自动评价不是专家认可。
+
+| 入口 | 保存的 COMPLETED 数 | 所有保存状态计数 |
+|---|---:|---|
+| discover | 1 | COMPLETED: 1, PAUSED_PROTOCOL: 3 |
+| develop | 0 | PAUSED_PROTOCOL: 3 |
+| run | 0 | PAUSED_PROTOCOL: 3 |
+
+这些计数只反映最终快照，不能把不同人工输入拼成同一张自然卡。历史已接受对象、失败响应与工程测试均不改写。
+
+| 摘要输入 | SHA256 |
+|---|---|
+| `docs/VALIDATION_SNAPSHOT.json` | `b34e9e1bc9fde974183748cddaf51fa6da3b39248e94bd23e256303ea75cd8b1` |
+| `work/release-verification.json` | `661e2c7746652f3a87341b60b9cf1947f641582bcc2505fdb5b714c7812d35b4` |
+| `docs/DELIVERY.md` | `a941381e6a72a855af6bb540de29c8fe6fa33798163ebfe19db1b56f80ed8a23` |
+| `work/final-cost-summary.json` | `3c96c83eea46881bff5def4ee85acbae0ae111d9fb5761fd5b0b976d4fa0a494` |
+<!-- ARC_CURRENT_DELIVERY_SUMMARY:END -->
+
 记录边界：本页工程证据及运行状态保留为 `d0d7459` 文档时点的历史记录，截止三笔预算追加之前；“暂停”“运行中”和未勾选项均指该时点，不代表最终续跑结果。最新执行状态与费用以 `docs/VALIDATION_SNAPSHOT.json`、`docs/COST_REPORT.md`、`docs/L4_REPORT.md` 及最终续跑记录为准；相应最终材料未落地前不预填结果。三笔追加授权见 [BUDGET_EXTENSION_AUTHORIZATION.md](BUDGET_EXTENSION_AUTHORIZATION.md)。
 
 d0d7459归档的工程验证：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；git archive源码构建的wheel/sdist、独立安装及 `/tmp` 资源/CLI检查均通过。Rendering调查的零新增调用恢复已成功，19条findings登记。历史5e3830c的290项/54.28s及首次 `duplicate_source_reference` 恢复失败保留在下文。

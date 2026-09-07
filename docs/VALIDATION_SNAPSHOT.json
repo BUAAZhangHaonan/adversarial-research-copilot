@@ -1,0 +1,1677 @@
+{
+  "as_of_utc": "2026-09-07T10:36:14.056677+00:00",
+  "head": "a14da30f31a1541b9a5732c6aa3b85ab9dc689f9",
+  "parent_budget": {
+    "account_id": "arc-vnext-validation-20260907",
+    "parent_id": null,
+    "limit_micro": 100000000,
+    "spent_lower_micro": 45154048,
+    "spent_upper_micro": 45303543,
+    "reserved_micro": 0,
+    "remaining_micro": 54696457,
+    "limit_cny": "100.000000",
+    "spent_lower_cny": "45.154048",
+    "spent_upper_cny": "45.303543",
+    "reserved_cny": "0.000000",
+    "remaining_cny": "54.696457",
+    "unknown_calls": 0,
+    "call_count": 1511,
+    "currency": "CNY",
+    "unsettled_lower_micro": 0,
+    "unsettled_lower_cny": "0.000000"
+  },
+  "runs": [
+    {
+      "run_id": "arc-vnext-validation-20260907.protocol.deepseek-v4-flash",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "protocol_probe",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "f14b576247dab28154d29d30bed838b6b7bface69c71ad8c3bc9160bb9955787",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.protocol.deepseek-v4-flash.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "03cea7ff40d6be298bcd74db0f900a6d4aa076576c103f16b9470c2cca4fee1e",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.protocol.deepseek-v4-flash",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 83568,
+        "spent_upper_micro": 83568,
+        "reserved_micro": 0,
+        "remaining_micro": 19916432,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.083568",
+        "spent_upper_cny": "0.083568",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.916432",
+        "unknown_calls": 0,
+        "call_count": 1,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.protocol.deepseek-v4-pro",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "protocol_probe",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "f14b576247dab28154d29d30bed838b6b7bface69c71ad8c3bc9160bb9955787",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.protocol.deepseek-v4-pro.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "f381144650eb986ab5d7f3b367e1fa110721adfe44ff766441a572f0f07fc5ce",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.protocol.deepseek-v4-pro",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 108774,
+        "spent_upper_micro": 108774,
+        "reserved_micro": 0,
+        "remaining_micro": 19891226,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.108774",
+        "spent_upper_cny": "0.108774",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.891226",
+        "unknown_calls": 0,
+        "call_count": 1,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION.discover",
+      "mode": "discover",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "TASK_DEPENDENCY_CHANGED_FORK_REQUIRED",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "f14b576247dab28154d29d30bed838b6b7bface69c71ad8c3bc9160bb9955787",
+      "sources": 66,
+      "canonical_sources": 65,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION.discover.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "3517860e75bdd5696c41ddf59b4341361f7ccbb6640b2b7518886cd76a2834bb",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION.discover.shared_investigation",
+          "status": "RESPONSE_SAVED",
+          "error": null,
+          "prompt_hash": "07a63dc585e4a4af6236154da36e5553e7befa6a35466c08e4227db1ba5ee4e4",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION.discover",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 554694,
+        "spent_upper_micro": 554702,
+        "reserved_micro": 0,
+        "remaining_micro": 19445298,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.554694",
+        "spent_upper_cny": "0.554702",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.445298",
+        "unknown_calls": 0,
+        "call_count": 43,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover",
+      "mode": "discover",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "excerpt_not_in_returned_source",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "f2e49c4e39ad9f63001577f742611f3221fe1a152885eda54a0c156a29bac10a",
+      "sources": 210,
+      "canonical_sources": 188,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "47a5ecadc4e5f428175d1adfb52899eeb9405c8f680bad069a289137be2b05b0",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover.shared_investigation",
+          "status": "ACCEPTED",
+          "error": "TOOL_LOCAL_PROCESSING_FAILED:StateError",
+          "prompt_hash": "8adc9a1bece0b8d33d2e9e73ff850a5a2fda48e6ca9a8733cb46a57839b57be7",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1733201,
+        "spent_upper_micro": 1733227,
+        "reserved_micro": 0,
+        "remaining_micro": 18266773,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.733201",
+        "spent_upper_cny": "1.733227",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.266773",
+        "unknown_calls": 0,
+        "call_count": 96,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover",
+      "mode": "discover",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "INVALID_OUTPUT_AFTER_REPAIR",
+      "assessment": null,
+      "card_id": "card_106f9f81b76c449cb429c4c883dbeb1d",
+      "card_version": 1,
+      "prompt_version": "bundle-sha256:e563a007d050ef8a06357755c565c121a4bd7b6897588c8d03eb32a102ee68e1",
+      "sources": 276,
+      "canonical_sources": 248,
+      "evidence_count": 18,
+      "draws": {
+        "campaign_0d84d1b632f544e1914d0268c2f03d1e.draw1": {
+          "plan": {
+            "continue_or_stop": "CONTINUE",
+            "proposed_family": "测量侧 family：拥挤小目标实例分割中，边界误差与合并/拆分误差的度量可识别性及其边界条件判定。核心问题：对 (A) 纯边界失真（外轮廓膨胀/腐蚀、轮廓带内像素错位、轮廓定位偏移，不改变实例数）与 (B) 纯实例合并/拆分（2→1 合并、1→k 拆分，轮廓局部仍保真）两类注入，现有度量族在何种对象尺度/边界带宽 δ/拥挤密度/标注模糊度下能把两类错误分开识别、何种区间把它们混同或系统性偏向其一。最小鉴别设计：在具名拥挤小目标基准掩码（MoNuSAC/CoNIC/LIVECell 级）上执行 Boundary IoU §3 式合成误差注入矩阵，但补齐其缺失的两个单元格——(i) 误差清单加入实例级合并/拆分通道；(ii) 全程在拥挤小目标区间运行并以对象面积×δ 比值分层（ev_63d6… 表明该比值决定 Boundary IoU 是否坍缩为 Mask IoU）；度量侧同时计算整体重叠族（IoU/AP/PQ 及 RQ×SQ 分解、AJI/SEG）、边界敏感族（Boundary IoU/Boundary AP）与匹配协议参数（阈值、一对一匹配、聚合方式，依 Nature Methods 证据固定协议）；以 GT 单像素形态学扰动与多标注者一致带（MoNuSAC/NuCLS 型）作为可检测性下限对照，注入幅度与标注噪声同尺度比较（ev_2655/ev_82e3 的 0.64–0.92 IoU 区间即该下限的定量模板）。判定目标不是提出新度量，而是给出经验判定与边界条件：若小目标区间边界敏感族与整体重叠族对两类注入的响应不可分辨，则结论为该区间度量通道坍缩（含 δ 依赖的坍缩边界）；若响应可分但合并/拆分误差经匹配失败污染边界读数，则结论为实例匹配层的混同机制；两种结果都直接产出测量/报告协议建议。",
+            "anchor_evidence_ids": [
+              "ev_2a892aa664ef667c9a85275578267aa0",
+              "ev_63d6ce44fbe37f6a0a9cf7cb71c1043d",
+              "ev_a1c9c6e2df4a8b385176aff41966cabb",
+              "ev_2655a3f6067439208941925f3eb00e13",
+              "ev_82e3ef6d52ec95e1fc3f9d4ad73c484c",
+              "ev_865bc63000c07625a080187aa66b503a",
+              "ev_f85d754e4e6cc3e0f999f9c5e260d2ba"
+            ],
+            "distinct_from_retained": "本 campaign 目前无 retained card（card=null、previous_draws 为空），档案检索在本轮四组词面下亦无同族卡片，故不存在需绕开的既有贡献。与 mandate 内另一候选分支（干预侧：统一边界误差驱动纠正 vs 分工分离机制的置换/消融判定，QuBER 类证据支撑但仅限稀疏大对象域）是不同科学问题：本 family 回答'两类错误在测量上能否被独立可靠识别及在何区间混同'，是 mandate 子问题 (1) 的经验判定；干预侧问题被显式保留给后续 draw，不并入本 family，避免把机制判定塞进测量研究。",
+            "relevant_archive_relations": [],
+            "missing_information": [
+              "最近邻缺口核验：现有最强近邻各自缺一格（Boundary IoU §3 误差清单无合并/拆分且验证于 COCO/LVIS/Cityscapes 尺度；MMA 有双通道注入但基线无边界敏感度量；SoftPQ 有合并/拆分调阈但验证未见与边界度量族及拥挤小目标的对照），需确认语料之外不存在已完成的'合并/拆分注入×边界度量×拥挤小目标'完整 factorial——本论归档检索 0 命中受词面与窗口限制，不构成全局无证据。",
+              "候选基准与数据前提：需具名选定含掩码、许可明确、有每实例面积分布的拥挤小目标基准（MoNuSAC/CoNIC/LIVECell 等），并确认哪些数据集带有多标注者或不确定带证据以建立检测下限（目前只有核病理语料有 ev_2655/ev_82e3/ev_4e19 型证据，LIVECell 等未知）。",
+              "协议与实现核验：Boundary IoU/AP、PQ、AJI/SEG 的公开实现需逐项核验其匹配/聚合协议并显式固定（Nature Methods 证据要求），避免同名异义使结论不可迁移。",
+              "MMA 已存副本截断部分：逐度量 top-1/pairwise 分歧统计表位于 40,000 字符之外，若 family 扩展模型池排序分歧分析需先补齐该表（次要、非必经路径）。",
+              "算力与时间约束未知：本 family 最小形态为掩码+注入器+度量代码（轻量、可 CPU 完成）；是否扩展训练级模型池排序需另行确认，不预设。"
+            ],
+            "why_this_draw_is_worthwhile": "已核验证据把 mandate 子问题 (1) 切成三块互不通约的局部结论：Boundary IoU 的'边界度量独立识别边界错误'建立在大对象尺度且其误差清单本身不含实例级错误；核病理 PQ 批评量化了小对象上整体重叠度量的失真与匹配阈失效但没有检验边界敏感族是否提供独立通道；MMA 把两类错误通道分别注入 LIVECell 却只用非边界度量打分。没有一个已检工作在同一数据集、同一注入协议、同一匹配聚合框架下回答'两类错误能否被分开识别、在何区间坍缩为一类'，而 ev_63d6… 的推导（对象尺寸≈δ 时 Boundary IoU≈Mask IoU）使'拥挤小目标上边界度量天然独立'这一默认假设必须被专门检验而非沿用。该判定会直接改变：(a) 该领域应报告哪些错误通道指标（测量/报告协议建议，mandate 列出的贡献形式之一）；(b) 对 QCell 式'增益源于 de-overlapping 而非边界细化'、SoftPQ 式'调阈惩罚合并/拆分'等主张在拥挤小目标域的读法——若度量混同，现有 PQ/AP 级增益陈述本身不可分；(c) 后续干预侧 card 的设计前提——先确认哪类误差在测量上可独立检出，才能设计'统一 vs 分工'的置换检验及其结果解释。鉴别实验以掩码级注入与度量计算为主，不需要先验未知的大算力，正负结果均有价值：正结果给出可分离性的边界条件区间，负结果给出通道坍缩边界；管道以'大对象细胞应复现 Boundary IoU 已知的尺寸分层行为'为有效性对照。"
+          },
+          "card_id": "card_106f9f81b76c449cb429c4c883dbeb1d",
+          "card_version": 1
+        }
+      },
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "3daf0768698667434e330e2f73a0d4b21cd4addadd6b8be3f42ff317de1f36c3",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.shared_investigation",
+          "status": "PAUSED_PROTOCOL",
+          "error": "excerpt_not_in_returned_source",
+          "prompt_hash": "a0f53b07b8a357aa82cf6cb08c0f25755d67dd5a696dd6e301df1bb3305c54c9",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.shared_investigation.source_recheck",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "544964e9e4d92def1face02731156b11c11822b0ae96bcde04e5604826c493de",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.draw1.next",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "12dffc57a93481961c2b25e5658a27f59fe2a44651b20c07c5479dc393deea17",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.draw1.compose",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "102ba00a2d76294fbcc0cf6cc0ce35bb28e1cc369f70847349817b185c1d8785",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.draw1.novelty",
+          "status": "PAUSED_PROTOCOL",
+          "error": "INVALID_OUTPUT_AFTER_REPAIR",
+          "prompt_hash": "1903e8db5a5c00bf2f927598c62ffeee1f8d5f9376804da589d781b9ce447e37",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 4529248,
+        "spent_upper_micro": 4539975,
+        "reserved_micro": 0,
+        "remaining_micro": 15460025,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "4.529248",
+        "spent_upper_cny": "4.539975",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "15.460025",
+        "unknown_calls": 0,
+        "call_count": 190,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-flash",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "joint_json_native_tools_protocol_verified",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:e852e9424bb6b9d67dee0a1d497789d6eb2d70e079dce2279e10b4aa16db35d1",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-flash.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "9c041a3ce4c42e20a61d09dbd5f5565de4a7aec96ac66af5ac3dd570a99fa73f",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-flash",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 19979,
+        "spent_upper_micro": 19981,
+        "reserved_micro": 0,
+        "remaining_micro": 19980019,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.019979",
+        "spent_upper_cny": "0.019981",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.980019",
+        "unknown_calls": 0,
+        "call_count": 3,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-pro",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "joint_json_native_tools_protocol_verified",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:e852e9424bb6b9d67dee0a1d497789d6eb2d70e079dce2279e10b4aa16db35d1",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-pro.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "5f101f7cda366c0d969204225a462b64a481380d5df60f30ec1072e36009b882",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-pro",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 77400,
+        "spent_upper_micro": 77402,
+        "reserved_micro": 0,
+        "remaining_micro": 19922598,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.077400",
+        "spent_upper_cny": "0.077402",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.922598",
+        "unknown_calls": 0,
+        "call_count": 3,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.explicit_input.develop",
+      "mode": "develop",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "TASK_DEPENDENCY_CHANGED_FORK_REQUIRED",
+      "assessment": null,
+      "card_id": "card_b63f6d85554a493a8be684fca084edd6",
+      "card_version": 2,
+      "prompt_version": "bundle-sha256:e852e9424bb6b9d67dee0a1d497789d6eb2d70e079dce2279e10b4aa16db35d1",
+      "sources": 98,
+      "canonical_sources": 87,
+      "evidence_count": 7,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.develop.import",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "e151aaf2842915e61fccb1a207d629c4984786ed69ed971f11be3df802d5ab9c",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.develop.fresh_verification",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "7ac7077df51d6bab1898865839e124212c48496c82ae0106fdd8312e8561bd5f",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.develop.development",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "060f62eca27b3ea453885f54ec24f58da98521b357ec97f92e2d60c8c6c4ede7",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.develop.round1.proposer",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "a71247091548ee2765d8192c4bda863acead485daa7b3177ca0adee9aad01e7e",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.develop.round1.skeptic",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "4dd796bceff525a1abbd14d62c531ba62ca811ca2a528c4e8681c246ab933f70",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.develop.round1.moderator",
+          "status": "PENDING",
+          "error": null,
+          "prompt_hash": "d87635db825cc002095fda2fc7ed4480cba4827d442b4a3fabb8a867e2eb5332",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.explicit_input.develop",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 25000000,
+        "spent_lower_micro": 4106986,
+        "spent_upper_micro": 4107017,
+        "reserved_micro": 0,
+        "remaining_micro": 20892983,
+        "limit_cny": "25.000000",
+        "spent_lower_cny": "4.106986",
+        "spent_upper_cny": "4.107017",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "20.892983",
+        "unknown_calls": 0,
+        "call_count": 100,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.explicit_input.run",
+      "mode": "run",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "metadata_source_empty_read_loop_development_pause",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:e852e9424bb6b9d67dee0a1d497789d6eb2d70e079dce2279e10b4aa16db35d1",
+      "sources": 1,
+      "canonical_sources": 1,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input.run.import",
+          "status": "RESPONSE_SAVED",
+          "error": null,
+          "prompt_hash": "3ee1bd4e72acbdeced60408e349d43962f31c2fdb774579c698d7f3c27268a06",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.explicit_input.run",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 6464293,
+        "spent_upper_micro": 6464552,
+        "reserved_micro": 0,
+        "remaining_micro": 13535448,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "6.464293",
+        "spent_upper_cny": "6.464552",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "13.535448",
+        "unknown_calls": 0,
+        "call_count": 654,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover",
+      "mode": "discover",
+      "status": "COMPLETED",
+      "stop_reason": "no_distinct_direction",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 278,
+      "canonical_sources": 256,
+      "evidence_count": 19,
+      "draws": {
+        "campaign_f41ce4c25f514bd9b28867854dcad96c.draw1": {
+          "plan": {
+            "continue_or_stop": "CONTINUE",
+            "proposed_family": "在固定场景约束下把合成训练分布沿渲染空间两个可控轴正交注入并归因真实测试模型错误：以具名工业位姿基准T-LESS（固定20个真实测试场景、真实图+GT、CAD与重建两套网格、CC BY 4.0，官方页已核）与BlenderProc4BOP官方数据生成脚本（main_TLESS_random/upright.py、bop_scene_replication等，场景级config/python参数化已核）为唯一设置锚点。外观轴=物体材质BRDF/纹理与光照（强度/颜色/环境）的随机化范围；几何轴=训练位姿与相机视点相对真实测试位姿分布的覆盖宽度、场景布局与遮挡结构（真实场景复制 vs 物理落体 vs 收窄采样）。固定T-LESS真实测试图像+GT为读数，在匹配训练预算下比较：(A)仅放宽/收窄外观轴、(B)仅放宽/收窄几何轴、(C)双轴同时放宽的模型错误分解（形状相似实例混淆类错误 vs 连续位姿误差 vs 检测/召回错误），判定(1)两轴边际效应是否可加、是否存在覆盖型交互（DR覆盖逻辑检验）、(2)该判定在按对称/遮挡可见性分层（BOP-D式歧义审计）与不同位姿度量族（MSSD/MSPD/VSD及歧义处理）下是否翻转；产出按条件组织的归因协议与判定，不宣称新训练算法、新渲染配方或新指标。本draw将该族作为本campaign唯一候选方向；后续COMPOSE阶段收敛为一个最小判别协议（如2×2+1缺省对照条件的正交注入格、单种子以上重复、默认PBR条件作阳性复现控制），其余候补（度量族敏感性单独卡、ITODD许可审计卡）不作为本draw方向。",
+            "anchor_evidence_ids": [
+              "ev_93f14f764bfbe67ec9c8da31f4718bb7",
+              "ev_60fff8546c130dd02fd5c5f711ad096c",
+              "ev_9b3aa6ad897bdb9bbf9f1cfc9ab6570f",
+              "ev_5b7261fc7da59f73238eb2e7bc12a7de",
+              "ev_0a4f606844e5985713ba9d220d4833c9",
+              "ev_18585463168c87fd22712d8c822d2b12",
+              "ev_266e8b52029f8abee2d857dba5acd402",
+              "ev_27f77e1a159bf71ca22f4abfbf8689a5",
+              "ev_215746482da2c370445a0737ab0875f2",
+              "ev_b71382f95060831b82f107efcb72e638",
+              "ev_bde4c89c55376b2faabbe305f35fa726"
+            ],
+            "distinct_from_retained": "本campaign尚无已保留卡（previous_draws为空、card为null），故区分对象是存档卡族与最近文献。存档层面：本轮直接通读card_106f9f81b76c449cb429c4c883dbeb1d v1与card_b63f6d85554a493a8be684fca084edd6 v1/v2全文确认——该族在2D拥挤小目标掩码域把『纯边界误差 vs 纯实例合并/拆分误差』作为构造真值注入，考察整体重叠度量族与边界敏感度量族在固定实例匹配框架下的可识别性区间，测量层（掩码/轮廓-匹配度量）、对象（细胞/核掩码，无具名sim-to-real真实配对）、问题与产出（度量/报告协议建议 vs 渲染轴归因协议与按条件判定）均不同；本族在渲染/数据生成层对工业固定场景真实测试配对做外观/几何双轴注入并归因真实模型错误，属另一测量层与对象域，其重开条件（同域同格factorial完成、分层翻转、扰动算子重设计、分割ER1/ER2文献覆盖闭合）均未被本draw证据触发。最近文献层面：PNDR（ev_27f77e1a、ev_10ecf1d5）只隔离光照单轴且对象为HomeBrewedDB日常杂乱桌面、单点光源+NOCS式度量，不含几何轴受控也不属工业固定场景；Hodaň 2019（ev_266e8b52）与BOP Challenge 2020（ev_18585463、官方页50K PBR七数据集原文复核）只提供要素联合或聚合层面证据，无法分离单轴；2506.07539在自建工业2D检测集上做因素组级消融（光照未列入关键因素），非外观/几何两轴正交；没有任何存档卡或已检文献能在同一具名工业固定场景上回答『错误归因是否可分、是否测量条件化』。本draw要改变的研究决策是：后续卡族应按『轴主导性判定（若两轴可加）』还是『按条件组织的条件化判定+度量混同审计（若存在交互或读数翻转）』来组织，以及T-LESS+BlenderProc4BOP是否作为该campaign的单一执行锚点推进——该决策不被任何保留卡或存档卡改变。",
+            "relevant_archive_relations": [
+              {
+                "archive_card_id": "card_106f9f81b76c449cb429c4c883dbeb1d",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "本轮直接通读该卡全文确认：问题锚定2D拥挤小目标（LIVECell/CoNIC/MoNuSAC类）实例掩码上『纯边界误差vs纯实例合并/拆分误差』在整体重叠度量族与边界敏感度量族（含Boundary IoU、匹配层oracle消融）上的可识别性区间判定，输出测量/报告协议建议；测量层为掩码/轮廓-匹配度量、无sim-to-real配对、无渲染轴干预。本draw族在渲染空间对固定场景工业位姿（T-LESS）做外观/几何双轴注入并归因真实测试错误，测量层、对象域、问题与产出均不同；该卡anti_scope明确把真实模型错误分解列为后续扩展，本draw族亦不触发其重开条件（同域同格factorial、地板带解析、真实预测分解）。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_b63f6d85554a493a8be684fca084edd6",
+                "archive_card_version": 2,
+                "relation": "related_but_distinct",
+                "rationale": "该版本为开发验收输入的最小检验卡：相互接触小实例分割中边界错误与合并错误的测量可辨识性（Boundary IoU族 vs mask AP/PQ族，剂量匹配扰动，面积带×接触密度分层），干预在掩码/匹配测量层、对象为2D小尺度接触实例、无具名真实测试配对、断言全部待测。本draw族在渲染轴（外观/几何随机化分布）与sim-to-real错误归因层、固定场景具名真实配对（T-LESS）上操作，问题、测量层、对象均不同；其重开条件（残余文献覆盖闭合、分层翻转、扰动算子重设计、干预有效性检查失败）不被本draw证据触发，该卡也无实验证据可为渲染轴归因提供方向性支持。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_b63f6d85554a493a8be684fca084edd6",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "该族import初始版本（科学断言全部待核实）问题仍限于2D接触小实例掩码的错误类测量可辨识性，与本draw的渲染空间外观/几何双轴归因属不同测量层与对象域；本轮三次追加定向检索（含『appearance geometry dual-axis orthogonal injection factorial interaction fixed-scene sim-to-real pose』『材质 光照 位姿 布局 双轴 交互 归因』『renderer axis randomization coverage interaction real test error attribution』）仍只返回该卡族或空集，未见覆盖渲染轴归因主题的存档卡；该draw亦不触发其重开条件（ER1/ER2文献覆盖、分层翻转、扰动算子重设计）。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              }
+            ],
+            "missing_information": [
+              "BlenderProc4BOP逐轴开关的代码/config级可行性未验证：官方脚本为python参数化（本轮核验examples/datasets/bop_challenge页面：main_<dataset>_<random/upright>.py、25图/场景、随机相机、CC0壁材/落体），但『复制真实测试位姿与相机内外参时能否独立关闭或收窄材质与光照随机化』『固定材质/光照时能否只改位姿/布局分布』需在选定BlenderProc版本+实际T-LESS资产上跑通并检查模块开关后才可确认；证据层仅支持模块存在与官方鼓励扩展。",
+              "合成-only训练协议与预算未定：需选定公开可复现模型与训练配方（T-LESS合成训练+真实测试的公开代码，如CosyPose/GDRNPP类或其轻量可复现替代），并确定正交注入格条件数×随机种子数在3090/A100显式假设下的上限；GPU型号与训练时长上限仍未给出（mandate unknown_constraints），决定网格最小形态。",
+              "真实测试读数的歧义分层可用性未确认：BOP-D式逐图位姿分布/可见性分层标注是否对T-LESS公开可下载、BOP现行官方评测对T-LESS实际使用哪些度量（MSSD/MSPD/VSD及对称容差处理）需在协议书写前核实，决定度量族敏感性检查与分层的具体实现。",
+              "训练位姿分布与真实测试位姿分布的覆盖重叠量化方法未定（如逐场景比较采样视点/位姿与测试GT位姿分布的覆盖率或距离统计），DR覆盖逻辑解释需要该量作为协变量纳入判定。",
+              "ITODD虽同属候选锚点（固定多传感器工位、纳入BOP），但官网『3500标注场景』与ICCV2017摘要『约3500个GT变换/800+场景』口径不一致且许可为CC BY-NC-SA 4.0（禁商用+共享派生），本draw不将其纳入主协议；若后续需第二锚点须先解决口径与许可审计。"
+            ],
+            "why_this_draw_is_worthwhile": "这是本campaign第一个draw，证据层已给出明确但未闭合的缺口：现有证据分别支持聚合层面外观逼真度有效（BOP Challenge 2020，ev_18585463+官方页50K PBR原文复核）、要素联合变化有效但不可归因（Hodaň 2019，ev_266e8b52）、非工业单轴光照隔离（PNDR §6.1固定内容光照实验，ev_27f77e1a）、因素组级消融且光照非关键（2506.07539，ev_b7d339ab）、以及测量地板带可改变方法排名的歧义审计（BOP-D，ev_b71382f9）；同时T-LESS把形状相似/对称/互为部件设计为基准核心挑战（ev_60fff8546c）且BlenderProc4BOP默认把两轴联合随机化（ev_5b7261fc7）——没有任何已检工作在同一具名工业固定场景上把两轴正交注入并以真实测试错误分解作为读数。若结果支持可加性，单轴逐一收窄的低成本审计协议即获有效性依据；若发现显著交互（覆盖耦合）或读数随度量/歧义分层翻转，则现有『材质/光照vs几何』讨论必须转为按条件组织的判定，域差距报告须附带分布覆盖与歧义分层。两种结果均直接改变实践者应拉动哪个数据工程杠杆（材质/光照建模 vs 位姿/布局采样）及如何报告错误来源，且零结果仍可解释（需对照默认PBR条件的阳性复现与测量敏感性），完全落在mandate的(a)(b)(c)判别范围内并符合scope_in（复用官方渲染管线与公开模型、不宣称新算法/指标）；本draw还给出了唯一可执行设置（T-LESS+BlenderProc4BOP官方脚本）以约束后续卡的规模。"
+          },
+          "card_id": "card_52bce58017164c2b9594c418eb0cac7b",
+          "card_version": 1,
+          "finished": true,
+          "selection": {
+            "selection": "MAIN_REPORT",
+            "assessment": "PROMISING",
+            "contribution_summary": "在具名工业固定场景T-LESS上，以匹配训练预算对外观轴（材质/光照随机化范围）与几何轴（位姿/相机覆盖、布局）做正交2×2+锚点注入，以真实测试错误分解（召回/ID混淆/连续位姿误差）+按对称与可见性的歧义分层+多度量族（MSSD/MSPD/VSD）为读数，产出按（外观范围×几何覆盖×歧义分层×度量族）条件组织的错误归因判定与可复用协议。知识增量是：在已检范围内首次把『两轴错误贡献是否可加、判定是否必须条件化』确立为6D位姿层可检验的经验问题，并给出可区分的H1/H2/H3预测；其经验结果决定实践者拉动材质/光照还是位姿/布局数据工程杠杆，以及sim-to-real报告应否附带覆盖重叠、歧义分层与度量族的条件说明。",
+            "why_worth_investigating": "无论结果落在哪一支都改变后续研究与实践的决策：H1成立则低成本『逐轴收窄审计』协议获得有效性依据；H2成立则现行材质/光照vs位姿/布局的讨论必须改写为按分布覆盖×歧义分层×度量族组织的条件化判定；H3成立则证明测量审计须先于任何轴归因。动机证据链已核实：BlenderProc4BOP默认管线把两轴联合随机化（ev_5b7261fc），现有经验证据全部处于聚合或联合层面（ev_18585463168、ev_266e8b52），已检唯一单轴隔离实验PNDR不含几何轴且域为非工业杂乱桌面（ev_27f77e1a），而T-LESS的几何困难（相似/对称/互为部件）被设计为可独立于纹理外观触发（ev_60fff854）；BOP-D已在T-LESS上证明单GT评测会被局部歧义扰动并改变方法排名（ev_b71382f9），该卡把歧义审计内建为读数维度而非事后补救。在阳性对照通过的前提下，零结果也产出测量敏感性上界与功效分析，仍有信息量。",
+            "closest_work_delta": "独立复核原文确认最接近的结构性先例：DIMO(2211.16066, src_bf6cc4ca)在工业金属件上构造了与卡同构的{位姿×光照}2×2合成子集并以真实测试读数回答『哪一轴该随机』——原文§3.1列出四种子集（真实孪生/随机位姿/随机光照/双随机），§4.1等图数（各1775张）比较下『随机光照+真实位姿』合成集最好、『真实光照+随机位姿』最差（5.22 AP），结论为光照宜随机、位姿宜建模；但其读数是Mask R-CNN的2D检测AP层，无6D位姿错误分解、无歧义分层、无A:G交互统计检验、域为带纹理金属件而非T-LESS无纹理相似/对称件，只构成2D层的参照预测而非覆盖。SADGE(2605.22467, src_6d66aa0f)在度量层证实外观-几何相似性非线性交互（r=0.88），但不做训练分布干预。PNDR单轴光照隔离、BOP2020/Hodaň2019/2506.07539聚合或组级证据、BOP-D测量审计均只覆盖协议单组件。故『T-LESS上6D位姿层两轴可加性/条件化判定』未被任何已检工作建立，delta可辩护；建议下一版卡把DIMO单格结果登记为H1/H2的2D层参照预测，并把DIMO与SADGE补入closest_work_delta（此补录不改变not_covered判定，亦不触发ER1重开闸门）。",
+            "hypothesis_plausibility": "H1有PNDR单轴隔离实验作『弱交互参照系』；H2的机制动机来自DR覆盖逻辑（Tobin，ev_21574648）与Geirhos式线索偏好类比（ev_bde4c89c），均属类比性动机而非本设置证据；H3有BOP-D在T-LESS上的直接证据支撑其先验重要性。三者事前概率无法由现有证据可靠排序，卡片如实标注假说性质（未把类比当已证结论），这正是判别实验的价值所在；不得宣称任何假说已被证实或预测其胜出。",
+            "test_identifiability": "2×2+锚点格内唯一变量是数据分布，H1/H2/H3与零效应有可区分的操作化预测；种子噪声探针与阳性对照（C00默认条件量级、合成域自一致性、检测recall对照）提供敏感性下限，使『轴效应缺失』可解释为真零效应或敏感性不足而非实现失败；错误分解（召回/ID混淆/连续位姿误差）与分层读数使各错误类型可分离。主要可识别性缺口均有预案：BOP-D式标注不可得时降级为可见性带×对称组近似并声明结论范围；种子噪声≥效应时改在错误类型份额上检验。这些执行前置项不使测试无法回答主问题。",
+            "stitching_check": "本卡不组合流行模块以求性能增益：全部组件各自对应归因判定的一个必要读数维度（错误分解、交互检验、测量审计），官方渲染管线与单一公开模型属复用而非方法创新，未承诺任何性能改进数字。不适用组合例外条款。",
+            "resource_assessment": "估计：8×RTX 3090 24GB（若选定配方需更大显存则升级A100并保持规模），训练800–2600 GPU-h、推理20–150 GPU-h、墙钟450–1100 h；渲染总量约100K张（5条件×约20K张，全种子共用），必要时升至250K张（预算×约2.5）。依据为官方50K PBR/数据集规模（ev_4628d679）与bop_challenge官方分片说明，吞吐未实测、不确定性高（±2×）。规模大但在正常研究开发范围内，不构成拒绝理由；最便宜的判别性子集是首步渲染探针（1–3天单机）与C00阳性对照标定，应先于全格投入，且两者不占用GPU训练预算。",
+            "unverified_assumptions": [
+              "BlenderProc4BOP逐轴独立开关仅在文档/模块清单层面核实（ev_0a4f6068），未在选定版本+实际T-LESS资产上代码级跑通；失败时需基于官方模块自定义最小管线并记录偏离",
+              "公开合成-only训练配方与C00阳性对照量级未标定（CosyPose官方训练为synthetic+real混合，合成-only需自配）；每条件图数/种子数待定稿",
+              "BOP-D式逐图位姿分布重标注对T-LESS的实际可下载性未核实（论文声明将公开T-LESS标注与代码，属作者承诺而非已验证下载）；VSD对T-LESS的现行官方支持（需深度）未核实",
+              "外观『收窄』不等价于逼近真实外观：真实BRDF/光照值未知，范围宽度与真实覆盖可能混同，协议以覆盖重叠协变量与范围档位敏感性缓解",
+              "训练-测试位姿分布覆盖重叠量化的实现方法需自实现并公开，无现成官方工具",
+              "GPU-hours为外推估计（无实测吞吐），3090/A100换算不依赖通用倍率"
+            ],
+            "decisive_risks": [
+              "逐轴开关代码级不可行且基于官方模块的自定义最小管线仍失败——协议前提受损，须重新限定几何轴操作或放弃该设置（重开条件2）",
+              "合成-only训练在T-LESS上读数过低（检测召回不足）导致错误分解与轴效应不可测——缓解：C00阳性对照先于主格标定，必要时图数升至50K/条件并保持全条件匹配",
+              "种子噪声≥预期效应使交互项不可识别——缓解：种子探针先行，必要时加种子/图数或改在错误类型份额上检验",
+              "测量地板带吞没轴效应（H3情形）：若BOP-D式标注不可得，审计降级为近似分层，结论须限定在近似质量内而非当作歧义感知结论",
+              "外观收窄与真实覆盖混同使H2方向性解读受限——判定须附覆盖重叠协变量与2-3个范围档位复测，防止阈值伪影"
+            ],
+            "evidence_ids": [
+              "ev_93f14f764bfbe67ec9c8da31f4718bb7",
+              "ev_5b7261fc7da59f73238eb2e7bc12a7de",
+              "ev_0a4f606844e5985713ba9d220d4833c9",
+              "ev_60fff8546c130dd02fd5c5f711ad096c",
+              "ev_b71382f95060831b82f107efcb72e638",
+              "ev_18585463168c87fd22712d8c822d2b12",
+              "ev_266e8b52029f8abee2d857dba5acd402",
+              "ev_27f77e1a159bf71ca22f4abfbf8689a5",
+              "ev_215746482da2c370445a0737ab0875f2",
+              "ev_4628d679389e1f3f316159ff3d470daf"
+            ],
+            "next_action": "HANDOFF_EXPERIMENT",
+            "reopening_condition": "若出现已发表/存档工作在同一具名工业固定场景（含T-LESS）完成等价2×2正交注入+错误分解+条件化判定（或DIMO被扩展至6D位姿错误分解层覆盖本格），知识增量被覆盖，本卡转为复现/边界扩展或撤销；若首步逐轴开关验证失败且基于官方模块的自定义最小管线仍不可行，重新限定几何轴操作或放弃该设置；若阳性对照通过但种子噪声探针显示效应不可测，重设计读数方案（加图数/换模型/改错误类型份额统计）后再判定。",
+            "selection_checks": {
+              "motivation": {
+                "status": "supported",
+                "evidence_ids": [
+                  "ev_5b7261fc7da59f73238eb2e7bc12a7de",
+                  "ev_18585463168c87fd22712d8c822d2b12",
+                  "ev_266e8b52029f8abee2d857dba5acd402",
+                  "ev_27f77e1a159bf71ca22f4abfbf8689a5",
+                  "ev_60fff8546c130dd02fd5c5f711ad096c"
+                ],
+                "rationale": "官方文档原文证实默认管线把材质/光照随机化与物理落体位姿/相机布点联合进行（两轴默认不可分离）；既有经验证据均处聚合或联合层面（BOP2020 PBR聚合有效、Hodaň 2019四要素联合改变），已检唯一单轴隔离在非工业杂乱桌面且不含几何轴（PNDR §6.1）；T-LESS把相似/对称/互为部件设计为可独立于纹理触发的几何困难。『错误来自哪一轴、是否可加、判定是否条件化』是有证据支撑的未回答问题，而非作者臆造的空缺。"
+              },
+              "knowledge_delta": {
+                "status": "supported",
+                "evidence_ids": [
+                  "ev_27f77e1a159bf71ca22f4abfbf8689a5",
+                  "ev_18585463168c87fd22712d8c822d2b12",
+                  "ev_266e8b52029f8abee2d857dba5acd402",
+                  "ev_b7d339ab3d162d2f246f15c5d43dfd7c",
+                  "ev_b71382f95060831b82f107efcb72e638"
+                ],
+                "rationale": "本次独立复核原文确认最近的结构性先例DIMO(2211.16066, src_bf6cc4ca)同构2×2仅覆盖2D检测AP层（§3.1子集结构、§4.1等图数1775张结果逐字核对：无位姿读数、无歧义分层、无交互检验），SADGE(2605.22467, src_6d66aa0f)为度量层相关而非训练干预；PNDR仅单轴光照且域不同；BOP2020/Hodaň/2506.07539为聚合或组级证据；BOP-D提供测量审计组件但无归因。6D位姿错误分解+歧义分层+度量族条件化判定未被任何已检工作建立。存档比较记录（card_106f9f81 v1、card_b63f6d85 v1/v2）为2D掩码度量卡族，域、干预与判定均不同，判related_but_distinct且无重开条件触发。"
+              },
+              "test_identifiability": {
+                "status": "supported",
+                "evidence_ids": [
+                  "ev_b71382f95060831b82f107efcb72e638",
+                  "ev_5b7261fc7da59f73238eb2e7bc12a7de",
+                  "ev_0a4f606844e5985713ba9d220d4833c9"
+                ],
+                "rationale": "factorial+交互统计量+错误分解+分层读数给出H1/H2/H3与零效应的可区分预测；种子噪声探针与多重阳性对照提供敏感性下限；覆盖重叠协变量区分『轴不重要』与『覆盖缺失』。逐轴开关与BOP-D标注可得性为执行前置项而非设计缺陷，各有探针先行与降级预案；最终判定按近似质量降级表述，不静默保留。"
+              },
+              "resource_path": {
+                "status": "supported",
+                "evidence_ids": [
+                  "ev_4628d679389e1f3f316159ff3d470daf",
+                  "ev_5b7261fc7da59f73238eb2e7bc12a7de"
+                ],
+                "rationale": "以官方50K PBR/数据集规模与官方分片并行说明为外推锚点，给出8×3090、800–2600 GPU-h与墙钟区间的显式估计并如实披露吞吐未实测的不确定性；规模在正常研究开发范围内，且首步渲染探针与C00标定构成先于全格投入的低成本闸门，资源路径不构成拒绝理由。"
+              },
+              "stitching": {
+                "status": "not_applicable",
+                "evidence_ids": [],
+                "rationale": "本卡为归因协议而非方法组合：官方渲染管线与公开模型为复用，各组件对应必要读数维度，不承诺性能增益；组合例外条款不适用。"
+              }
+            },
+            "stitching_type": "not_applicable",
+            "meaningful_gain_basis": null,
+            "interaction_prediction": null,
+            "matched_budget_test": null
+          },
+          "novelty": {
+            "closest_works": [
+              {
+                "source_id": "src_bf6cc4ca084d47a4bc92bfbea82c4440",
+                "evidence_ids": [],
+                "established_claim": "《Analysis of Training Object Detection Models with Synthetic Data》(arXiv:2211.16066)在工业金属件数据集DIMO上构造了与卡同构的{位姿×光照}2×2合成子集：位姿照搬真实或随机物理落体 × 光照照搬真实HDR或31张室内环境图随机。真实测试集验证结果显示：等图数(各1775张)比较下『随机光照+真实位姿』的合成集在合成集内最好，『真实光照+随机位姿』最差(5.22 AP)；作者结论为光照随机化有益、真实光照建模有害，物体位姿则宜尽量建模(高层形状/位姿特征应匹配、低层颜色/光照特征宜随机)。(原文§3.1、§4.1已核对，ar5iv原始文本)",
+                "conditions": [
+                  "2D实例检测(Mask R-CNN/ResNet101，COCO AP/AP50/AP75读数)，非6D位姿",
+                  "DIMO工业金属件数据集，非T-LESS；无对称/遮挡歧义分层，无MSSD/MSPD/VSD",
+                  "主比较各子集图数不等(约2k/29k/78k)，等图数变体才匹配预算；无种子重复、无A:G交互统计检验",
+                  "无错误分解(无ID混淆、连续位姿误差、可见性分层读数)"
+                ],
+                "card_claim": "claim_d1c_gap_logical",
+                "coverage": "partial",
+                "rationale": "本次独立检索发现的最接近的结构性先例：与卡的{外观×几何}正交格同构，且同样以真实测试读数回答『哪一轴该随机』。但覆盖仅限2D检测AP层：DIMO无6D位姿读数、无错误分解、无歧义分层、主格预算未匹配、未检验交互项，且域为带纹理金属件而非T-LESS无纹理相似/对称件。因此它建立的是『2D检测层的同构回答』，不覆盖卡在T-LESS 6D位姿层的知识增量；其『光照宜随机、位姿宜建模』的单格结果应作为卡H1/H2在2D层的参照预测登记，卡方应将其补入closest_work_delta。"
+              },
+              {
+                "source_id": "src_5461ae3912e9438cb88a8bfcc83255c6",
+                "evidence_ids": [
+                  "ev_27f77e1a159bf71ca22f4abfbf8689a5"
+                ],
+                "established_claim": "PNDR(ECCV 2022, arXiv:2210.12682)把材质/光照/渲染模块化为可分别随机化的神经网络组件，并在HomeBrewedDB scene5/10执行『场景内容恒定、仅光照显著不同』的单轴隔离实验：HB Scene10照明条件下真实图训练ADD AUC 22.24 vs 光追合成37.35 vs Ours-1088 40.44，即内容恒定、仅光照轴变化时合成域训练占优。",
+                "conditions": [
+                  "6D物体检测(HomeBrewedDB杂乱桌面，非工业固定场景)与单目深度下游任务",
+                  "NOCS式CBOD度量、简化单点光源渲染；不含几何轴受控、无2×2交互检验",
+                  "无错误分解与歧义分层读数"
+                ],
+                "card_claim": "claim_d1c_gap_aggregate",
+                "coverage": "partial",
+                "rationale": "已检文献中唯一的内容恒定单轴隔离实验，为卡的渲染参数层单轴干预提供工程前例，也是H1『弱交互参照系』的直接来源(卡已正确引用)。但它只隔离了光照单轴、域非工业固定场景、无T-LESS式ID混淆/对称歧义读数，故只部分支撑协议可行性，不覆盖卡的两轴正交归因主格。"
+              },
+              {
+                "source_id": "src_3ecb228b905a482184faf0cf2234c363",
+                "evidence_ids": [],
+                "established_claim": "da Cunha等(SIBGRAPI 2020)《A Study on the Impact of Domain Randomization for Monocular Deep 6DoF Pose Estimation》对单个无纹理3D打印件训练单目RGB 6DoF位姿模型，比较19个不同合成/真实数据组合(全合成、全真实、合成补充真实、真实-合成随机混合)训练的模型，显示递减真实数据量仍可获得更优结果；并展示合成随机化数据帮助模型应对光照变化与快速运动、合成相机仿真帮助跨传感器迁移。(官方SBC摘要页原文已核验)",
+                "conditions": [
+                  "自定义单一无纹理打印件(非T-LESS 30对象固定场景)",
+                  "19模型的逐因素消融结构未核验——论文正文未获取，仅摘要级核验",
+                  "无外观×几何正交格、无错误分解与歧义分层"
+                ],
+                "card_claim": "claim_d1c_gap_logical",
+                "coverage": "partial",
+                "rationale": "6D位姿域内最接近的DR效用研究，但其对照轴是合成/真实混合策略与跨传感器泛化，不是两轴正交注入；对象、度量与读数均与卡不同。即使其全文含逐因素消融，也只能提高partial程度，不可能覆盖T-LESS上的错误分解归因主格。"
+              },
+              {
+                "source_id": "src_f40bc09f387e44518d41696ca576f1b6",
+                "evidence_ids": [
+                  "ev_266e8b52029f8abee2d857dba5acd402"
+                ],
+                "established_claim": "Hodaň等(ICIP 2019, arXiv:1902.03334)将『全场景3D模型+真实材质与光照+物理仿真合理几何配置+PBR渲染』四要素联合引入合成训练，在Rutgers APC与LM-O上相对随机照片底基线取得+24%/+11% mAP@.75IoU。",
+                "conditions": [
+                  "Faster R-CNN实例检测；Rutgers APC与LineMod-Occluded",
+                  "摘要级核验；比较同时改变外观与几何(布局)要素，不可归因到单轴"
+                ],
+                "card_claim": "claim_d1c_gap_aggregate",
+                "coverage": "partial",
+                "rationale": "联合层面证据，正因联合改变才构成卡要解开的混同(卡的claim_d1c_default_confound即以此为动机之一)。它排除『两轴联合无效』的强否定结论，但不提供任何单轴边际效应或交互信息，不覆盖卡的两轴判定。"
+              },
+              {
+                "source_id": "src_ed3dc6a17ed54fe8933e4070c29c2805",
+                "evidence_ids": [
+                  "ev_18585463168c87fd22712d8c822d2b12"
+                ],
+                "established_claim": "BOP Challenge 2020(arXiv:2009.07378)公开结果：提供350K BlenderProc4BOP PBR合成图后深度网络法追平点对特征法；26个方法中仅RGB通道训练的PBR-only法排第5、PBR+real排第3；数据增强被识别为CosyPose关键组件，PBR逼真度被证明有效。",
+                "conditions": [
+                  "七核心数据集(含T-LESS)聚合排名，26个评测方法",
+                  "聚合层面结论，无按轴受控比较"
+                ],
+                "card_claim": "claim_d1c_gap_aggregate",
+                "coverage": "partial",
+                "rationale": "聚合层面对外观(PBR)有效性的证据；无法把效果分解到材质/光照轴或位姿/布局轴，不覆盖卡的归因问题，仅构成C00默认条件阳性对照的量级参照。"
+              },
+              {
+                "source_id": "src_51daccf6f95c4821aff1b749bcff1382",
+                "evidence_ids": [
+                  "ev_b7d339ab3d162d2f246f15c5d43dfd7c"
+                ],
+                "established_claim": "制造环境DR综合研究(arXiv:2506.07539)把生成因素分为对象特征(数量/位姿/纹理)、背景与干扰物、相机视角、光照、后处理五组，在公开机器人工业件集与自建SIP15-OD上训练YOLOv8合成-only并真实测试(mAP@50最高96.4%)；作者识别关键因素为材质属性、渲染方法、后处理与干扰物，光照未被列入关键因素。",
+                "conditions": [
+                  "2D检测、YOLOv8、制造/物流场景真实测试",
+                  "因素组级消融而非两轴正交；无6D位姿读数"
+                ],
+                "card_claim": "claim_d1c_gap_aggregate",
+                "coverage": "partial",
+                "rationale": "与DIMO研究同属2D检测层因素级证据，且两者方向不同(该文光照非关键，DIMO中光照随机化关键)，说明因素重要性随场景与任务设定变化——直接支持卡『必须在目标锚点实测』的动机，但不覆盖6D位姿层的轴归因。"
+              },
+              {
+                "source_id": "src_e64324ca1b62462987f8d935880e266b",
+                "evidence_ids": [
+                  "ev_b71382f95060831b82f107efcb72e638"
+                ],
+                "established_claim": "BOP-D(arXiv:2408.17297)证明6D位姿基准把视觉歧义近似为全局对称集、忽略视点/遮挡造成的局部歧义；以可见性感知逐图位姿分布重标注T-LESS后，现有方法排名显著改变；并记录VSD需深度、已被新任务省略。",
+                "conditions": [
+                  "T-LESS等BOP数据集；评测/标注层研究",
+                  "不含任何训练分布轴干预"
+                ],
+                "card_claim": "claim_d1c_measurement_ambiguity",
+                "coverage": "partial",
+                "rationale": "覆盖卡测量审计组件(c类)的动机与工具基础——『轴归因读数受标注歧义与度量选择调制』已有T-LESS上的直接证据；但它本身不做轴干预归因，因此只覆盖协议的一个读数维度，不覆盖主贡献。"
+              },
+              {
+                "source_id": "src_6d66aa0f03de4fce8d5e61e3a5d09194",
+                "evidence_ids": [],
+                "established_claim": "SADGE(arXiv:2605.22467, 2026-05)在五个公开合成-真实基准族、15个数据集级变体(79k图像对)上测量外观相似性与几何相似性度量对检测/分割/位姿下游性能的预测力：单独的外观或几何相似性都不可靠，两者的非线性交互决定合成数据效用；融合DINOv3外观相似性与MASt3R几何一致性的双线性交互项最优(Pearson r=0.88, Spearman rho=0.77)。",
+                "conditions": [
+                  "数据集度量级相关研究(不训练受控干预模型)",
+                  "非T-LESS固定场景归因；摘要级核验(arXiv abs页)"
+                ],
+                "card_claim": "claim_d1c_gap_logical",
+                "coverage": "partial",
+                "rationale": "在同一『外观 vs 几何』概念轴上最新(2026)的相邻工作，且在度量层直接证实两轴非线性交互——与卡H2的交互动机一致，说明该问题在数据集度量层已被注意；但它估计的是相似性度量与下游性能的相关，不做训练分布正交注入、无真实测试错误分解与T-LESS条件化判定，因此不能替代卡，反而支持『干预层的两轴交互在T-LESS上尚未被回答』的判断。"
+              },
+              {
+                "source_id": "src_8a29e4539cd74e698325589e8c4d825e",
+                "evidence_ids": [],
+                "established_claim": "Tremblay等(arXiv:1804.06516)的系统把光照、位姿、物体纹理等模拟参数以非真实方式随机化并探索这些参数的重要性，证明仅用非艺术化生成的合成数据即可在KITTI上训练出性能可观的汽车检测网络，且加真实数据微调后优于纯真实训练。",
+                "conditions": [
+                  "2D汽车检测(KITTI)；摘要级核验",
+                  "无6D位姿、无错误分解、无两轴正交交互检验"
+                ],
+                "card_claim": "claim_d1c_gap_aggregate",
+                "coverage": "partial",
+                "rationale": "DR参数重要性探索的经典先例，与卡同族但任务层级(检测AP)与锚点(KITTI)均不同，构成背景参照；其抽象结论(随机化可替代保真度)正是卡试图在T-LESS位姿层细化的对象。"
+              },
+              {
+                "source_id": "src_fb2817fbb75b4b84aa40dcdfc3e63cd3",
+                "evidence_ids": [],
+                "established_claim": "SynthRender与I-AsSET(arXiv:2602.21141, 2026-02/08)提出程序化Guided Domain Randomization框架，在多个工业基准上做结构化消融量化单个渲染设计选择的影响并产出数据高效合成训练指南；三工业基准达98.7/97.9/95.1 mAP@50。(摘要级核验)",
+                "conditions": [
+                  "2D工业物体感知(mAP@50)为主，含自建32类I-AsSET",
+                  "非6D位姿、非T-LESS；消融粒度未在摘要中展开"
+                ],
+                "card_claim": "claim_d1c_gap_aggregate",
+                "coverage": "partial",
+                "rationale": "2026年仍在活跃的『渲染因素消融』线的最新代表，显示单因素重要性研究持续产出；但属2D感知层、以性能指南为目标，不做T-LESS上两轴正交注入+位姿错误分解+歧义分层条件化判定，不覆盖卡的主格。"
+              }
+            ],
+            "contribution_coverage": "not_covered",
+            "defensible_delta": "卡的知识增量——在同一具名工业固定场景(T-LESS)上以匹配预算对『外观轴(材质/光照随机化范围)×几何轴(位姿/相机覆盖、布局)』做正交2×2+锚点注入，并以真实测试位姿错误分解(ID混淆、连续位姿误差、召回)、对称/遮挡歧义分层与MSSD/MSPD/VSD度量族为条件化读数判定两轴效应可加性/交互与判定翻转——未被任何已检工作建立。最接近的结构性先例DIMO(2211.16066)在同构{位姿×光照}2×2上只覆盖2D检测AP层(域非T-LESS、主格预算未匹配、无交互检验、无错误分解)；PNDR仅做非工业域的单轴光照隔离；SIBGRAPI为单物体DR混合策略研究(全文未核验)；BOP2020/Hodaň2019/2506.07539为聚合或组级证据；BOP-D提供测量审计组件但无归因；SADGE在度量层证实外观-几何非线性交互但不做干预。故『T-LESS上两轴边际效应是否可加、判定是否随歧义分层与度量族翻转』仍是开放问题。delta可辩护，但卡方应把DIMO与SADGE补入closest_work_delta，并把DIMO『光照宜随机、位姿宜建模』的2D层单格结果登记为H1/H2的现有参照预测(而非覆盖)。",
+            "search_scope": "独立检索(2026-09-07执行，8次定向web查询)：T-LESS渲染轴归因/factorial交互；sim-to-real gap appearance/geometry分解；DR消融6D位姿；DIMO合成数据研究原文；SIBGRAPI DR 6DoF研究；几何模型保真度与sim-to-real gap；T-LESS+BlenderProc逐因素消融；位姿覆盖/训练分布消融。检读原文：2211.16066(ar5iv原文§1-§4.2，2×2子集结构与§4.1等图数结果逐字核验)、SIBGRAPI 2020官方摘要页、PNDR缓存(摘要段复核)、SADGE/Tremblay/SynthRender arXiv摘要页、2108.11018(缩放律，与本卡归因问题不同层，未列入closest_works)。继承证据：卡内已核验证据链(PNDR§6.1、Hodaň2019、BOP2020、2506.07539、BOP-D、Tobin2017、BlenderProc4BOP官方文档)与存档比较记录(card_106f9f81 v1、card_b63f6d85 v1/v2为2D掩码度量可识别性卡族，判related_but_distinct、无重开条件触发，载荷已提供其锚点与重开条件，未重开记录)。截止日期2026-09-07。否定结论限于上述查询与窗口，非全局存在性断言。",
+            "unchecked_items": [
+              "SIBGRAPI 2020全文未获取(仅官方摘要页核验)：其19个模型的逐因素消融结构未核实；若含逐轴消融则partial程度更高，但单对象非T-LESS，不会覆盖6D位姿错误分解主格。",
+              "MDPI Sensors 21(23)7901『Generating Images with Physics-Based Rendering for an Industrial Object Detection Task』与PMC10748156『Deep Learning-Based 6-DoF Object Pose Estimation Considering Synthetic Data...』返回403/JS墙，渲染因素消融内容未核验(2D检测层证据，预期只影响partial粒度)。",
+              "Hodaň 2019正文仅摘要级(卡的既有证据同)；其habilitation论文(2112.15075)合成数据章节未逐节核验，可能含更多单因素分析(APC/LM-O检测层，不影响T-LESS 6D位姿层判定)。",
+              "付费墙与2025-2026新工业sim2real论文全文(如Real-Gen、『A Modular End-to-End Sim2Real Pipeline』、Springer『Exploring the Impact of Geometric Model Fidelity on the Sim-to-Real Gap』)未读全文，仅据检索摘要判定为2D感知/几何资产保真度层，不构成同格归因。",
+              "非英文文献、私有代码仓库内未发表消融、BlenderProc bop_challenge脚本逐轴开关的代码级可执行性(执行前提，非本判定范围)。",
+              "存档检索仅限载荷记录的6次定向查询与limit=8窗口(未翻页)，未覆盖全存档元数据；本判定不构成『全存档无渲染轴归因卡』的存在性断言。"
+            ],
+            "recommended_selection_effect": "维持card_52bce580 v1的知识增量主张：贡献位于6D位姿错误分解+歧义分层+度量族条件化判定层，未发现任何已检工作覆盖该层(最接近的DIMO仅覆盖2D检测AP层的同构2×2)；DIMO/PNDR/SADGE等先例反而为协议可执行性与交互动机提供基础。选择效果：不因先例覆盖而拒绝该卡，亦不触发存档中2D掩码卡族(card_106f9f81、card_b63f6d85)的任何重开条件；建议将新发现的DIMO(2211.16066)与SADGE(2605.22467)补入closest_work_delta并在closest_work_delta中登记DIMO的单格结果作为H1/H2参照预测，ER1重开闸门(同域同格factorial出现即转复现/扩展)保持有效。"
+          },
+          "archive_relations": {
+            "comparisons": [
+              {
+                "archive_card_id": "card_106f9f81b76c449cb429c4c883dbeb1d",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "该卡判定2D拥挤小目标（细胞/核）掩码上『纯边界误差 vs 实例合并/拆分误差』在整体重叠度量族与边界敏感度量族上的测量可识别性（掩码级注入、无训练、以LIVECell/CoNIC/MoNuSAC为基准），本卡归因6D位姿sim-to-real合成训练分布中外观轴（材质/光照随机化范围）与几何轴（位姿/相机覆盖、布局）对T-LESS固定场景真实测试错误的边际贡献与交互（渲染参数层干预+真实测试读数）。两者共享『受控注入×错误分解×分层×多度量族×条件化判定+可复用协议』的形式骨架，但领域、注入对象（GT掩码扰动 vs 训练渲染分布scoping）、读数对象与知识增量均不同，属方法论层面的类似而非同一贡献；其重开条件（同域同格factorial被他人完成、地板带吞没等）与本卡无涉，不触发。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_b63f6d85554a493a8be684fca084edd6",
+                "archive_card_version": 2,
+                "relation": "related_but_distinct",
+                "rationale": "该卡为与card_106f9f81同题的开发验收输入修订版（相互接触小实例中边界错误与实例合并错误的测量可辨识性/分开处理条件，尚未有实验证据），与card_52bce580的T-LESS渲染轴归因问题分属2D掩码测量层与6D位姿训练分布归因层，条件、干预与判定均不重叠；其重开条件（小尺度接触实例两族指标归属被系统回答、分层翻转、干预有效性失败）不因本卡出现而满足。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_b63f6d85554a493a8be684fca084edd6",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "该卡是同卡（card_b63f6d85）的import初始版本，科学断言全部待核实，研究物与v2一致（2D掩码错误类测量可辨识性），相对本卡（T-LESS渲染轴正交注入归因协议）仍为不同域、不同问题与不同贡献；不构成same_contribution，亦未满足该卡任何重开条件（其重开条件均关于其自身未核实条目或实验失败后的重设计）。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              }
+            ],
+            "records_opened": [],
+            "retrieval_scope": "运行时候选窗口total=4（含当前卡自身card_52bce580 v1的自匹配），外部候选为2D掩码度量可识别性卡族：card_106f9f81 v1、card_b63f6d85 v1与v2，共3条需判定记录；两个唯一卡的problem_anchor/重开条件在载荷中完整提供，无需再开记录。另执行6次不同措辞的定向查询（T-LESS 6D位姿外观/几何轴正交注入归因；domain randomization材质光照vs位姿覆盖交互；BlenderProc/BOP渲染参数消融与覆盖；sim-to-real位姿分布覆盖；PBR/非真实感渲染消融；T-LESS无纹理/对称混淆与歧义度量协议），窗口均一致：除本卡自身外只命中上述卡族，未命中任何渲染轴归因、6D位姿sim-to-real或T-LESS主题存档卡。",
+            "unsearched_limits": [
+              "本判定的否定范围限于上述6次查询与运行时窗口：存档检索未命中不代表全存档不存在渲染轴归因主题卡（lexical_recall_is_not_semantic_uniqueness）",
+              "未翻页（limit=8, offset=0）且未用非中文/非英文混合术语以外词汇体系（如其他语种元数据）检索；若后续需要全局存在性断言，应以更多查询词与分页窗口复核"
+            ],
+            "needs_additional_lookup": false
+          }
+        },
+        "campaign_f41ce4c25f514bd9b28867854dcad96c.draw2": {
+          "plan": {
+            "continue_or_stop": "STOP",
+            "proposed_family": null,
+            "anchor_evidence_ids": [],
+            "distinct_from_retained": "本 draw 未提出新方向，因为逐一评估的候选族均不构成与保留卡 card_52bce580 v1（draw1 的 MAIN_REPORT）实质性不同的知识贡献：(1) 重述同族：任何『T-LESS+BlenderProc4BOP 固定场景双轴正交注入、真实测试错误分解+歧义分层+度量族条件化判定』的表述都与该卡同贡献（运行时预计算比较已登记 same_contribution，其重开条件全部未满足），ITODD 类第二锚点也在该卡 anti_scope 的『未经许可/口径审计不纳入』边界内；(2) 同问题换锚点/换读数层：HB/ITODD 第二锚点、2D 检测层（DIMO 2211.16066 已在 2D 层做过同构 2×2）、T-LESS 掩码/实例分割层都只是把同一 A×G 归因问题移到另一数据集或另一读数，没有证据表明产生新的不可约科学问题或机制解释，会被判为复述而非新贡献；(3) 主卡内部组件/后续扩展：几何轴子分解（CAD/重建网格保真度 vs 位姿覆盖）、外观轴子分解、覆盖重叠协变量方法、度量敏感性专项、模型族不变性检验等要么已被主卡协议列为读数维度/重开条件保留项，要么其价值严格取决于主卡尚未运行的 H1/H2/H3 结果；(4) 越界方向：测试侧光照/布局漂移归因、cue-conflict 诊断等不在本 mandate『合成训练分布两轴归因』的 scope_in 之内。本轮 5 组存档检索（lookup_archive，limit 8/offset 0，中文+英文术语）与 2 组 web 定向检索的窗口一致，仅返回主卡本身与已知 2D 掩码测量卡族、VLM 冲突卡族，未发现支撑上述任一候选为独立新族的证据锚。",
+            "relevant_archive_relations": [
+              {
+                "archive_card_id": "card_52bce58017164c2b9594c418eb0cac7b",
+                "archive_card_version": 1,
+                "relation": "same_contribution",
+                "rationale": "该卡即 draw1 保留主卡，研究物为 T-LESS+BlenderProc4BOP 固定场景下外观轴（材质/光照随机化范围）×几何轴（位姿/相机覆盖、布局）正交注入 + 匹配预算 + 真实测试错误分解/歧义分层/度量族的条件化判定。本 draw 若重提任何同构表述即为同一贡献：本轮 5 组存档检索仍以该卡为唯一命中（含我复核的 full problem_anchor），没有发现使其知识增量被覆盖的新工作；其重开条件（同域同格 factorial 出现、逐轴开关失败、种子噪声不可测、BOP-D 标注质量降级、他人完成主格后的扩展）无一被满足，故不触发重开、也不再以此族作为新 draw。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_106f9f81b76c449cb429c4c883dbeb1d",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "2D 拥挤小目标（细胞/核）掩码层『纯边界误差 vs 实例合并/拆分误差』的度量可识别性卡，无渲染轴注入、无合成训练域、无真实测试配对锚点，与本 campaign 的渲染空间双轴归因不同层、不同对象；仅作对照，其重开条件（同域同格 factorial 完成、分层翻转等）不因本 draw 出现而满足。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_0ccd1e68ea134bcc8764733c77c7ab05",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "冻结 VLM 图文冲突材料中标签歧义×图像可靠性的二选一行为研究，共享『受控分离两因素并检验交互』的提问结构但无渲染轴、无 sim-to-real 训练分布与泛化错误归因，实质贡献不同；其重开条件未触发。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_a60e80855eac4817b2669445a9a6f934",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "拥挤小目标分割测量层检验（边界错误 vs 实例合并错误的度量可分性与干预判据），全程无模型训练、无渲染轴注入，与本任务（渲染空间双轴归因 + 真实测试错误）不同层不同对象，仅作对照；重开条件未触发。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_b63f6d85554a493a8be684fca084edd6",
+                "archive_card_version": 2,
+                "relation": "related_but_distinct",
+                "rationale": "同属 2D 掩码度量可识别性卡族（小尺度接触实例边界/合并错误），记录标注为开发验收/import 性质而非自然 discover 卡；不触及渲染空间外观×几何归因，不构成覆盖，重开条件未触发。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              },
+              {
+                "archive_card_id": "card_b63f6d85554a493a8be684fca084edd6",
+                "archive_card_version": 1,
+                "relation": "related_but_distinct",
+                "rationale": "同一卡族的 import 初始版本（科学断言全部待核实），判定与 v2 相同：处于掩码测量层、针对小尺度接触实例的两族指标可辨识性，与本任务不同层不同对象，仅作对照；重开条件未触发。",
+                "reopening_condition_met": false,
+                "reopening_condition": null,
+                "new_evidence_ids": []
+              }
+            ],
+            "missing_information": [
+              "主卡 card_52bce580 v1 的实验结果未知：候选后续方向（模型族不变性、第二锚点扩展、子因素细分、度量敏感性专项等）的价值全部以其 H1/H2/H3 判定为前提，当前无任何方向性结果支持从中挑选一个作为新 draw；应先执行该卡的 HANDOFF_EXPERIMENT。",
+              "第二类锚点（ITODD 等）仍未完成独立审计：官网『3500 标注场景』与 ICCV2017 摘要『800+ 场景/约 3500 个 GT 变换』口径不一致（ev_f70c6662…），许可为 CC BY-NC-SA 4.0 且禁止商用、要求相同方式共享（ev_9893f6af…）；即使审计完成，其科学问题仍是同构两轴归因，属主卡结论的复制性扩展而非不同贡献，除非以多传感器同步固定观测为前提提出新的科学问题（如跨视角一致性错误归因）并补齐资产证据。",
+              "跨读数层（2D 检测/掩码分割）同格工作：2D 检测层已有 DIMO(2211.16066) 同构 2×2 部分覆盖，测量审计层已有 BOP-D 证据；需要先确认存在不可约的新问题而非读数层复述，目前无证据支持。",
+              "几何资产保真度（CAD vs 半自动重建双网格）与位姿覆盖宽度分离的方向：相关文献（如 Springer《Exploring the Impact of Geometric Model Fidelity on the Sim-to-Real Gap》等）仅有 metadata/摘要级线索、正文未核验，且该方向即使成立也更接近主卡几何轴内部的细化扩展，需主卡结果后再判断。",
+              "本轮否定为有界结论：执行了 5 组存档查询（lookup_archive，limit 8/offset 0）与 2 组 web 定向检索，窗口内仅命中主卡与已知 2D 掩码/VLM 卡族；未翻页、未覆盖全存档元数据与非中英术语体系，不构成『全域不存在其他方向』的断言。"
+            ],
+            "why_this_draw_is_worthwhile": "本 draw 的价值在于避免产出一张虚假的『第二方向』卡并如实记录停止理由：运行时预计算的存档比较已把『重述主卡研究物』标为 same_contribution 且重开条件未满足，而我对五类候选方向（同族重述、同问题换锚点/换层、主卡内部组件扩展、子因素分解、越界问题）的逐一核查显示，没有一类具有可辩护的独立知识增量或证据锚——它们要么被主卡 anti_scope/协议组件覆盖，要么以主卡未运行的结果为前提，要么超出 mandate 范围；本轮 5 组存档检索 + 2 组 web 检索的一致空窗进一步支持该判断（有界否定）。停止不等于声称领域已穷尽：已明确列出使未来 draw 重新成立的具体条件——主卡实验返回后（模型族/第二锚点/子因素扩展族获得条件性依据）、完成许可与口径审计并发现引入新科学问题的锚点、或出现同域同格工作覆盖主卡（此时按 card_52bce580 的 ER1 重开闸门转为复现/边界扩展，而非重复主格）。当前最值得人推进的下一步是主卡的判别性实验，而不是再开一个 draw。"
+          }
+        }
+      },
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "742910e6b5778cbb576e6277bb13d02e89e2d227224b4eaff89566773f9d685c",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.shared_investigation",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "df5d6797a093273a0ec1e298c377a57653892d0fd341185f9a88337be09cc930",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw1.archive",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "b676912304b6d4e595f93dfaeff653e83ffa2e50e37afd4b0fc346086fb2b80a",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw1.next",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "131c61abd6f10535f4b88c7ca4cf3c1da121819b06452cadff6875372acf26e9",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw1.compose",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "e876684521157f85cbcc4648eecdc685f1f1fb3ac77e87f95f1f4d649ccd279d",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw1.card_archive",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "1ed99ac1ed3bab8edb2257a594100891b9bec92e4ce4361d1860618d29755a45",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw1.novelty",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "fa480e03b8c860fcd12823b144edbd8632494735cbfacb2bcf12af87d00d2ad4",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw1.selection",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "a454c8f1c8f5f8c78d98dc68b2870874ad00d62c98fa403de4c5d44e0ec4652f",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw2.archive",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "59bb046a12c48b874b2c26931a5f5f5c330d898de4fb246c78b48af14044ed17",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.draw2.next",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "d5c819e63e25ad5255805ffcf698f3bec956b0ba5d36e5fb2a4c9eb1b5f203ed",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 25000000,
+        "spent_lower_micro": 8897677,
+        "spent_upper_micro": 8897731,
+        "reserved_micro": 0,
+        "remaining_micro": 16102269,
+        "limit_cny": "25.000000",
+        "spent_lower_cny": "8.897677",
+        "spent_upper_cny": "8.897731",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "16.102269",
+        "unknown_calls": 0,
+        "call_count": 199,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.ARC",
+      "mode": "evaluation",
+      "status": "PAUSED_EXTERNAL",
+      "stop_reason": "frozen_material_blocked",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.ARC.frame",
+          "status": "PAUSED_EXTERNAL",
+          "error": null,
+          "prompt_hash": "5162576ca2e8c92b5dcd856a7c1b076d64f0eb1d721d766e35800520effb35ad",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.ARC",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1323994,
+        "spent_upper_micro": 1323996,
+        "reserved_micro": 0,
+        "remaining_micro": 18676004,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.323994",
+        "spent_upper_cny": "1.323996",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.676004",
+        "unknown_calls": 0,
+        "call_count": 2,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.direct-Pro",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "frozen_material_comparison",
+      "assessment": null,
+      "card_id": "card_a60e80855eac4817b2669445a9a6f934",
+      "card_version": 1,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.direct-Pro.compose",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "8154de840063021317dcc25928e3c1d2b2be1f84594049b2748b94e70a6ebb03",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.direct-Pro.novelty",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "99e2058d6582c1765af2f2c26f8c0a7098b3010f86ca3abb1a7dd1aa5222c79e",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.direct-Pro.selection",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "d43a9bad3e5bc28d641f355ff9ad2a65bfdc3719805715f58f8579c48c00f63c",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover.comparison.direct-Pro",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 25000000,
+        "spent_lower_micro": 7101934,
+        "spent_upper_micro": 7101937,
+        "reserved_micro": 0,
+        "remaining_micro": 17898063,
+        "limit_cny": "25.000000",
+        "spent_lower_cny": "7.101934",
+        "spent_upper_cny": "7.101937",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "17.898063",
+        "unknown_calls": 0,
+        "call_count": 3,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.ARC",
+      "mode": "evaluation",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "INVALID_OUTPUT_AFTER_REPAIR",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.ARC.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "f3fe55298ab8682a3d3bd8736dc616022142b5140f86bb0c6cf2b5472e8dfffa",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.ARC.family",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "4b99cdcd51b3d7ce66015a7c3a6558085199fc8298c820301a2cf8701bedb180",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.ARC.compose",
+          "status": "PAUSED_PROTOCOL",
+          "error": "INVALID_OUTPUT_AFTER_REPAIR",
+          "prompt_hash": "9b7bc37d5995a2ef83808eccd4b443e462b816d05466016748537abfc12722df",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.ARC",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1808136,
+        "spent_upper_micro": 1808138,
+        "reserved_micro": 0,
+        "remaining_micro": 18191862,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.808136",
+        "spent_upper_cny": "1.808138",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.191862",
+        "unknown_calls": 0,
+        "call_count": 5,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.direct-Pro",
+      "mode": "evaluation",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "unknown_evidence_id",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.direct-Pro.compose",
+          "status": "PAUSED_PROTOCOL",
+          "error": "unknown_evidence_id",
+          "prompt_hash": "151e88415588850e59dd10d2b899542284f2a0636231dca8264b5e618e97b0c5",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.direct-Pro",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1264327,
+        "spent_upper_micro": 1264328,
+        "reserved_micro": 0,
+        "remaining_micro": 18735672,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.264327",
+        "spent_upper_cny": "1.264328",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.735672",
+        "unknown_calls": 0,
+        "call_count": 1,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.materials.conflict_holdout",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "evaluation_materials_registered",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 9,
+      "canonical_sources": 9,
+      "evidence_count": 15,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.fixed_materials",
+          "status": "PAUSED_PROTOCOL",
+          "error": "excerpt_not_in_returned_source",
+          "prompt_hash": "07485cb1b9e48af3f9bec14e498dd202e71903cf132299ef46e0c71b6e7c2544",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.fixed_materials.source_recheck",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "bc78b80ecfa63f39b67cc8a9cb29d3fcb65c8dba96692a7c26e3287c0ed86114",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.materials.conflict_holdout",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1328487,
+        "spent_upper_micro": 1328501,
+        "reserved_micro": 0,
+        "remaining_micro": 18671499,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.328487",
+        "spent_upper_cny": "1.328501",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.671499",
+        "unknown_calls": 0,
+        "call_count": 50,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.ARC",
+      "mode": "evaluation",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "evidence_request_claim_id_not_supplied_to_task",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.ARC.frame",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "def9ebe9f0a47a9d272c392bba5e0b117b1a30d8e020a8b66c037546f7b872a0",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.ARC.family",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "ad6241aef2121e367333a2a33d26de77de32a7ab83d477f6618ca1a661d3109e",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.ARC.compose",
+          "status": "PAUSED_PROTOCOL",
+          "error": "evidence_request_claim_id_not_supplied_to_task",
+          "prompt_hash": "7743dd913d1763fbf32641888db7ae11bdcb20c9aef29abed699601e9d15f846",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.ARC",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 451487,
+        "spent_upper_micro": 451489,
+        "reserved_micro": 0,
+        "remaining_micro": 19548511,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.451487",
+        "spent_upper_cny": "0.451489",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.548511",
+        "unknown_calls": 0,
+        "call_count": 3,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.direct-Pro",
+      "mode": "evaluation",
+      "status": "COMPLETED",
+      "stop_reason": "frozen_material_comparison",
+      "assessment": null,
+      "card_id": "card_0ccd1e68ea134bcc8764733c77c7ab05",
+      "card_version": 1,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 0,
+      "canonical_sources": 0,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.direct-Pro.compose",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "26257dd078a3a00c00b2af121288de4aacfe280ac4be78dbd6c27139a6a7cd30",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.direct-Pro.novelty",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "85aadcac069f0c0b3d096f3fd865f586bd95071f0bfc811d467746a79c3c8e3b",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.direct-Pro.selection",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "a189bffa9b5bc9cea7fbc7a60f7688d525e04b6ddcb6adf6fda03a52e4ba7045",
+          "model": "deepseek-v4-pro",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.materials.conflict_holdout.comparison.direct-Pro",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1989082,
+        "spent_upper_micro": 1989085,
+        "reserved_micro": 0,
+        "remaining_micro": 18010915,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.989082",
+        "spent_upper_cny": "1.989085",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.010915",
+        "unknown_calls": 0,
+        "call_count": 3,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.develop",
+      "mode": "develop",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "TOOL_ARGUMENTS_INVALID",
+      "assessment": null,
+      "card_id": "card_52bce58017164c2b9594c418eb0cac7b",
+      "card_version": 1,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 278,
+      "canonical_sources": 256,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.develop.fresh_verification",
+          "status": "RESPONSE_SAVED",
+          "error": null,
+          "prompt_hash": "d9fe86265640e1fa615925dff2e31c24dabd262ad16987aa368549ea39fdaffd",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.develop",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 688819,
+        "spent_upper_micro": 688825,
+        "reserved_micro": 0,
+        "remaining_micro": 19311175,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.688819",
+        "spent_upper_cny": "0.688825",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.311175",
+        "unknown_calls": 0,
+        "call_count": 27,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.run",
+      "mode": "run",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "INVALID_OUTPUT_AFTER_REPAIR",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 1,
+      "canonical_sources": 1,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.run.import",
+          "status": "PAUSED_PROTOCOL",
+          "error": "INVALID_OUTPUT_AFTER_REPAIR",
+          "prompt_hash": "c99ab1ebec965759c1718e6d349f20d121c10d294055e04938f17a9129d7f2fb",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.run",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 622656,
+        "spent_upper_micro": 622660,
+        "reserved_micro": 0,
+        "remaining_micro": 19377340,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.622656",
+        "spent_upper_cny": "0.622660",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.377340",
+        "unknown_calls": 0,
+        "call_count": 16,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.develop",
+      "mode": "develop",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "AFFECTED_CLAIMS_COVERAGE",
+      "assessment": null,
+      "card_id": "card_efc859b4332444d48af5362d8b1a208a",
+      "card_version": 1,
+      "prompt_version": "bundle-sha256:6545ef78f34b99e7311b7f5ecf6549df1d72df39990f8a7d372df3eec628f15e",
+      "sources": 76,
+      "canonical_sources": 68,
+      "evidence_count": 8,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.develop.import",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "7dfd47dea943104ad6f2ba6270bf6769971be64a9d972097652af42e0cee3dc7",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.develop.fresh_verification",
+          "status": "PAUSED_PROTOCOL",
+          "error": "excerpt_not_in_returned_source",
+          "prompt_hash": "451edff262ec38165802932be69fd1e3845d8afc7812657e78ac26a3deb7fae4",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.develop.fresh_verification.source_recheck",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "2b345140d3604c2ed98f3bb705b0dd7fac8ed1ba31fbf745502cbe1606a97355",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        },
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.develop.development",
+          "status": "ACCEPTED",
+          "error": null,
+          "prompt_hash": "8e3d7889f02135ec4eeceb9e98edbb20427900c9360c6e7ad4e8a7e875e2d94e",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": true
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.explicit_input_schema_v2.develop",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1704536,
+        "spent_upper_micro": 1842874,
+        "reserved_micro": 0,
+        "remaining_micro": 18157126,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.704536",
+        "spent_upper_cny": "1.842874",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.157126",
+        "unknown_calls": 0,
+        "call_count": 72,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    },
+    {
+      "run_id": "arc-vnext-validation-20260907.explicit_input_schema_v3.run",
+      "mode": "run",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "TOOL_ARGUMENTS_INVALID",
+      "assessment": null,
+      "card_id": null,
+      "card_version": null,
+      "prompt_version": "bundle-sha256:dd0ddf4c247756f233e52742119796a4bd604f1a39138532d572e007b23b5dc2",
+      "sources": 1,
+      "canonical_sources": 1,
+      "evidence_count": 0,
+      "draws": null,
+      "rounds_completed": null,
+      "issues": [],
+      "tasks": [
+        {
+          "task_id": "arc-vnext-validation-20260907.explicit_input_schema_v3.run.import",
+          "status": "RESPONSE_SAVED",
+          "error": null,
+          "prompt_hash": "eb50bde36a4c74b818af465cbffbe89c9c4e902793fdd928a21e1ea08fddef56",
+          "model": "deepseek-v4-flash",
+          "has_accepted_result": false
+        }
+      ],
+      "cost": {
+        "account_id": "arc-vnext-validation-20260907.explicit_input_schema_v3.run",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 294770,
+        "spent_upper_micro": 294781,
+        "reserved_micro": 0,
+        "remaining_micro": 19705219,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "0.294770",
+        "spent_upper_cny": "0.294781",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "19.705219",
+        "unknown_calls": 0,
+        "call_count": 39,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      }
+    }
+  ],
+  "boundaries": [
+    "No raw model reasoning included.",
+    "Model judgments are not expert labels or executed research results."
+  ]
+}
