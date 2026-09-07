@@ -158,7 +158,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             task_id=metadata['task_id'],
             request_key=metadata['parent_call_id'] + ':' + metadata['tool_call_id'])
         return {'recorded': True, 'request_id': identifier, 'capability_available': False,
-                'status': 'pending_codex_review', 'execution_authorized': False}
+                'status': 'pending_user_review', 'execution_authorized': False}
     tools['request_capability'] = BoundTool('request_capability', CapabilityRequest.model_json_schema(),
         request_capability, Decimal(0), 'LOCAL_REQUIREMENTS_ARTIFACT')
 

@@ -49,11 +49,15 @@ def test_durable_requests_review_and_handoff_do_not_grant_authority(tmp_path):
     before=ledger.summary('account'); original_run=store.get_run(run.run_id)
     identifier=store.save_capability_request(run.run_id,request_payload(),task_id='task-a',request_key='task-a.envelope.0')
     record=store.get_capability_request(identifier)
-    assert record['status']=='pending_codex_review' and record['review'] is None
-    assert '尚未评估，不生成执行支线' in render_capability_handoff(record)
+    assert record['status']=='pending_user_review' and record['review'] is None
+    pending=render_capability_handoff(record)
+    assert '尚未评估，不生成执行支线' in pending
+    assert '用户评估模板' in pending and 'CodeX' not in pending
+    assert '优点、缺点、成本' in pending and '不要仅复述' in pending
     assert store.save_capability_request(run.run_id,request_payload(),task_id='task-a',request_key='task-a.envelope.0')==identifier
     reviewed=store.review_capability_request(identifier,review_payload())
     assert reviewed['status']=='reviewed' and reviewed['task_id']=='task-a'
+    assert reviewed['reviewer']=='user' and reviewed['review_context']=='production'
     assert store.review_capability_request(identifier,review_payload())==reviewed
     assert '用户执行支线交付模板' in render_capability_handoff(reviewed)
     assert '没有创建或启动任何任务' in render_capability_handoff(reviewed)
@@ -63,6 +67,59 @@ def test_durable_requests_review_and_handoff_do_not_grant_authority(tmp_path):
     assert store.get_record(identifier)==reviewed
     assert ledger.summary('account')==before and store.get_run(run.run_id)==original_run
     assert len(store.list_capability_requests(run.run_id))==1
+
+
+def test_codex_review_is_explicit_development_only(tmp_path):
+    store,_=services(Settings(data_dir=tmp_path)); run=store.create_run('discover')
+    identifier=store.save_capability_request(run.run_id,request_payload())
+    before=store.get_capability_request(identifier)
+    with pytest.raises(ValueError,match='requires_development'):
+        store.review_capability_request(identifier,review_payload(),reviewer='codex')
+    assert store.get_capability_request(identifier)==before
+    assert '开发阶段 CodeX 评估模板' in render_capability_handoff(before,development_review=True)
+    record=store.review_capability_request(identifier,review_payload(),reviewer='codex',development=True)
+    assert record['reviewer']=='codex' and record['review_context']=='development'
+    text=render_capability_handoff(record)
+    assert '用户评估模板' in text and '开发阶段 CodeX 评估模板' not in text
+    assert '此评估保留为开发阶段记录' in text
+    assert store.review_capability_request(identifier,review_payload(),reviewer='codex',development=True)==record
+
+
+@pytest.mark.parametrize('reviewed',[False,True])
+def test_historical_capability_records_are_read_without_rewriting(tmp_path,reviewed):
+    store,_=services(Settings(data_dir=tmp_path)); run=store.create_run('discover')
+    original={**request_payload(),'status':'reviewed' if reviewed else 'pending_codex_review',
+        'task_id':'historical-task','created_at':'2026-09-07T00:00:00Z',
+        'review':review_payload() if reviewed else None,'reviewed_at':'2026-09-07T00:01:00Z' if reviewed else None}
+    raw=json.dumps(original,ensure_ascii=False)
+    with store._transaction() as db:
+        db.execute('INSERT INTO capabilities VALUES (?,?,?)',('historical-cap',run.run_id,raw))
+    record=store.get_capability_request('historical-cap')
+    assert store.get_record('historical-cap')==record
+    assert store.list_capability_requests(run.run_id)==[record]
+    text=render_capability_handoff(record)
+    if reviewed:
+        assert '原记录未注明' in text
+    else:
+        assert '历史开发阶段的状态标签，原记录未改写' in text
+    assert '用户评估模板' in text and '开发阶段 CodeX 评估模板' not in text
+    with store._connect() as db:
+        assert db.execute('SELECT data FROM capabilities WHERE id=?',('historical-cap',)).fetchone()[0]==raw
+
+
+def test_cli_codex_requires_explicit_development_flag(tmp_path):
+    store,_=services(Settings(data_dir=tmp_path/'data')); run=store.create_run('discover')
+    identifier=store.save_capability_request(run.run_id,request_payload())
+    review=tmp_path/'review.json'; review.write_text(json.dumps(review_payload()),encoding='utf-8')
+    runner=CliRunner(); base=['--data-dir',str(tmp_path/'data'),'requirements']
+    result=runner.invoke(app,[*base,'review',identifier,'--review',str(review),'--reviewer','codex'])
+    assert result.exit_code!=0 and '--development-review' in result.output
+    assert store.get_capability_request(identifier)['status']=='pending_user_review'
+    result=runner.invoke(app,[*base,'export',identifier,'--development-review'])
+    assert result.exit_code==0 and '开发阶段 CodeX 评估模板' in result.output
+    result=runner.invoke(app,[*base,'review',identifier,'--review',str(review),'--reviewer','codex','--development-review'])
+    assert result.exit_code==0,result.output
+    assert json.loads(result.output)['review_context']=='development'
 
 
 @pytest.mark.parametrize('assessment',['needs_information','not_recommended'])

@@ -13,7 +13,7 @@ from .config import load_settings, Settings
 from .prompting import PromptLoader
 
 app = typer.Typer(help='ARC：发现研究卡、展开方案、压力测试。每个阶段默认结束即停。', no_args_is_help=True)
-requirements = typer.Typer(help='登记改进需求、记录 CodeX 评估并导出用户支线模板；不执行变更。', no_args_is_help=True)
+requirements = typer.Typer(help='登记改进需求、记录用户评估并导出执行模板；不执行变更。', no_args_is_help=True)
 app.add_typer(requirements, name='requirements')
 
 
@@ -31,18 +31,25 @@ def list_requirements(ctx: typer.Context, run_id: str):
 
 
 @requirements.command(name='review')
-def review_requirement(ctx: typer.Context, request_id: str, review: Path = typer.Option(..., exists=True, dir_okay=False)):
-    """记录 CodeX 提供的评估 JSON，不触发模型或授予执行权限。"""
+def review_requirement(ctx: typer.Context, request_id: str, review: Path = typer.Option(..., exists=True, dir_okay=False),
+                       reviewer: str = typer.Option('user'), development_review: bool = typer.Option(False)):
+    """记录评估 JSON；开发阶段可显式指定 codex 评估者，不触发模型。"""
+    if reviewer not in ('user','codex'):
+        raise typer.BadParameter('--reviewer must be user or codex')
+    if reviewer=='codex' and not development_review:
+        raise typer.BadParameter('--reviewer codex requires --development-review')
     store, _ = services(ctx.obj)
-    record=store.review_capability_request(request_id,json.loads(review.read_text(encoding='utf-8')))
+    record=store.review_capability_request(request_id,json.loads(review.read_text(encoding='utf-8')),
+                                          reviewer=reviewer,development=development_review)
     typer.echo(json.dumps(record,ensure_ascii=False,indent=2))
 
 
 @requirements.command(name='export')
-def export_requirement(ctx: typer.Context, request_id: str, output: Optional[Path] = typer.Option(None)):
+def export_requirement(ctx: typer.Context, request_id: str, output: Optional[Path] = typer.Option(None),
+                       development_review: bool = typer.Option(False)):
     from .reports import render_capability_handoff
     store, _ = services(ctx.obj)
-    text=render_capability_handoff(store.get_capability_request(request_id))
+    text=render_capability_handoff(store.get_capability_request(request_id),development_review=development_review)
     if output is None:
         typer.echo(text)
     else:

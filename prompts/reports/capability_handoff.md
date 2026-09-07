@@ -8,26 +8,46 @@
 
 状态：{{ record.status }}
 
+{% if record.status == 'pending_codex_review' %}
+这是历史开发阶段的状态标签，原记录未改写；当前由用户处理，不进入正式运行的自动评估流程。
+{% endif %}
+
 ## 原始需求
 
 {{ request_json }}
 
-## CodeX 评估交付模板
+{% if development_review %}
+## 开发阶段 CodeX 评估模板
 
-请核对上述实际限制与相关实现，评估提议是否合理，比较当前替代方案，推荐最小可行选项。
+这是显式选择的开发阶段评估，不是正式 Agent 运行的一部分。
+{% else %}
+## 用户评估模板
+{% endif %}
+
+请核对上述实际限制与相关实现，评估提议是否合理。
+请在 rationale 中分别说明候选方案的优点、缺点、成本与尚未确认的影响，
+包括保持现状的方案；不要仅复述需求方的 alternatives。根据比较推荐最小可行选项。
 将评估写为 JSON，字段为 assessment（recommended / needs_information / not_recommended）、
 rationale、recommended_option（无建议时为 null）、implementation_scope（列表）、validation_plan（列表）。
 本步骤仅评估，不执行变更。用 arc requirements review 记录评估。
 
 {% if record.review is not none %}
-## 已记录的 CodeX 评估
+## 已记录的评估
+
+评估者：{{ record.get('reviewer') or '原记录未注明' }}
+
+评估阶段：{{ record.get('review_context') or '原记录未注明' }}
+
+{% if record.get('reviewer') == 'codex' %}
+此评估保留为开发阶段记录，不代表正式 Agent 依赖该评估者。
+{% endif %}
 
 {{ review_json }}
 
 {% if record.review.assessment == 'recommended' %}
 ## 用户执行支线交付模板
 
-用户决定采用后，可将以下文本交给 CodeX；本文件没有创建或启动任何任务。
+用户决定是否采用，并安排实施；本文件没有创建或启动任何任务。
 
 基于需求 {{ record.request_id }}，请实施已评估选项：{{ record.review.recommended_option }}
 

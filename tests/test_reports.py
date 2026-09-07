@@ -61,7 +61,7 @@ class FakeStore:
     def list_capability_requests(self,run_id):
         from .test_capabilities import request_payload
         return [{**request_payload(),'request_id':'cap-1','run_id':run_id,'task_id':'task-1',
-                 'status':'pending_codex_review','review':None}]
+                 'status':'pending_user_review','review':None}]
 
 
 def test_report_preserves_state_judgments_versions_and_costs(tmp_path,monkeypatch):

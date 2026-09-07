@@ -764,8 +764,9 @@ class Store:
         from .schemas import CapabilityRequest
         record=CapabilityRequest.model_validate(request)
         identifier=f"cap_{run_id}.{request_key}" if request_key is not None else stable_id("cap")
-        data={**record.model_dump(mode="json"),"status":"pending_codex_review",
-              "created_at":utc_now(),"review":None,"reviewed_at":None,"task_id":task_id}
+        data={**record.model_dump(mode="json"),"status":"pending_user_review",
+              "created_at":utc_now(),"review":None,"reviewed_at":None,"task_id":task_id,
+              "reviewer":None,"review_context":None}
         with self._transaction() as db:
             existing=db.execute("SELECT run_id,data FROM capabilities WHERE id=?",(identifier,)).fetchone()
             if existing is not None:
@@ -776,18 +777,23 @@ class Store:
             db.execute("INSERT INTO capabilities VALUES (?,?,?)",(identifier,run_id,_dump(data)))
         return identifier
 
-    def review_capability_request(self,request_id,review):
-        """Record an explicit CodeX assessment; this grants no execution authority."""
+    def review_capability_request(self,request_id,review,*,reviewer="user",development=False):
+        """Record a supplied assessment without granting execution authority."""
         from .schemas import CapabilityReview
+        if reviewer not in ("user","codex"): raise ValueError("unknown_capability_reviewer")
+        if reviewer=="codex" and not development: raise ValueError("codex_review_requires_development_context")
+        review_context="development" if development else "production"
         review=CapabilityReview.model_validate(review).model_dump(mode="json")
         with self._transaction() as db:
             row=db.execute("SELECT data FROM capabilities WHERE id=?",(request_id,)).fetchone()
             if row is None: raise StateError("record_missing")
             data=json.loads(row["data"])
             if data["review"] is not None:
-                if data["review"] != review: raise StateError("capability_review_already_recorded")
+                if data["review"] != review or data.get("reviewer")!=reviewer or data.get("review_context")!=review_context:
+                    raise StateError("capability_review_already_recorded")
             else:
-                data.update(status="reviewed",review=review,reviewed_at=utc_now())
+                data.update(status="reviewed",review=review,reviewed_at=utc_now(),
+                            reviewer=reviewer,review_context=review_context)
                 db.execute("UPDATE capabilities SET data=? WHERE id=?",(_dump(data),request_id))
         return self.get_capability_request(request_id)
 

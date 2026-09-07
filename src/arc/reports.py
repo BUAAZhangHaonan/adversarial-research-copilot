@@ -35,13 +35,14 @@ SELECTIONS = {'MAIN_REPORT':'值得继续调查','LEAD_ONLY':'待补证线索','
 ASSESSMENTS = {'PROMISING':'值得继续调查','NEEDS_EVIDENCE':'缺少判断所需证据','REJECTED':'已有依据不支持继续','SCOPE_CHANGE_PROPOSED':'建议转向，当前已冻结'}
 
 
-def render_capability_handoff(record, loader=None):
+def render_capability_handoff(record, loader=None, *, development_review=False):
     """A deterministic review/implementation handoff, never a task dispatch."""
     from .schemas import CapabilityRequest
     request={key:record[key] for key in CapabilityRequest.model_fields}
     return (loader or PromptLoader()).render_report('capability_handoff', {
         'record':record, 'request_json':json.dumps(request,ensure_ascii=False,indent=2),
         'review_json':json.dumps(record.get('review'),ensure_ascii=False,indent=2),
+        'development_review':development_review,
     })
 
 
