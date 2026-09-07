@@ -278,6 +278,38 @@ class Store:
                 rows=db.execute("SELECT card_id,max(version) as version FROM cards GROUP BY card_id ORDER BY card_id").fetchall()
         return [self.get_card(r["card_id"],r["version"]) for r in rows]
 
+    def card_provenance_context(self,card_id,version):
+        """Read the selected version's research inputs, never inherit judgments."""
+        from .schemas import InvestigatorResult
+        from pydantic import ValidationError
+        card=self.get_card(card_id,version)
+        source_ids=set(card.draft.closest_work_delta.source_ids)
+        evidence_ids=set(card.draft.motivation.evidence_ids)
+        for claim in card.draft.claims: evidence_ids.update(claim.evidence_ids)
+        with self._connect() as db:
+            rows=db.execute("SELECT r.data FROM runs r JOIN run_cards c ON c.run_id=r.id WHERE c.card_id=? AND c.version=? ORDER BY r.rowid",(card_id,version)).fetchall()
+        prior_runs=[RunRecord.model_validate_json(row[0]) for row in rows]
+        investigations=[]
+        for run in prior_runs:
+            source_ids.update(run.state.get("source_ids",[]))
+            evidence_ids.update(run.state.get("evidence_ids",[]))
+            for task in self.list_tasks(run.run_id):
+                if task.status!="ACCEPTED" or not isinstance(task.accepted_result,dict): continue
+                if not isinstance(task.prompt_manifest,dict) or "roles/investigator.md" not in task.prompt_manifest: continue
+                try:
+                    InvestigatorResult.model_validate(task.accepted_result.get("result"))
+                except ValidationError:
+                    continue
+                investigations.append(task.task_id)
+        source_ids.update(e.source_id for e in self.list_evidence(ids=sorted(evidence_ids)))
+        context={"card_id":card_id,"card_version":version,
+            "source_ids":sorted(source_ids),"evidence_ids":sorted(evidence_ids),
+            "provenance_run_ids":[run.run_id for run in prior_runs],
+            "provenance_campaign_ids":sorted({run.campaign_id for run in prior_runs if run.campaign_id}),
+            "investigation_task_ids":sorted(set(investigations))}
+        self.validate_references({"source_ids":context["source_ids"],"evidence_ids":context["evidence_ids"]})
+        return context
+
     def record_selection(self,run_id,card_id,version,judgment,state_patch=None):
         result=SelectorResult.model_validate(judgment)
         self.validate_references(result)
@@ -473,6 +505,12 @@ class Store:
         task=TaskRecord.model_validate(task)
         if task.response_artifact_path: self.read_artifact(task.response_artifact_path)
         if task.rendered_prompt_path: self.read_artifact(task.rendered_prompt_path)
+        if (task.environment_snapshot_path is None)!=(task.environment_snapshot_hash is None):
+            raise StateError("environment_snapshot_requires_path_and_hash")
+        if task.environment_snapshot_path:
+            environment=self.read_artifact(task.environment_snapshot_path)
+            if hashlib.sha256(environment.encode("utf-8")).hexdigest()!=task.environment_snapshot_hash:
+                raise StateError("environment_snapshot_hash_mismatch")
         if task.status in {"RESPONSE_SAVED","ACCEPTED"} and not task.response_artifact_path:
             raise StateError("response_state_requires_artifact")
         if task.status=="ACCEPTED" and task.accepted_result is None:
@@ -481,7 +519,8 @@ class Store:
             row=db.execute("SELECT data FROM tasks WHERE id=?",(task.task_id,)).fetchone()
             if row:
                 previous=TaskRecord.model_validate_json(row[0])
-                for field in ("run_id","input_hash","prompt_hash","model_config_hash"):
+                for field in ("run_id","input_hash","prompt_hash","model_config_hash",
+                              "environment_snapshot_path","environment_snapshot_hash","evidence_ids"):
                     if getattr(previous,field)!=getattr(task,field): raise StateError("task_dependency_changed_requires_fork")
                 if previous.status=="ACCEPTED" and (task.status!="ACCEPTED" or previous.accepted_result!=task.accepted_result):
                     raise StateError("accepted_task_immutable")
@@ -701,5 +740,8 @@ class Store:
             result["content"]=self.read_artifact(source.content_path) if source.content_path else None
             return result
         if kind=="evidence": return self.list_evidence(ids=[id])[0].model_dump(mode="json")
-        if kind=="tasks": return self.get_task(id).model_dump(mode="json")
+        if kind=="tasks":
+            task=self.get_task(id)
+            return {"task_id":task.task_id,"run_id":task.run_id,"status":task.status,
+                    "accepted_result":task.accepted_result,"evidence_ids":task.evidence_ids}
         return self.get_card(id,version).model_dump(mode="json")

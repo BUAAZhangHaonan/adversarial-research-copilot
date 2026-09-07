@@ -75,6 +75,11 @@ class RenderedPrompt:
     @classmethod
     def load_snapshot(cls, path: str | Path) -> "RenderedPrompt":
         payload = json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+        return cls.from_snapshot(payload)
+
+    @classmethod
+    def from_snapshot(cls, payload: dict[str, Any]) -> "RenderedPrompt":
+        payload = dict(payload)
         payload["dependencies"] = tuple(payload["dependencies"])
         obj = cls(**payload)
         if set(obj.source_hashes) != set(obj.sources) or set(obj.dependencies) != set(obj.sources):

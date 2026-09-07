@@ -60,3 +60,29 @@ def test_ambiguous_input_rejected_before_budget_creation(tmp_path):
     result=CliRunner().invoke(app,['--data-dir',str(tmp_path/'data'),'develop','--card','x','--question','y'])
     assert result.exit_code != 0
     assert not (tmp_path/'data'/'arc.sqlite').exists()
+
+def test_card_stage_inherits_scoped_original_material_without_prior_approval(tmp_path, monkeypatch):
+    from arc.cli import new_run
+    from arc.budget import BudgetLedger
+    from arc.schemas import SourceRecord
+    from tests.test_selection import research_store, research_draft
+    store, source, evidence = research_store(tmp_path)
+    extra = store.register_source(SourceRecord(title='Unresolved original condition',
+        url='https://example.org/original-condition', source_type='paper',
+        access_status='retrieved', content_origin='original'),
+        content='The author leaves the independence of the two controls unresolved.')
+    card = store.save_card(research_draft())
+    campaign = store.create_campaign('Controlled mechanisms')
+    prior = store.create_run('discover', campaign_id=campaign.campaign_id,
+        card_id=card.card_id, card_version=card.version,
+        state={'source_ids':[source.source_id,extra.source_id], 'evidence_ids':[evidence.evidence_id]})
+    store.update_run(prior.run_id, status='COMPLETED', assessment='PROMISING')
+    ledger = BudgetLedger(store.db_path)
+    monkeypatch.setattr('arc.cli.services', lambda settings:(store,ledger))
+    stage = new_run(Settings(data_dir=tmp_path),'develop',card_id=card.card_id,version=1)
+    assert stage.campaign_id == campaign.campaign_id
+    assert extra.source_id in stage.state['source_ids']
+    assert stage.state['input_provenance']['provenance_run_ids'] == [prior.run_id]
+    assert stage.assessment is None and stage.status == 'RUNNING'
+    assert 'final_ruling' not in stage.state and not store.get_issues(stage.run_id)
+    assert ledger.summary(stage.run_id)['call_count'] == 0

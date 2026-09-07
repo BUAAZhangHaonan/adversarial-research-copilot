@@ -4,7 +4,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from importlib.metadata import PackageNotFoundError, version as package_version
+import platform
 import re
+import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -25,6 +28,37 @@ def encoded(value) -> str:
 
 def digest(value) -> str:
     return hashlib.sha256(encoded(value).encode()).hexdigest()
+
+
+EVIDENCE_REF_KEYS = frozenset({'evidence_id', 'evidence_ids', 'new_evidence_ids', 'anchor_evidence_ids',
+    'trigger_evidence_ids', 'decisive_evidence_ids', 'basis_evidence_ids'})
+SOURCE_REF_KEYS = frozenset({'source_id', 'source_ids', 'target_source_ids', 'original_sources_revisited'})
+
+
+def reference_ids(value, keys) -> set[str]:
+    if isinstance(value, BaseModel): value = value.model_dump(mode='json')
+    if isinstance(value, (list, tuple)): return set().union(*(reference_ids(item, keys) for item in value))
+    if not isinstance(value, dict): return set()
+    found = set()
+    for key, item in value.items():
+        if key in keys and item is not None:
+            ids = item if isinstance(item, list) else [item]
+            if any(not isinstance(identifier, str) for identifier in ids):
+                raise ValueError('REFERENCE_ID_NOT_STRING')
+            found.update(ids)
+        elif isinstance(item, (list, tuple, dict, BaseModel)):
+            found.update(reference_ids(item, keys))
+    return found
+
+
+def environment_snapshot() -> dict:
+    packages = {}
+    for name in ('adversarial-research-copilot', 'openai', 'mcp', 'pydantic', 'httpx', 'anyio',
+                 'jsonschema', 'Jinja2', 'tzdata'):
+        try: packages[name] = package_version(name)
+        except PackageNotFoundError: packages[name] = None
+    return {'python': platform.python_version(), 'implementation': platform.python_implementation(),
+            'platform': sys.platform, 'packages': packages}
 
 
 class RuntimePaused(RuntimeError):
@@ -197,22 +231,29 @@ class Runtime:
         if not record or not record.response_artifact_path: return []
         return json.loads(self.store.read_artifact(record.response_artifact_path)).get('tool_trace', [])
 
+    def _load_prompt_snapshot(self, record, state=None):
+        from .prompting import RenderedPrompt
+        try:
+            snapshot = RenderedPrompt.from_snapshot(json.loads(self.store.read_artifact(record.rendered_prompt_path)))
+            if snapshot.prompt_hash != record.prompt_hash or snapshot.source_hashes != record.prompt_manifest:
+                raise ValueError('TASK_PROMPT_SNAPSHOT_HASH_MISMATCH')
+            if state is not None:
+                active = snapshot
+                if state['repair_count']:
+                    active = RenderedPrompt.from_snapshot(json.loads(self.store.read_artifact(state['repair_snapshot_path'])))
+                    if active.source_hashes != snapshot.source_hashes or active.sources != snapshot.sources:
+                        raise ValueError('REPAIR_SNAPSHOT_SOURCE_MISMATCH')
+                if active.prompt_hash != state['prompt_hash'] or state['messages'][:2] != active.messages:
+                    raise ValueError('TASK_PROMPT_HISTORY_MISMATCH')
+            return snapshot
+        except (ValueError, KeyError, TypeError, FileNotFoundError) as exc:
+            raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
+
     def _validate_semantics(self, envelope, payload, state):
         from .store import StateError
         self.store.validate_references(envelope)
-        ref_keys = {'source_id', 'source_ids', 'target_source_ids', 'original_sources_revisited',
-                    'evidence_id', 'evidence_ids', 'new_evidence_ids', 'anchor_evidence_ids', 'trigger_evidence_ids',
-                    'decisive_evidence_ids', 'basis_evidence_ids'}
-        def refs(value):
-            if isinstance(value, BaseModel): value = value.model_dump(mode='json')
-            if isinstance(value, list): return set().union(*(refs(item) for item in value))
-            if not isinstance(value, dict): return set()
-            found = set()
-            for key,item in value.items():
-                if key in ref_keys and item is not None: found.update(item if isinstance(item,list) else [item])
-                elif isinstance(item,(list,dict)): found.update(refs(item))
-            return found
-        if refs(envelope) - refs([payload, state['tool_trace']]):
+        keys = EVIDENCE_REF_KEYS | SOURCE_REF_KEYS
+        if reference_ids(envelope, keys) - reference_ids([payload, state['tool_trace']], keys):
             raise StateError('reference_not_supplied_to_task')
         findings = (getattr(envelope.result, 'findings', []) + getattr(envelope.result, 'contrary_findings', [])
                     if envelope.result is not None else [])
@@ -267,6 +308,13 @@ class Runtime:
         record = self.store.get_task(task_id)
         state = json.loads(self.store.read_artifact(record.response_artifact_path)) if record else None
         if state:
+            self._load_prompt_snapshot(record, state)
+            if record.environment_snapshot_path:
+                saved_environment = self.store.read_artifact(record.environment_snapshot_path)
+                if hashlib.sha256(saved_environment.encode()).hexdigest() != record.environment_snapshot_hash:
+                    raise RuntimePaused('PAUSED_PROTOCOL', 'ENVIRONMENT_SNAPSHOT_HASH_MISMATCH')
+                if json.loads(saved_environment) != environment_snapshot():
+                    raise RuntimePaused('PAUSED_PROTOCOL', 'DEPENDENCY_ENVIRONMENT_CHANGED_FORK_REQUIRED')
             functions = state['original_tools']
             if [item['function']['name'] for item in functions] != profile:
                 raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_PROFILE_CHANGED_FORK_REQUIRED')
@@ -300,14 +348,23 @@ class Runtime:
             if record.status == 'UNKNOWN':
                 raise RuntimePaused('PAUSED_EXTERNAL', 'REMOTE_RESULT_UNKNOWN')
         else:
+            try:
+                input_evidence_ids = sorted(reference_ids(payload, EVIDENCE_REF_KEYS))
+                self.store.validate_references({'evidence_ids': input_evidence_ids})
+            except (ValueError, RuntimeError) as exc:
+                raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
             rendered = self.loader.render(f'{role}.{task}', data, schema=envelope_type.model_json_schema(), tool_profile=profile)
             record = TaskRecord(task_id=task_id, run_id=subject_data['run_id'], input_hash=input_hash,
                                 prompt_hash=rendered.prompt_hash, model_config_hash=digest(config), model_id=model,
                                 prompt_manifest=rendered.source_hashes,
-                                evidence_ids=payload.get('evidence_ids', []))
+                                evidence_ids=input_evidence_ids)
             prompt_path = f'runs/{record.run_id}/tasks/{digest(task_id)}/prompt.json'
             self.store.save_artifact(prompt_path, encoded(asdict(rendered)))
             record.rendered_prompt_path = prompt_path
+            environment = encoded(environment_snapshot())
+            record.environment_snapshot_path = f'runs/{record.run_id}/tasks/{digest(task_id)}/environment.json'
+            record.environment_snapshot_hash = hashlib.sha256(environment.encode()).hexdigest()
+            self.store.save_artifact(record.environment_snapshot_path, environment)
             state = {'messages': rendered.messages, 'calls': [], 'tool_trace': [], 'repair_count': 0,
                      'pending_model': None, 'pending_tool': None, 'response': None, 'tools': functions,
                      'original_tools': functions,
@@ -360,10 +417,7 @@ class Runtime:
                 # Rendered original system is authoritative on resume. Only the
                 # registered repair task supplies additional behavior.
                 errors = exc.errors(include_url=False, include_input=False) if isinstance(exc, ValidationError) else [str(exc)]
-                original = json.loads(self.store.read_artifact(record.rendered_prompt_path))
-                from .prompting import RenderedPrompt
-                original['dependencies'] = tuple(original['dependencies'])
-                snapshot = RenderedPrompt(**original)
+                snapshot = self._load_prompt_snapshot(record)
                 repaired = self.loader.render_repair(snapshot, data, schema=envelope_type.model_json_schema(),
                     previous_response=message.get('content'), validation_errors=errors)
                 state['messages'] = repaired.messages
@@ -373,8 +427,9 @@ class Runtime:
                 state['prompt_hash'] = repaired.prompt_hash
                 state['prompt_manifest'] = repaired.source_hashes
                 repair_path = f'runs/{record.run_id}/tasks/{digest(task_id)}/repair.json'
-                self.store.save_artifact(repair_path, encoded({'messages': state['messages'],
-                    'source_hashes': repaired.source_hashes, 'validation_errors': errors}))
+                self.store.save_artifact(repair_path, encoded(asdict(repaired)))
+                state['repair_snapshot_path'] = repair_path
+                state['repair_validation_errors'] = errors
                 self._checkpoint(record, state, 'PENDING')
                 continue
             try:
@@ -416,6 +471,8 @@ class Runtime:
         price_path = f'runs/{record.run_id}/tasks/{digest(record.task_id)}/requests/{call_id}.pricing.json'
         self.store.save_artifact(price_path, self.prices.raw)
         self.ledger.reserve(self.account_id, call_id, maximum, run_id=record.run_id, task_id=record.task_id,
+            stage=self.account_id, environment_snapshot_path=record.environment_snapshot_path,
+            environment_snapshot_hash=record.environment_snapshot_hash,
             campaign_id=state['subject'].get('campaign_id'), model_requested=config['model'], thinking='enabled', effort='max',
             price_snapshot_id=self.prices.snapshot_id, price_snapshot_hash=self.prices.content_hash,
             price_snapshot_path=price_path,

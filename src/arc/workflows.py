@@ -59,6 +59,7 @@ class WorkflowEngine:
             'evidence': data(evidence),
             'sources': data(self.store.list_sources(ids=sorted(source_ids))),
             'constraints': run.config.get('constraints', {}),
+            'input_provenance': run.state.get('input_provenance'),
         }
 
     async def call(self, run_id, key, role, task='INVOKE', payload=None,

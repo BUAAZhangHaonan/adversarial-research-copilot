@@ -440,3 +440,81 @@ async def test_finding_target_is_exactly_visible_claim_version(tmp_path,target):
         with pytest.raises(StateError,match='finding_target_claim_not_supplied_to_task'):
             runtime._validate_semantics(Envelope[Findings].model_validate(raw),payload,{'tool_trace':[]})
     await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_nested_existing_input_evidence_manifest_and_actual_dependency_snapshot(tmp_path):
+    from arc.schemas import SourceRecord,EvidenceRecord
+    from importlib.metadata import version
+    import platform
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(json.dumps(answer()))])
+    source=store.register_source(SourceRecord(title='Metadata fixture',url='https://example.org/fixture',
+        source_type='paper',access_status='metadata_only',content_origin='metadata'))
+    evidence=[]
+    for index in range(3):
+        evidence.append(store.register_evidence(EvidenceRecord(evidence_id=f'ev_fixture_{index}',
+            source_id=source.source_id,claim_id=f'claim_{index}',claim_version=1,claim='Unverified suggestion',
+            conditions=[],locator=None,excerpt=None,relation='motivates',origin='inference',
+            locator_status='locator_unverified',verification_status='unverified',support_explanation='Metadata only.')))
+    payload={'context':{'evidence':[evidence[0].model_dump(mode='json')],
+                        'issues':[{'basis_evidence_ids':[evidence[1].evidence_id]}]}}
+    await runtime.invoke('investigator','INVOKE',payload,Result,SUBJECT,'task_fixture')
+    task=store.get_task('task_fixture')
+    assert task.evidence_ids==[evidence[0].evidence_id,evidence[1].evidence_id]
+    environment=json.loads(store.read_artifact(task.environment_snapshot_path))
+    assert environment['python']==platform.python_version()
+    assert environment['packages']['openai']==version('openai')
+    assert environment['packages']['mcp']==version('mcp')
+    assert ledger.list_calls()[0]['metadata']['environment_snapshot_hash']==task.environment_snapshot_hash
+    assert evidence[2].evidence_id not in task.evidence_ids
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('target', ['prompt_messages','prompt_source','state_prefix','environment','repair_messages'])
+async def test_corrupt_snapshot_refuses_resume_without_new_model_request(tmp_path,target):
+    responses=[sse('{}'),sse(json.dumps(answer()))] if target=='repair_messages' else [sse(json.dumps(answer()))]
+    runtime,store,ledger,requests=setup_runtime(tmp_path,responses)
+    await invoke(runtime)
+    before=len(requests)
+    task=store.get_task('task_fixture')
+    state=json.loads(store.read_artifact(task.response_artifact_path))
+    if target in {'prompt_messages','prompt_source'}:
+        path=task.rendered_prompt_path
+        saved=json.loads(store.read_artifact(path))
+        if target=='prompt_messages':saved['messages'][0]['content']+=' CORRUPTED'
+        else:saved['sources'][next(iter(saved['sources']))]+=' CORRUPTED'
+    elif target=='environment':
+        path=task.environment_snapshot_path;saved=json.loads(store.read_artifact(path));saved['python']='changed'
+    elif target=='repair_messages':
+        path=state['repair_snapshot_path'];saved=json.loads(store.read_artifact(path));saved['messages'][0]['content']+=' CORRUPTED'
+    else:
+        path=task.response_artifact_path;saved=state;saved['messages'][0]['content']+=' CORRUPTED'
+    store.save_artifact(path,json.dumps(saved,ensure_ascii=False))
+    with pytest.raises(RuntimePaused) as paused:await invoke(runtime)
+    assert paused.value.status=='PAUSED_PROTOCOL' and len(requests)==before
+    assert len(ledger.list_calls())==before
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_changed_sdk_environment_requires_explicit_fork(tmp_path,monkeypatch):
+    import arc.runtime as runtime_module
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(json.dumps(answer()))])
+    await invoke(runtime)
+    changed=runtime_module.environment_snapshot();changed['packages']['openai']='different-sdk-version'
+    monkeypatch.setattr(runtime_module,'environment_snapshot',lambda:changed)
+    with pytest.raises(RuntimePaused,match='DEPENDENCY_ENVIRONMENT_CHANGED_FORK_REQUIRED'):
+        await invoke(runtime)
+    assert len(requests)==1
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_unknown_nested_input_evidence_rejected_before_model_admission(tmp_path):
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[])
+    with pytest.raises(RuntimePaused,match='unknown_evidence_id'):
+        await runtime.invoke('investigator','INVOKE',{'nested':{'new_evidence_ids':['not_registered']}},
+            Result,SUBJECT,'task_fixture')
+    assert not requests and not ledger.list_calls()
+    await runtime.close()

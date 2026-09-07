@@ -347,3 +347,37 @@ def test_source_extension_rejects_unproven_or_conflicting_content(store,change):
     with pytest.raises(StateError,match="explicit_version"):
         store.register_source(incoming,content=full)
     assert store.get_record(first.source_id)["content"]==old
+
+def test_card_provenance_inherits_only_linked_version_research_inputs(store):
+    src=source(store); ev=evidence(store,src,relation="challenges")
+    campaign=store.create_campaign("specific scope")
+    prior=store.create_run("discover",campaign_id=campaign.campaign_id,state={"source_ids":[src.source_id],"evidence_ids":[ev.evidence_id],"assessment":"PROMISING","rounds_completed":9})
+    card=store.save_card(card_payload(),run_id=prior.run_id)
+    assert card.draft.motivation.evidence_ids==[]
+    investigation={"questions_addressed":["What contradicts this idea?"],"actual_searches":[],"findings":[],"contrary_findings":[],"source_access_limits":["missing appendix"],"implications_for_current_card":["uncertain"],"unresolved_questions":["unresolved condition"],"recommended_next_action":"RETRIEVE"}
+    response=store.save_artifact("test/investigation.json",json.dumps(investigation))
+    store.put_task(TaskRecord(task_id="original-investigation",run_id=prior.run_id,input_hash="i",prompt_hash="p",model_config_hash="m",status="ACCEPTED",response_artifact_path=response,prompt_manifest={"roles/investigator.md":"fixture_sha256"},accepted_result={"result":investigation}))
+    store.put_task(TaskRecord(task_id="name-claims-investigator-but-is-not",run_id=prior.run_id,input_hash="i",prompt_hash="p",model_config_hash="m",status="ACCEPTED",response_artifact_path=response,prompt_manifest={"roles/selector.md":"fixture_sha256"},accepted_result={"result":investigation}))
+    unrelated_source=store.register_source(SourceRecord(title="unrelated",url="https://unrelated.test/paper",source_type="paper",access_status="metadata_only",content_origin="metadata"))
+    unrelated=store.create_run("discover",state={"source_ids":[unrelated_source.source_id]})
+    store.save_card(card_payload(),run_id=unrelated.run_id)
+    revision=store.save_card(card.draft,card_id=card.card_id,parent_version=1)
+    later=store.create_run("develop",card_id=card.card_id,card_version=revision.version,state={"source_ids":[unrelated_source.source_id]})
+    context=store.card_provenance_context(card.card_id,1)
+    assert context["source_ids"]==[src.source_id]
+    assert context["evidence_ids"]==[ev.evidence_id]
+    assert context["provenance_run_ids"]==[prior.run_id]
+    assert context["provenance_campaign_ids"]==[campaign.campaign_id]
+    assert context["investigation_task_ids"]==["original-investigation"]
+    original_record=store.get_record("original-investigation")
+    assert original_record["accepted_result"]["result"]["unresolved_questions"]==["unresolved condition"]
+    assert set(original_record)=={"task_id","run_id","status","accepted_result","evidence_ids"}
+    assert set(context)=={"card_id","card_version","source_ids","evidence_ids","provenance_run_ids","provenance_campaign_ids","investigation_task_ids"}
+    assert store.get_run(later.run_id).state=={"source_ids":[unrelated_source.source_id]}
+
+def test_imported_card_provenance_is_empty_without_prior_runs(store):
+    card=store.save_card(card_payload())
+    context=store.card_provenance_context(card.card_id,1)
+    assert context["provenance_run_ids"]==[]
+    assert context["investigation_task_ids"]==[]
+    assert context["evidence_ids"]==[]

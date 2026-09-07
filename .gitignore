@@ -10,7 +10,7 @@ venv/
 .coverage
 htmlcov/
 *.log
-reports/
+/reports/
 *.db
 *.sqlite
 *.sqlite-*
@@ -21,7 +21,7 @@ dist/
 build/
 *.tar.gz
 *.whl
-artifacts/
+/artifacts/
 *.egg-info/
 .zcode/
 

@@ -36,11 +36,16 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
     amount = Decimal(str(budget))
     if amount <= 0:
         raise typer.BadParameter('budget_cny must be positive')
+    inherited = None
     if mode in ('develop', 'run'):
         if not card_id and not input_text:
             raise typer.BadParameter('--card is required')
         if card_id:
             version = store.get_card(card_id, version).version
+            inherited = store.card_provenance_context(card_id, version)
+            campaigns = inherited['provenance_campaign_ids']
+            if campaign_id is None and len(campaigns) == 1:
+                campaign_id = campaigns[0]
     ledger.create_account(run_id, str(amount), parent_id=parent)
     if mode == 'discover':
         campaign = store.create_campaign(topic, max_draws=settings.draws,
@@ -49,7 +54,8 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
         campaign_id = campaign.campaign_id
     prompt_hash = hashlib.sha256(files('arc_prompt_assets').joinpath('manifest.json').read_bytes()).hexdigest()
     code_hash = hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path(__file__).parent.glob('*.py')))).hexdigest()
-    state = {}
+    state = {'source_ids': inherited['source_ids'], 'evidence_ids': inherited['evidence_ids'],
+             'input_provenance': inherited} if inherited else {}
     if input_text:
         from .schemas import SourceRecord
         source = store.register_source(SourceRecord(title='用户导入的研究问题', url=None,

@@ -367,6 +367,8 @@ class TaskRecord(StrictModel):
     response_artifact_path: str | None = None
     accepted_result: JsonValue = None
     rendered_prompt_path: str | None = None
+    environment_snapshot_path: str | None = None
+    environment_snapshot_hash: str | None = None
     prompt_manifest: JsonValue = Field(default_factory=dict)
     evidence_ids: list[str] = Field(default_factory=list)
     model_id: str | None = None

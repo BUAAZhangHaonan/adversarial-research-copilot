@@ -209,7 +209,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     trace_tasks=[]
     for task in tasks:
         artifacts=[]
-        for key in ['rendered_prompt_path','response_artifact_path']:
+        for key in ['rendered_prompt_path','response_artifact_path','environment_snapshot_path']:
             relative=_artifact_path(task.get(key),output_dir,store)
             if relative:
                 artifacts.append({'label':key,'path':relative})
