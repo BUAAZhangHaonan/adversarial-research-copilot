@@ -105,7 +105,13 @@ async def run_comparison(settings, source_run_id):
     from .store import StateError
     from .validation import ProtocolViolation, validate_selection
     store, ledger = services(settings)
-    ledger.create_account(VALIDATION_PARENT, '100')
+    from .budget import BudgetError
+    try:
+        ledger.summary(VALIDATION_PARENT)
+    except BudgetError as exc:
+        if str(exc) != 'account_missing':
+            raise
+        ledger.create_account(VALIDATION_PARENT, '100')
     source_run = store.get_run(source_run_id)
     campaign = store.get_campaign(source_run.campaign_id)
     frozen_path = f'evaluations/{source_run_id}/evidence.json'
@@ -141,7 +147,7 @@ async def run_comparison(settings, source_run_id):
         try:
             run = store.get_run(run_id)
         except StateError:
-            run = new_run(config, 'evaluation', budget='20', parent=VALIDATION_PARENT, run_id=run_id)
+            run = new_run(config, 'evaluation', budget=settings.budget_cny, parent=VALIDATION_PARENT, run_id=run_id)
         config = type(settings).model_validate(run.config)
         runtime = await make_runtime(store, ledger, run, config)
         draft = judgments = None
@@ -200,7 +206,7 @@ async def run_comparison(settings, source_run_id):
     try:
         evaluation = store.get_run(eval_id)
     except StateError:
-        evaluation = new_run(settings, 'evaluation', budget='20', parent=VALIDATION_PARENT, run_id=eval_id)
+        evaluation = new_run(settings, 'evaluation', budget=settings.budget_cny, parent=VALIDATION_PARENT, run_id=eval_id)
     runtime = await make_runtime(store, ledger, evaluation, type(settings).model_validate(evaluation.config))
     store.update_run(eval_id, status='RUNNING', stop_reason=None)
     try:
