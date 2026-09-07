@@ -1,12 +1,16 @@
 # 真实验收记录
 
-本文件按层级分开工程契约、真实接口、自然研究卡贯穿和自动质量对照。自动判断不是人类认可，PROMISING 不是实验成功。
+最新工程验证：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；git archive源码构建的wheel/sdist、独立安装及 `/tmp` 资源/CLI检查均通过。Rendering调查的零新增调用恢复已成功，19条findings登记。历史5e3830c的290项/54.28s及首次 `duplicate_source_reference` 恢复失败保留在下文。
 
-截至2026-09-07本次更新：代码 `535357d` 的283项工程测试与独立wheel通过；较早0f66f56的Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty或科研裁决。明确标记的软件输入develop停于预算准入，独立run因反复读取空正文而在新请求边界由开发者暂停。新渲染主题自然链正在验证535357d的通用数据契约修复；L2未全部完成，L3未完成，L4未执行。
+本文件按层级分开工程契约、真实接口、自然研究卡贯穿和自动质量对照。自动判断不是人类认可，PROMISING 不是实验成功。本报告中的独立原文复核由Codex检查已保存材料完成，也不代表人类研究者认可。
+
+截至2026-09-07本次更新：Flash/Pro JSON加原生工具联合真实probe均COMPLETED。V3自然卡已保存，但novelty一次结构修复后仍为INVALID_OUTPUT_AFTER_REPAIR，没有accepted novelty。明确标记的软件输入develop停于预算准入，独立run因反复空读在新请求边界由开发者暂停。Rendering shared_investigation在bac3659下由已保存响应与实际搜索trace恢复为ACCEPTED；原raw及研究字段不改，只机械派生actual_searches，未新增模型/工具调用。后续自然抽卡已resume，结果尚待；L2未全部完成，L3未完成，L4未执行。
 
 ## L1：工程与安装包
 
-- 最新代码快照：`535357d`，283 tests passed / 52.08s，日志 `work/tests-claim-source.log`。该HEAD经git archive构建wheel/sdist并独立安装，从 `/tmp` 验证CLI和包资源；日志 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`。Windows此前快照282 tests / 427.42s不作为最终283项的记录。
+- 最新代码快照：`bac3659512f2bae137b8a0241b71c64c17ff3549`，326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`。由该HEAD的git archive构建wheel/sdist，在独立 `.venv-wheel` 安装并从 `/tmp` 运行 `work/check_installed.py` 与 `arc --help` 均通过；日志 `work/wheel-build-bac3659.log`、`work/wheel-install-bac3659.log`、`work/wheel-help-bac3659.log`。
+- 历史快照：`5e3830cc65d462afb6420ae9860d57e4f7b55aaf`，290 tests / 54.28s，`work/tests-provenance.log`及 `work/wheel-*-5e3830c.log` 记录整套与独立安装通过。
+- 历史快照：`535357d`，283 tests passed / 52.08s，日志 `work/tests-claim-source.log`。该HEAD经git archive构建wheel/sdist并独立安装，从 `/tmp` 验证CLI和包资源；日志 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`。Windows此前快照282 tests / 427.42s不作为最终283项的记录。
 - 历史快照：`0f66f56`，263 tests passed / 48.55s，远端日志 `work/tests-json-tools.log`。该HEAD独立wheel验证通过，日志为 `work/wheel-build-0f66f56.log`、`work/wheel-install-0f66f56.log`、`work/wheel-help-0f66f56.log`。源码归档构建后在独立 `.venv-wheel` 安装，从 `/tmp` 检查CLI、0.2.0版本、prompt/报告/配置资源，避免仓库cwd掩盖漏打包。
 - `2b8b79a` 固定comparison.boundaries与shuffle_seed，并追加公共请求归属说明；对应258 tests / 46.23s，日志 `work/tests-evaluation-ownership.log`。冻结相同材料和匿名顺序是工程能力，此时并未运行L4质量对照。
 - 历史快照 `eda3965`：255 tests / 47.29s，日志 `work/tests-claim-bindings.log`，独立wheel验证通过。它修复背景证据绑定与目标指纹，后续V3卡保存恢复成功。
@@ -102,7 +106,7 @@ V3原最终回复不是JSON；一次格式修复后返回complete，但3个前�
 
 develop的import、fresh_verification、development、round1 proposer/skeptic已保存，moderator未完成时触发 `PAUSED_BUDGET`。子账花费4.106986–4.107017元，剩余15.892983元，低于下一Pro完整请求15.912元预留。没有assessment；不是科学否决。上界核查与可用性限制见 [BUDGET_ADMISSION_REVIEW](BUDGET_ADMISSION_REVIEW.md)。
 
-人工复核发现development原始响应漏了claims键，旧schema静默补[]后保存v2；skeptic仍把背景evidence的旧claim ID当当前目标。另一争点将IoU=.80扩大为边界带近全覆盖，原文不足以支持；NucVerse3D只读取90000/124840字符，缓存尾被误认全文尾。它们都是尚无moderator裁决的失败证据，详见 [L2_EVIDENCE_REVIEW](L2_EVIDENCE_REVIEW.md)。
+独立原文复核发现development原始响应漏了claims键，旧schema静默补[]后保存v2；skeptic仍把背景evidence的旧claim ID当当前目标。另一争点将IoU=.80扩大为边界带近全覆盖，原文不足以支持；NucVerse3D只读取90000/124840字符，缓存尾被误认全文尾。它们都是尚无moderator裁决的失败证据，详见 [L2_EVIDENCE_REVIEW](L2_EVIDENCE_REVIEW.md)。
 
 独立run停于导入。固定轨迹抽查发现连续215次零正文read_record；最近40次是20个metadata-only来源各读两次，未取得新原文。开发者临时在仅该run的下一笔预算INSERT准入处设暂停，允许已开始的 `call_c3532cc771304bff85d163e3aad6cb69` 完整返回、保存、结算后拒绝下一工具请求。进程退出后移除临时限制；账户和授权hash未变，全部调用SETTLED，reserved/unknown均0，完整性/FK检查通过。子账654调用、6.464293–6.464552元。保存原ERROR/IntegrityError原因后，运行标为 `PAUSED_PROTOCOL / metadata_source_empty_read_loop_development_pause`。
 
@@ -110,4 +114,20 @@ develop的import、fresh_verification、development、round1 proposer/skeptic已
 
 535357d使claims必填；删除复核需旧版本和非空说明；明确的结构化claim/issue引用限制在当前卡与ledger；read_record保留原文总长并区分缓存分页，对无正文来源明确要求补取。没有把自由文本强行解释为ID，没有添加固定调用次数或关键词停机规则。旧付费响应、卡与判断不补回不重写。详见 [CLAIM_AND_SOURCE_FIXES](CLAIM_AND_SOURCE_FIXES.md)。
 
-新渲染自然链 `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover` 按预登记主题与默认五次上限启动，使用新代码与新bundle，仍属原100元父账本。目前剩余验收为L2完整入口、L3自然同卡链、L4冻结同材料对照与人工复核，以及最终费用汇总；不能以离线修复证明真实科研链通过。
+新渲染自然链 `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover` 按预登记主题与默认五次上限启动，使用新代码与新bundle，仍属原100元父账本。其最新shared_investigation停点见下节；不能以离线修复证明真实科研链通过。
+
+## Rendering：来源ID复写错误、重复命中误拒与成功恢复
+
+Task `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.shared_investigation` 首次停点为 `PAUSED_PROTOCOL / unknown_source_id`，accepted_result=null。停点子账为人民币1.303072–1.303085，66次模型及工具账本调用，reserved=0；不是开发父账户总费用。完整冻结原件、结构修复过程及19条摘录核对见 [RENDERING_EVIDENCE_REVIEW](RENDERING_EVIDENCE_REVIEW.md)。
+
+唯一的来源ID差异位于修复后候选的 `$.result.actual_searches[1].source_ids[5]`：模型写成 `src_d981b8788f84791b2af69a2f07ae529`，本task成功搜索 `tool_a18a8794e6dc476a836949b39cd63b2d` 实际返回 `src_d981b87884f84791b2af69a2f07ae529`，漏写一个4。真实ID已在来源表，属于搜索metadata；不在19条finding的来源或摘录中。18次搜索声明与实际trace逐项核对，仅此一项不同。
+
+19条findings涉及13个来源，摘录均在已保存正文及本task实际返回的正文片段中精确出现。它们在该历史停点尚未登记，科学内容保留；摘录匹配不是全部科学、许可或可行性主张成立。原始生成JSON本身还有尾部/字段类型等结构问题，一次repair后才得到可解析候选；不能将原始生成描述为除ID外已完全合法，也没有再发第二次repair。
+
+已实现的通用修复由Runtime从本task已经完成的search真实trace派生actual_searches，单独保留原始模型声明和执行事实审计；不按字符串相似度猜ID，不改raw、修复后研究字段、预算或一次repair上限。任务书§6执行事实、§7保存响应后本地恢复、§11真实trace验收的依据见 [SEARCH_PROVENANCE_FIX](SEARCH_PROVENANCE_FIX.md)。5e3830c整套290项通过后，首次禁止新增动作的真实恢复仍因duplicate_source_reference暂停，日志 `work/recover-rendering-provenance.log`：actual_searches[5].source_ids实际连续返回两次同一src_48b4ff39da4d46ecb4f9afcbc8cb6c8a，派生日志忠实保留，旧科研引用唯一性检查误拒了执行日志。bac3659仅允许typed执行记录保留真实重复命中，不放松科研引用或来源存在性检查。
+
+`bac3659`的禁止新增模型/工具动作恢复已通过：shared_investigation为 `ACCEPTED`，error=None，19条findings已登记；原始raw及除actual_searches外的研究字段完全不变，repair_count=1，new_model_or_tool_calls=0。恢复窗口父账本保持1157调用、人民币18.981215–18.992283、reserved=0。审计路径相对于 `.arc-validation/artifacts/`：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`；normalization审计hash为 `16cd9bf3476c7e3c032d3b24b245708b2fe9c1e63d5847a625d40a8f5be540e4`。该账本快照不包含随后已恢复的自然抽卡新增调用。
+
+后续自然抽卡已resume，尚无本次文档可关闭的完整阶段结果。19条摘录登记仍不代表全部科学、许可或可行性主张成立。
+
+L2完整入口、L3自然同卡链、L4同材料对照和最终费用汇总仍未完成。只恢复机械检索记录不能作为科学通过或完成整个discover的依据。

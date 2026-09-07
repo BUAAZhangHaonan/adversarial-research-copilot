@@ -8,13 +8,13 @@
 
 采用 Typer/Pydantic、OpenAI SDK、官方 MCP SDK 2.x、Jinja StrictUndefined、SQLite 和文件。移除旧自制通信协议、关键词/分数控制、重复 reviewer 循环和旧 pipeline/chat-mode。删除清单为 `docs/REMOVED_TRACKED_FILES.json`，仅含受控旧实现；迁移见 `MIGRATION.md`。
 
-当前代码验证基准为 `535357d08667ee192e246f8de0a126de0a544f0d`（主张续接、结构化目标及缓存/metadata-only来源修复）：283 tests passed / 52.08s，日志 `work/tests-claim-source.log`；该提交git archive构建的独立wheel/sdist及 `/tmp` 安装资源验证通过。本次文档更新起点为 `3f6026f`，不将文档提交当作另一个已测代码版本。Windows此前282项/427.42s是较早快照；0f66f56的263项/48.55s、2b8b79a的258项/46.23s和eda3965的255项/47.29s均为历史验证。
+当前代码验证基准为 `bac3659512f2bae137b8a0241b71c64c17ff3549`（机械搜索来源、重复命中、报告继承与实际查证契约修复）：326 tests passed / 66.28s，日志 `work/tests-contract-closeout.log`；该提交git archive构建的独立wheel/sdist及 `/tmp` 安装资源/CLI验证通过。历史5e3830c为290项/54.28s及独立安装通过；535357d为283项/52.08s，日志work/tests-claim-source.log。Windows此前282项/427.42s是更早快照；0f66f56的263项/48.55s、2b8b79a的258项/46.23s和eda3965的255项/47.29s均保留为历史验证，不将文档提交当作已测代码版本。
 
 ## 当前真实验收停点
 
 Flash/Pro均已完成JSON、native tools、thinking/max、384000输出上限和stream的联合真实探针。每模型两次模型请求、一次实际read_record、repair_count=0，最终finish_reason=stop，均为COMPLETED。它们共用原100元父账户；实际请求ID、工具ID、费用及原件指针见 [JSON_TOOL_PROTOCOL](JSON_TOOL_PROTOCOL.md) 与 [E2E_REPORT](E2E_REPORT.md)。该读取是run元数据，不能代替影响科研争点的新证据。
 
-L2显式软件输入develop当前为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡；535357d的新run真实验证刚开始，尚无最终结果。
+L2显式软件输入develop当前为 `PAUSED_BUDGET`：已花人民币4.106986–4.107017，剩余15.892983，低于下一次Pro请求所需15.912预留；round 1 moderator尚未完成。这是新请求准入暂停，没有截断已开始的回答，也不是科研否决。旧独立run因metadata-only空读循环由开发者在下一次准入处暂停，最终为PAUSED_PROTOCOL；临时单run INSERT gate已移除，未改预算或截断已开始请求。它不是生产自动循环检测。上述明确标记的输入不属于自然发现卡。Rendering自然run的shared_investigation已在bac3659下零新增调用恢复为ACCEPTED并登记19条findings，后续抽卡已resume，仍待结果；恢复明细见下文。
 
 V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_AFTER_REPAIR`，没有accepted novelty。L2三入口尚未全部完成，L3自然同卡和L4同材料对照仍未完成；已有工程测试和联合探针不能关闭这些验收项。
 
@@ -82,11 +82,11 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 | B15 | replaced | execution/assessment 分离，跨记录无效推荐暂停且不重复付费；test_cross_record_invalid_selection_pauses_without_acceptance_or_paid_replay、test_later_stage_reports_final_assessment_instead_of_old_selection。 |
 | B16 | replaced | 明确 CLI 覆盖优先级，移除别名兼容；test_explicit_cli_options_override_config_without_default_shadowing。 |
 | B17 | replaced | SDK 实际请求、流终止、usage、reasoning tool 回传；test_actual_sdk_request_max_full_output_usage_and_role_resume、test_native_tool_reasoning_association_and_trace；真实两模型 trace 见 E2E_REPORT。 |
-| B18 | replaced | 真 trace 条件与定向补证链引用；test_actual_searches_must_cover_successful_search_trace、test_novelty_requested_evidence_trace_is_kept_through_continuation；真实工具范围及外部限制见 E2E_REPORT。 |
+| B18 | replaced | 真 trace 条件与定向补证链引用；test_actual_searches_must_cover_successful_search_trace、test_novelty_requested_evidence_trace_is_kept_through_continuation；实际搜索零结果与有覆盖的非空正文读取分别检查，tests/test_evidence_gates.py 的 test_empty_external_reads_do_not_satisfy_verification_or_replay、test_successful_zero_result_search_counts_as_search_not_original_read；真实工具范围及外部限制见 E2E_REPORT。 |
 
 ## 全文交付映射与状态含义
 
-本轮只核对两份交付文档与当前源码/测试，不重新运行付费任务。`confirmed_fixed` 指已观察到的缺陷有修复及对应验证；`already_fixed` 只用于无需本轮修改且已有直接通过证据的要求；`replaced` 指旧结构已被新契约替换，不能反推旧BUG已复现；`not_reproduced` 指实际尝试仍不能重现，不代表无缺陷；`blocked` 指关闭验收所需证据仍缺，未必表示运行进程阻塞。不为凑齐标签而声称做过旧版本重现。下表静态结论均不能代替动态验收。
+本轮只核对限定交付文档与当前源码/测试，不重新运行付费任务。`confirmed_fixed` 指已观察到的缺陷有修复及对应验证；`already_fixed` 只用于无需本轮修改且已有直接通过证据的要求；`replaced` 指旧结构已被新契约替换，不能反推旧BUG已复现；`not_reproduced` 指实际尝试仍不能重现，不代表无缺陷；`blocked` 指关闭验收所需证据仍缺，未必表示运行进程阻塞。不为凑齐标签而声称做过旧版本重现。下表静态结论均不能代替动态验收。
 
 | 契约范围 | 状态及可核对依据 |
 |---|---|
@@ -106,7 +106,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 ## §11 离线矩阵逐行核对
 
-以下既有回归及新增主张/来源反例均包含在 `535357d` 的283项整合测试中。实现与测试的文件名均为仓库相对路径；不把模拟模型的答案当成真实科研证据。
+以下既有回归及新增契约反例均包含在 `bac3659` 的326项整合测试中。实现与测试的文件名均为仓库相对路径；不把模拟模型的答案当成真实科研证据。
 
 | 矩阵行 | 状态 / 文件与回归证据 | 未被该测试证明的部分 |
 |---|---|---|
@@ -123,7 +123,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 ## 附录 A–D 的独立核对
 
-附录A为already_fixed（原稿落地），共27份，而不是27个语义调用。`tests/test_prompts.py::test_spec_assets_are_exact` 从任务书独立提取并逐文件比较。当前23份全文相等，developer/investigator/output_protocol/read_record四份保留完整原稿前缀后追加；本轮独立比较也检查这个边界。output_protocol归属说明随2b8b79a追加，read_record的Cached source coverage与metadata-only说明随535357d提交，均包含在当前283项测试中。追加理由见PROMPT_INVENTORY/PROMPT_CALIBRATION/CLAIM_AND_SOURCE_FIXES；不把四份追加文件称为全文仍与附录相等。
+附录A为already_fixed（原稿落地），共27份，而不是27个语义调用。`tests/test_prompts.py::test_spec_assets_are_exact` 从任务书独立提取并逐文件比较。当前23份全文相等，developer/investigator/output_protocol/read_record四份保留完整原稿前缀后追加；本轮独立比较也检查这个边界。output_protocol归属说明随2b8b79a追加，read_record的Cached source coverage与metadata-only说明随535357d提交，均包含在当前326项测试中。本次source_recheck删除内联句子，不修改任何Markdown/schema，仍为23份全文相等与4份完整前缀。追加理由见PROMPT_INVENTORY/PROMPT_CALIBRATION/CLAIM_AND_SOURCE_FIXES；不把四份追加文件称为全文仍与附录相等。
 
 | 附录编号 | 仓库内文件 |
 |---|---|
@@ -140,7 +140,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 | B2 13种结果、issue/control | replaced：`tests/test_contracts.py` 的 test_all_thirteen_registered_semantic_contracts_are_closed；`tests/test_store.py` 的 test_issue_ledger_preserves_unseen_issues_and_validates_transitions、test_empirical_issue_cannot_be_reclassified_to_bypass_evidence。registered IMPORT/SCOPE_AUDIT复用角色schema，reporter不实际付费调用。 |
 | B3 卡/资源/费用字段 | replaced：`src/arc/schemas.py`、`budget.py`；`tests/test_contracts.py` 的 test_resource_ranges_reject_invalid_bounds、test_resource_units_and_gpu_assumptions_are_explicit；`tests/test_budget.py` 的 test_call_ledger_preserves_full_usage_and_does_not_invent_actual_invoice。 |
 | B4 装配与工具子集 | replaced：`prompts/manifest.json`、`src/arc/prompting.py`；`tests/test_prompts.py` 的 test_registered_roles_render_traceable_task_and_minimal_prefix、test_resumed_repair_uses_frozen_markdown_not_live_templates。报告走确定性模板，同材料评价不在线扩展。 |
-| B5 可观察性/AST/报告 | confirmed_fixed / replaced：`src/arc/reports.py`、`runtime.py`、`.gitignore`；`tests/test_reports.py` 的 test_report_links_actual_local_original_and_prompt_artifact、test_deterministic_report_rebuild_and_empty_discovery；完整prompt/输入/环境快照测试见下方验证解释。原始reasoning本地恢复，不进入对外研究报告。 |
+| B5 可观察性/AST/报告 | confirmed_fixed / replaced：`src/arc/reports.py`、`runtime.py`、`.gitignore`；`tests/test_reports.py` 的 test_report_links_actual_local_original_and_prompt_artifact、test_deterministic_report_rebuild_and_empty_discovery、test_cross_run_report_resolves_only_referenced_inherited_evidence；完整prompt/输入/环境快照测试见下方验证解释。原始reasoning本地恢复，不进入对外研究报告。 |
 | B6 分层验收 | already_fixed（计划/层级边界）：`docs/EVAL_PLAN.md`、`src/arc/evaluation.py`；`tests/test_evaluation.py` 的 test_same_card_final_scientific_assessment_does_not_erase_l3_completion、test_develop_rejection_does_not_force_pressure_test、test_frozen_needs_evidence_is_saved_without_online_expansion_or_repeated_call。blocked（真实完成证据）：L2/L3/L4仍未齐，不能由这些测试勾选。 |
 
 附录C为already_fixed（来源清单与适用范围）：S01–S10官方接口/SDK/Jinja、P01–P05论文与官方研究说明、C01–C05社区观察、R01–R07用户基线与六参考快照均在任务书可定位。`docs/SERVICE_AUDIT.md` 和 `docs/reference-review-notes.md`记录实际采用范围。ARIS、Stanford AI-Researcher、Sakana AI-Scientist、PaperQA、EvoScientist、Kaimen Co-Scientist均已覆盖；Kaimen是非Google官方复刻。未将一般论文问答/辩论表现当ARC质量依据，本轮文档核对也不是再次联网验证所有链接。
@@ -162,7 +162,7 @@ V3自然卡已保存，但novelty在一次结构修复后仍为 `INVALID_OUTPUT_
 
 ## 安装包的独立验证
 
-当前 `535357d` 的受控git archive源码已分别构建wheel和sdist，并在独立环境从 `/tmp` 验证CLI及安装后的prompt/报告/配置资源。远端日志为 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`；它与283项整套测试对应同一代码提交，独立.venv-wheel从/tmp加载安装资源。
+当前 `bac3659` 的受控git archive源码已分别构建wheel和sdist，并在独立 `.venv-wheel` 安装后从 `/tmp` 执行 `work/check_installed.py` 与 `arc --help`，CLI及prompt/报告/配置资源均通过。远端日志为 `work/wheel-build-bac3659.log`、`work/wheel-install-bac3659.log`、`work/wheel-help-bac3659.log`；它与326项整套测试对应同一代码提交。历史5e3830c和535357d的整套与独立安装结果分别为290项/54.28s、283项/52.08s，不能反向覆盖后续修复。
 
 历史安装快照：`eda3965` 从受控git archive源码构建wheel及sdist，产物位于远端 `work/release-dist-eda3965/`，日志为 `work/wheel-build-eda3965.log`、`work/wheel-install-eda3965.log`、`work/wheel-help-eda3965.log`。在独立 `.venv-wheel` 安装后，从 `/tmp` 执行 `work/check_installed.py`，确认0.2.0版本、15个登记语义prompt及报告/配置资源可加载，OpenAI 2.54.0、MCP 2.1.1。该验证不依赖仓库cwd或pytest的pythonpath；结果由主线程实际运行记录，本轮没有再次安装或远端写入。
 
@@ -215,3 +215,18 @@ V3原最终回复不是JSON；仅一次格式修复后返回complete，但3个�
 `0f66f56`另修复有native tools时遗漏JSON模式：所有语义请求统一发送response_format=json_object，保留thinking/max、384000及stream，不加入tool_choice，不修改预算或单次结构修复上限。`tests/test_runtime.py` 的 test_native_tool_reasoning_association_and_trace、test_native_json_output_invalid_or_empty_keeps_single_repair_policy覆盖完整请求与非法/空正文；实际双模型联合探针随后通过。这不会把原V3失败任务变为accepted，也不保证模型科学判断正确。
 
 `535357d`已落实claims必填、删除claim需旧version和非空说明、Runtime只核对明确结构化当前claim/issue外键；proposer自由文字不按ID猜测。read_record保留有正文来源的原文总长/完整度，另公开缓存范围；metadata-only明确无正文且重复本地读不能补出正文。对应 `tests/test_claim_targets.py`、`tests/test_runtime.py` 的 test_partial_source_cache_end_preserves_original_coverage、test_metadata_only_source_reads_expose_missing_body_without_claiming_completeness，详细原件/测试映射见 [CLAIM_AND_SOURCE_FIXES](CLAIM_AND_SOURCE_FIXES.md)。这些离线与安装结果不证明新run已避免空读循环或完成科研判断，L2/L3/L4未完成标识保持。
+
+## bac3659 契约收口与真实恢复
+
+| 条目 | 状态与具体证据 |
+|---|---|
+| §8.1 / D6 Markdown边界 | confirmed_fixed：workflows移除source_recheck内联英文问题，保留原questions与结构化失败数据；test_invalid_quote_has_one_separate_source_task_and_preserves_rejection及生产AST检查，未新增Markdown/schema。 |
+| §4.2 / B5 报告继承 | confirmed_fixed：reports按实际引用解析跨run证据，不复制验证结论或引入全库；tests/test_reports.py 的 test_cross_run_report_resolves_only_referenced_inherited_evidence覆盖四种引用位置。 |
+| §4.2 / §6 / B18 实际查证 | confirmed_fixed：workflows区分合法零结果搜索与注册且有非空正文/一致覆盖的读取；tests/test_evidence_gates.py 的四组反例和通过例验证fresh/novelty及恢复，空读不会满足门槛。 |
+| §6 / §7 / B08 / D9 执行来源 | confirmed_fixed：runtime仅从本task成功搜索trace派生actual_searches，typed执行日志保留真实有序重复；tests/test_runtime_provenance.py 的 test_actual_search_repeated_hits_preserve_order_and_accept_without_deduplication、test_scientific_source_reference_duplicates_still_rejected、test_investigator_request_duplicate_sources_not_exempted_with_search_log。 |
+
+首次5e3830c零调用恢复仍被duplicate_source_reference拒绝：实际工具重复命中同来源，原执行记录没有造假；旧科研引用唯一性误用于执行日志。该失败及work/recover-rendering-provenance.log保留，详情见 [SEARCH_PROVENANCE_FIX](SEARCH_PROVENANCE_FIX.md)。
+
+`bac3659`的禁止新增模型/工具动作恢复已通过：shared_investigation为 `ACCEPTED`，error=None，19条findings已登记；原始raw及除actual_searches外的研究字段完全不变，repair_count=1，new_model_or_tool_calls=0。恢复窗口父账本保持1157调用、人民币18.981215–18.992283、reserved=0。审计路径相对于 `.arc-validation/artifacts/`：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/implementation-fixes/bac3659512f2bae137b8a0241b71c64c17ff3549.json`；normalization审计hash为 `16cd9bf3476c7e3c032d3b24b245708b2fe9c1e63d5847a625d40a8f5be540e4`。该账本快照不包含随后已恢复的自然抽卡新增调用。
+
+上述恢复是真实本地恢复证据，不是重新生成科研内容，也不关闭L2/L3/L4。后续自然抽卡已resume；本次只勾选工程与已完成的受控恢复，完整流程、质量对照、实际断SSH/超过24小时以及最终父账本结算仍缺相应验收记录。

@@ -60,3 +60,20 @@
 这些修复约束数据完整性和读取范围，不会自动纠正L2抽查中IoU数值被推成几何覆盖、SoftPQ条件扩大等科学推断。修复通过后仍不能仅凭结构合法或可定位摘录声称idea质量提高，L2/L3/L4的完成状态由真实验收报告另行记录。
 
 源码535357d的独立安装日志为 `work/wheel-build-535357d.log`、`work/wheel-install-535357d.log`、`work/wheel-help-535357d.log`。本次文档更新起点为3f6026f；这三个安装结果与283项工程测试均不能把旧paid任务改成成功，L2/L3/L4尚未完成。
+
+## 真实缓存边界验证：rendering共享调查快照
+
+references_audit的只读审计时间为 **2026-09-07 07:01:00.986915 UTC**，这是读取时钟，不是产物写入时间。对象是 `arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.shared_investigation`；固定状态文件相对于 `.arc-validation/artifacts/` 为：
+
+`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/tasks/805c7f22e9760ba8422b8da3052a3b42eac47ed7eb5f3d32959f12ed60a99292/states/b92d9e19c8064172a488b6b83d0c31e8.json`
+
+| 真实read_record调用 | 参数与来源 | 返回正文 / 原文总长 / 缓存长度 | 缓存边界字段 |
+|---|---|---|---|
+| `tool_1c3ed5164c5b49218b92a7490c11a28e` | offset=0、limit=16000；`src_8811a98f8a964341a428584b93c0b547` | 16000 / 46429 / 20000字符 | more_cached_content=true；requires_source_fetch=false；content_complete=false |
+| `tool_864823b1703647df9bced3cfa0998cb2` | offset=0、limit=14000；`src_e64324ca1b62462987f8d935880e266b` | 14000 / 48371 / 14000字符 | more_cached_content=false；requires_source_fetch=true；content_complete=false |
+
+审计随后仅对这份冻结状态核对：两份保存正文的SHA256均与各自 `result.content_sha256` 一致，实际缓存长度分别为20000与14000，返回正文与指定缓存切片逐字相等。第一条仍有缓存页可读，因此此时不要求补取；第二条已读尽缓存，但原文仍不完整，因此明确要求外部补取。原文总长没有再次被缓存长度覆盖。
+
+该快照共有24条工具调用：search_web 12、read_web 9、read_record 2、read_paper 1；23条completed、1条read_paper error。两次read_record都有正文，空正文read_record为0。**metadata-only read_record分支尚未在这个真实快照中出现，不能因此宣称重复空读问题已经解决。**
+
+这只证明两种真实缓存边界返回、文件长度/hash和切片一致；不证明模型已经正确使用这些字段作科研判断，也不表示共享调查、整条研究链或L2/L3/L4已经完成。本次文档追加没有新请求、补写旧paid结果或改变运行状态。
