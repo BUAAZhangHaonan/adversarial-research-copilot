@@ -73,3 +73,13 @@ questions. Gather the fixed conflict holdout last, without prompt tuning on its 
 Candidate and evaluator calls remain sequential, offline with respect to the frozen
 snapshot, at max effort. A protocol, source or budget stop is recorded as incomplete;
 no final report may turn that status into a successful quality comparison.
+
+Before starting the rendering attempt, development trace review exposed omitted claims
+being defaulted to an empty list, unbound structured debate targets, and cached/metadata-only
+source reads being mistaken for full original coverage. The generic data-contract corrections
+are committed as `535357d`; 283 offline tests and an independently installed wheel passed.
+The old independent run was paused at a new-request admission boundary after its admitted
+response finished; its empty-read history and fees are preserved. The rendering attempt uses
+the corrected bundle as a new run, not an in-place rewrite of an old task or a manual promotion.
+No holdout output informed these changes. Stage limits, models, effort and original parent
+remain unchanged.
