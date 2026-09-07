@@ -50,8 +50,6 @@ class EvidenceRequest(StrictModel):
 
     @model_validator(mode="after")
     def actionable(self):
-        if not (self.claim_id or self.issue_id or self.draw_id):
-            raise ValueError("evidence_request_requires_subject")
         if not (self.target_source_ids or self.queries):
             raise ValueError("evidence_request_requires_target")
         return self
@@ -85,6 +83,12 @@ class Envelope(StrictModel, Generic[T]):
             raise ValueError("incomplete_requires_reason")
         if self.result_status == "needs_evidence" and not self.evidence_requests:
             raise ValueError("needs_evidence_requires_request")
+        for request in self.evidence_requests:
+            if not (request.claim_id or request.issue_id or request.draw_id):
+                # Before a card/draw exists, the request belongs to this actual
+                # task and its campaign/run; no provisional entity ID is invented.
+                if not (self.subject.card_id is None and self.subject.campaign_id and self.subject.run_id):
+                    raise ValueError("evidence_request_requires_subject")
         ids = [r.request_local_id for r in self.evidence_requests]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate_request_local_id")

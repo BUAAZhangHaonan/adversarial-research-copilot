@@ -42,6 +42,64 @@ def test_needs_evidence_must_be_actionable():
     with pytest.raises(ValidationError):
         Envelope[FrameResult](schema_version="arc.v1",task_id="t",subject=Subject(campaign_id=None,run_id=None,card_id=None,card_version=None),result_status="needs_evidence",result=None,evidence_requests=[],capability_requests=[],note="search")
 
+def prerequisite_request():
+    return {"request_local_id":"request1","claim_id":None,"issue_id":None,"draw_id":None,
+        "question":"Does the original describe this comparison?","target_source_ids":["registered_source"],
+        "queries":[],"purpose":"Check the proposed investigation boundary.",
+        "decision_if_supported":"Include the comparison in the evidence map.",
+        "decision_if_contradicted":"Record the missing comparison as unresolved."}
+
+def prerequisite_envelope(request=None,**subject_updates):
+    subject={"campaign_id":"campaign1","run_id":"run1","card_id":None,"card_version":None}
+    subject.update(subject_updates)
+    return {"schema_version":"arc.v1","task_id":"run1.shared_investigation","subject":subject,
+        "result_status":"needs_evidence","result":None,"evidence_requests":[request or prerequisite_request()],
+        "capability_requests":[],"note":"A specific source question remains open."}
+
+@pytest.mark.parametrize("status",["complete","needs_evidence","blocked"])
+def test_pre_card_evidence_request_is_bound_to_enclosing_task_and_run(status):
+    from arc.schemas import EvidenceRequest
+    payload=prerequisite_envelope()
+    payload["result_status"]=status
+    if status=="complete":
+        payload["result"]={"mandate":{"topic":"research question","research_object":"fixed domain","scope_in":[],"scope_out":[],"known_constraints":[],"unknown_constraints":[]},"initial_search_questions":[]}
+    envelope=Envelope[FrameResult].model_validate(payload)
+    assert envelope.task_id=="run1.shared_investigation"
+    assert envelope.subject.campaign_id=="campaign1" and envelope.subject.run_id=="run1"
+    assert envelope.evidence_requests[0].model_dump()==payload["evidence_requests"][0]
+    assert set(EvidenceRequest.model_fields)==set(prerequisite_request())
+    assert envelope.model_dump()==payload
+
+@pytest.mark.parametrize("subject",[
+    {"card_id":"card1","card_version":1},
+    {"campaign_id":None},{"run_id":None},{"campaign_id":""},{"run_id":""},
+])
+def test_unbound_evidence_request_requires_pre_card_campaign_and_run(subject):
+    with pytest.raises(ValidationError,match="evidence_request_requires_subject"):
+        Envelope[FrameResult].model_validate(prerequisite_envelope(**subject))
+
+@pytest.mark.parametrize("target",["claim_id","issue_id","draw_id"])
+def test_existing_entity_evidence_requests_keep_explicit_subject(target):
+    request=prerequisite_request(); request[target]="existing_id"
+    envelope=Envelope[FrameResult].model_validate(prerequisite_envelope(request,card_id="card1",card_version=1))
+    assert getattr(envelope.evidence_requests[0],target)=="existing_id"
+
+@pytest.mark.parametrize("field",["question","purpose","decision_if_supported","decision_if_contradicted"])
+def test_pre_card_request_still_requires_concrete_question_and_decisions(field):
+    request=prerequisite_request(); request[field]=""
+    with pytest.raises(ValidationError): Envelope[FrameResult].model_validate(prerequisite_envelope(request))
+    del request[field]
+    with pytest.raises(ValidationError): Envelope[FrameResult].model_validate(prerequisite_envelope(request))
+
+def test_pre_card_request_still_requires_search_target_and_actual_task():
+    request=prerequisite_request(); request["target_source_ids"]=[]
+    with pytest.raises(ValidationError,match="evidence_request_requires_target"):
+        Envelope[FrameResult].model_validate(prerequisite_envelope(request))
+    request["queries"]=["specific original source question"]
+    assert Envelope[FrameResult].model_validate(prerequisite_envelope(request)).evidence_requests[0].queries
+    payload=prerequisite_envelope(); payload["task_id"]=""
+    with pytest.raises(ValidationError): Envelope[FrameResult].model_validate(payload)
+
 def test_card_complete_without_fabricated_probability_or_experimental_success():
     payload=card_payload()
     assert CardDraft.model_validate(payload).hypotheses.favored_only_if_justified is None

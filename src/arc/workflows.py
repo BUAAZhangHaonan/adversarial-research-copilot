@@ -8,6 +8,7 @@ import json
 from .config import Settings
 from .schemas import RESULT_SCHEMAS, Subject, CardDraft, ProblemAnchor
 from .store import StateError
+from .runtime import RuntimePaused
 from .validation import ProtocolViolation, validate_archive_comparisons, validate_selection, validate_revision
 
 
@@ -178,18 +179,55 @@ class WorkflowEngine:
     async def investigate(self, run_id, key, questions, *, fresh=False, extra=None):
         payload = {**self.context(run_id), 'questions': questions,
                    'fresh_verification_required': fresh, **(extra or {})}
-        result = await self.call(run_id, key, 'investigator', payload=payload)
+        result_key = key
+        try:
+            result = await self.call(run_id, key, 'investigator', payload=payload)
+        except RuntimePaused as exc:
+            # A failed quote is an evidence question, not a formatting repair.
+            # Keep the rejected task intact and allow exactly one separately
+            # budgeted source-reading task. Its failure propagates unchanged.
+            if exc.reason != 'excerpt_not_in_returned_source':
+                raise
+            rejected = self.store.get_task(f'{run_id}.{key}')
+            if rejected is None or rejected.accepted_result is not None:
+                raise
+            saved = json.loads(self.store.read_artifact(rejected.response_artifact_path))
+            draft = json.loads(saved['response']['message']['content'])
+            trace = self.runtime.tool_trace(rejected.task_id)
+            source_ids = sorted({sid for item in trace if item.get('status') == 'completed'
+                                 for sid in item.get('source_ids', [])})
+            original = self.store.get_run(run_id).state['task_inputs'][key]['payload']
+            result_key = key + '.source_recheck'
+            self.checkpoint(run_id, **{key + '_source_recheck': {
+                'rejected_task_id': rejected.task_id,
+                'reason': exc.reason, 'replacement_task_id': f'{run_id}.{result_key}',
+                'rejected_response_path': rejected.response_artifact_path,
+                'maximum_rechecks': 1}})
+            result = await self.call(run_id, result_key, 'investigator', payload={
+                **original, 'sources_from_rejected_task': data(self.store.list_sources(ids=source_ids)),
+                'rejected_unverified_result': draft['result'],
+                'questions': questions + [
+                    'Which findings remain supported after checking their exact quotations against the registered original text?'],
+                'source_validation_failure': {'reason': exc.reason, 'task_id': rejected.task_id},
+            }, tool_profile=['read_record', 'request_capability'])
+            self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks':
+                [rejected.task_id] + self.trace_tasks(run_id, result_key)})
         trace = self.task_trace(run_id, key)
         if fresh and not any(t.get('name') in EXTERNAL_EVIDENCE_TOOLS and
                              t.get('status') == 'completed' for t in trace):
             self.checkpoint(run_id, missing_fresh_verification=key)
             raise WorkflowPause('PAUSED_EXTERNAL', 'fresh_verification_not_executed')
         # Findings receive registry IDs only after the actual source passage exists.
-        frozen = self.store.get_run(run_id).state['task_inputs'][key]['payload']
+        # On resume the result still belongs to the independently accepted
+        # recheck task, never to the rejected source task.
+        recheck = self.store.get_run(run_id).state.get(key + '_source_recheck')
+        if recheck:
+            result_key = key + '.source_recheck'
+        frozen = self.store.get_run(run_id).state['task_inputs'][result_key]['payload']
         frozen_card = frozen.get('card') or frozen.get('original_card') or {}
         allowed_claims = frozen_card.get('draft', {}).get('claims', [])
         registered = self.store.register_findings(result.findings + result.contrary_findings,
-            task_id=f'{run_id}.{key}', allowed_claims=allowed_claims)
+            task_id=f'{run_id}.{result_key}', allowed_claims=allowed_claims)
         run = self.store.get_run(run_id)
         self.checkpoint(run_id,
             evidence_ids=sorted(set(run.state.get('evidence_ids', [])) | {e.evidence_id for e in registered}),

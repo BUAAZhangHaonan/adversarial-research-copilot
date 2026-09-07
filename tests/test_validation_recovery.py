@@ -5,6 +5,63 @@ from tests.test_selection import research_store
 from tests.test_workflows import ScriptedRuntime, campaign_run
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('recheck_fails', [False, True])
+async def test_invalid_quote_has_one_separate_source_task_and_preserves_rejection(tmp_path, recheck_fails):
+    import json
+    from arc.runtime import RuntimePaused
+    from arc.schemas import TaskRecord
+    store, _, _ = research_store(tmp_path)
+    _, run = campaign_run(store, max_draws=1)
+    class QuoteRuntime(ScriptedRuntime):
+        async def invoke(self, **kw):
+            if kw['task_id'].endswith('.shared'):
+                result = self.reply('investigator', 'INVOKE', kw['payload'], kw['task_id'])
+                path = self.store.save_artifact('tests/rejected.json', json.dumps({
+                    'response': {'message': {'content': json.dumps({'result': result})}}}))
+                self.store.put_task(TaskRecord(task_id=kw['task_id'], run_id=run.run_id,
+                    input_hash='frozen', prompt_hash='frozen', model_config_hash='frozen',
+                    status='PAUSED_PROTOCOL', error='excerpt_not_in_returned_source',
+                    response_artifact_path=path))
+                raise RuntimePaused('PAUSED_PROTOCOL', 'excerpt_not_in_returned_source')
+            assert kw['task_id'].endswith('.source_recheck')
+            assert kw['tool_profile'] == ['read_record', 'request_capability']
+            assert kw['payload']['sources_from_rejected_task'][0]['source_id'] == 'src_synthetic'
+            if recheck_fails:
+                self.calls.append({'task_id': kw['task_id']})
+                raise RuntimePaused('PAUSED_PROTOCOL', 'excerpt_not_in_returned_source')
+            return await super().invoke(**kw)
+        def reply(self, role, task, payload, task_id):
+            result = super().reply(role, task, payload, task_id)
+            if task_id.endswith('.source_recheck'):
+                result['findings'] = [{'claim': 'The variables were not isolated.',
+                    'conditions': ['synthetic'], 'source_id': 'src_synthetic',
+                    'locator': None, 'locator_status': 'locator_unverified', 'relation': 'limits',
+                    'origin': 'original', 'excerpt': 'they do not isolate the variables.',
+                    'support_explanation': 'The authors explicitly state the limitation.'}]
+            return result
+        def tool_trace(self, task_id):
+            if task_id.endswith('.source_recheck'):
+                return [{'name':'read_record', 'status':'completed', 'source_ids':['src_synthetic']}]
+            return super().tool_trace(task_id)
+    runtime = QuoteRuntime(store)
+    engine = WorkflowEngine(store, runtime, Settings())
+    if recheck_fails:
+        with pytest.raises(RuntimePaused, match='excerpt_not_in_returned_source'):
+            await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        assert len(runtime.calls) == 1
+        assert store.list_evidence(run_id=run.run_id) == []
+    else:
+        await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        before = len(runtime.calls)
+        await engine.investigate(run.run_id, 'shared', ['Check the confound.'], fresh=True)
+        assert len(runtime.calls) == before
+        assert len(store.list_evidence(run_id=run.run_id)) == 1
+        assert store.get_run(run.run_id).state['shared_trace_tasks'] == [
+            run.run_id + '.shared', run.run_id + '.shared.source_recheck']
+    rejected = store.get_task(run.run_id + '.shared')
+    assert rejected.status == 'PAUSED_PROTOCOL' and rejected.accepted_result is None
+
+@pytest.mark.asyncio
 async def test_cross_record_invalid_selection_pauses_without_acceptance_or_paid_replay(tmp_path):
     store, _, _ = research_store(tmp_path)
     _, run = campaign_run(store, max_draws=1)
