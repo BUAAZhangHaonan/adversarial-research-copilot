@@ -336,17 +336,32 @@ def test_same_representation_partial_source_upgrades_without_losing_evidence(sto
     assert store.list_evidence(ids=[ev.evidence_id])==[ev]
     assert store.register_evidence(ev)==ev
 
-@pytest.mark.parametrize("change",["different_representation","different_prefix","complete_conflict"])
+@pytest.mark.parametrize("change",["different_prefix","complete_conflict"])
 def test_source_extension_rejects_unproven_or_conflicting_content(store,change):
     old="original prefix"; full=old+" longer"
     record=SourceRecord(title="original",url="https://example.test/paper",source_type="paper",access_status="retrieved",content_origin="original",content_complete=change=="complete_conflict",content_total_chars=len(old) if change=="complete_conflict" else len(full),representation_id="service:extractor:hash1")
     first=store.register_source(record,content=old)
     incoming=record.model_copy(update={"source_id":"other","content_complete":True,"content_total_chars":len(full)})
-    if change=="different_representation": incoming.representation_id="service:extractor:hash2"
     if change=="different_prefix": full="contrary prefix longer"; incoming.content_total_chars=len(full)
     with pytest.raises(StateError,match="explicit_version"):
         store.register_source(incoming,content=full)
     assert store.get_record(first.source_id)["content"]==old
+
+def test_paper_landing_page_and_body_have_distinct_representations_not_independent_works(store):
+    landing="Submission history\nAbstract only.\nWebsite footer"
+    body="Paper title\nMethods and experiments of the paper."
+    first=store.register_source(SourceRecord(title="paper",url="https://arxiv.org/abs/2306.16132",source_type="paper",access_status="retrieved",content_origin="original",content_complete=True,content_total_chars=len(landing),representation_id="webresearch:trafilatura:landing_hash"),content=landing)
+    old_evidence=store.register_evidence(EvidenceRecord(source_id=first.source_id,claim_id="claim_landing",claim_version=1,claim="Abstract statement",conditions=[],locator="L2",excerpt="Abstract only.",relation="motivates",origin="original",locator_status="verified",verification_status="verified",support_explanation="Exact abstract text; scope remains the abstract."))
+    second=store.register_source(SourceRecord(title="paper",url="https://ar5iv.labs.arxiv.org/html/2306.16132",arxiv_id="2306.16132",source_type="paper",access_status="retrieved",content_origin="original",content_complete=True,content_total_chars=len(body),representation_id="webresearch:trafilatura:body_hash"),content=body)
+    assert first.source_id!=second.source_id
+    assert first.canonical_id==second.canonical_id=="arxiv:2306.16132"
+    assert len({item.canonical_id for item in store.list_sources()})==1
+    assert store.get_record(first.source_id)["content"]==landing
+    assert store.get_record(second.source_id)["content"]==body
+    assert store.register_evidence(old_evidence)==old_evidence
+    assert store.register_source(second.model_copy(update={"source_id":"mirror"}),content=body).source_id==second.source_id
+    with pytest.raises(StateError,match="explicit_version"):
+        store.register_source(second.model_copy(update={"content_total_chars":len("conflicting original")}),content="conflicting original")
 
 @pytest.mark.parametrize("complete",[True,False])
 @pytest.mark.parametrize("same_length",[True,False])

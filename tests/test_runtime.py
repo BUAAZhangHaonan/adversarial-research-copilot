@@ -386,6 +386,9 @@ async def test_web_excerpt_then_full_read_upgrades_same_original_without_protoco
     assert reread['sources'][0]['content_complete'] is False
     assert reread['sources'][0]['registered_content_complete'] is True
     assert store.get_record(source.source_id)['content']=='abcdefghijk'
+    assert reread['sources'][0]['canonical_id']=='arxiv:2112.01527'
+    assert reread['sources'][0]['version']=='1'
+    assert reread['sources'][0]['representation_id']=='webresearch:trafilatura:same-html-hash'
 
 
 @pytest.mark.asyncio

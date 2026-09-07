@@ -67,7 +67,8 @@ class Store:
                 CREATE TABLE IF NOT EXISTS card_creation(creation_key TEXT PRIMARY KEY,card_id TEXT NOT NULL,version INTEGER NOT NULL,input_hash TEXT NOT NULL,FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
                 CREATE TABLE IF NOT EXISTS run_cards(run_id TEXT NOT NULL REFERENCES runs(id),card_id TEXT NOT NULL,version INTEGER NOT NULL,PRIMARY KEY(run_id,card_id,version),FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
                 CREATE TABLE IF NOT EXISTS selections(card_id TEXT NOT NULL,version INTEGER NOT NULL,run_id TEXT REFERENCES runs(id),data TEXT NOT NULL,PRIMARY KEY(card_id,version),FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
-                CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY,canonical_id TEXT NOT NULL,version TEXT NOT NULL,origin TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(canonical_id,version,origin));
+                CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY,canonical_id TEXT NOT NULL,version TEXT NOT NULL,origin TEXT NOT NULL,data TEXT NOT NULL);
+                CREATE UNIQUE INDEX IF NOT EXISTS source_representation_identity ON sources(canonical_id,version,origin,COALESCE(json_extract(data,'$.representation_id'),''));
                 CREATE TABLE IF NOT EXISTS evidence(id TEXT PRIMARY KEY,source_id TEXT NOT NULL REFERENCES sources(id),run_id TEXT,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS issues(run_id TEXT NOT NULL REFERENCES runs(id),id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(run_id,id));
@@ -369,7 +370,7 @@ class Store:
                 if len(raw)>source.content_total_chars or (source.content_complete and len(raw)!=source.content_total_chars):
                     raise StateError("source_content_completeness_mismatch")
         with self._transaction() as db:
-            old=db.execute("SELECT data FROM sources WHERE canonical_id=? AND version=? AND origin=?",(canonical,version,source.content_origin)).fetchone()
+            old=db.execute("SELECT data FROM sources WHERE canonical_id=? AND version=? AND origin=? AND COALESCE(json_extract(data,'$.representation_id'),'')=?",(canonical,version,source.content_origin,source.representation_id or "")).fetchone()
             if old:
                 previous=SourceRecord.model_validate_json(old[0])
                 if previous.content_sha256 and source.content_sha256 and previous.content_sha256!=source.content_sha256:

@@ -191,6 +191,8 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     representation_id=item.get('representation_id')), content=text)
                 source_ids.append(source.source_id)
                 registered.append({'source_id': source.source_id, 'title': source.title, 'url': source.url,
+                    'canonical_id': source.canonical_id, 'version': source.version,
+                    'representation_id': source.representation_id,
                     'content_origin': origin, 'abstract': item.get('abstract'), 'snippet': item.get('snippet'),
                     'content_chars': len(text) if text else 0,
                     'content_complete': item.get('content_complete', bool(text)),
