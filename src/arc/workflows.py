@@ -144,7 +144,9 @@ class WorkflowEngine:
                 on_admitted=on_admitted, tool_profile=audit['tool_profile'], request_depth=request_depth)
             traces = list(dict.fromkeys([r['source_task_id'] for r in retries] +
                                         self.trace_tasks(run_id, audit['replacement_key'])))
-            self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks': traces})
+            self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks': traces,
+                key + '_evidence_requests': self.store.get_run(run_id).state.get(
+                    audit['replacement_key'] + '_evidence_requests', [])})
             return result
         subject = Subject(campaign_id=run.campaign_id, run_id=run_id,
                           card_id=run.card_id, card_version=run.card_version)
@@ -184,7 +186,10 @@ class WorkflowEngine:
                     payload={**payload, **self.context(run_id),
                              'completed_evidence_requests': data(envelope.evidence_requests)},
                     tool_profile=tool_profile, request_depth=request_depth + 1)
-                self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks': list(dict.fromkeys(
+                self.checkpoint(run_id, **{key: data(result),
+                    key + '_evidence_requests': self.store.get_run(run_id).state.get(
+                        key + '.after_evidence_evidence_requests', []),
+                    key + '_trace_tasks': list(dict.fromkeys(
                     [task_id] + self.trace_tasks(run_id, request_key) +
                     self.trace_tasks(run_id, key + '.after_evidence')))})
                 return result
@@ -199,7 +204,8 @@ class WorkflowEngine:
             if item.get('status') == 'completed':
                 source_ids.update(item.get('source_ids', []))
                 evidence_ids.update(item.get('evidence_ids', []))
-        self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks': [task_id]}, source_ids=sorted(source_ids),
+        self.checkpoint(run_id, **{key: data(result), key + '_trace_tasks': [task_id],
+                        key + '_evidence_requests': data(envelope.evidence_requests)}, source_ids=sorted(source_ids),
                         evidence_ids=sorted(evidence_ids))
         return result
 
@@ -579,9 +585,11 @@ class WorkflowEngine:
                 ruling = self.save_moderator_revision(run_id, reassessment_key, reassessed,
                     creation_key=f'{run_id}.round{number}.evidence_reassessment.revision',
                     reject_further_removal=True)
+                moderator_key = reassessment_key
             self.store.apply_issues(run_id, ruling.updated_issues, ruling.issue_transitions,
                 event_key=f'{run_id}.round{number}',
-                state_patch={'rounds_completed': number, 'final_ruling': data(ruling)})
+                state_patch={'rounds_completed': number, 'final_ruling': data(ruling),
+                             'final_ruling_task_key': moderator_key})
             self.store.update_run(run_id, assessment=ruling.assessment)
             if await self.process_ruling(run_id, number, ruling):
                 return
@@ -623,8 +631,12 @@ class WorkflowEngine:
             targets = [data(i) for i in issues if i.status == 'needs_retrieval']
             if not targets:
                 raise WorkflowPause('PAUSED_PROTOCOL', 'retrieval_without_issue')
-            await self.investigate(run_id, f'round{number}.retrieval', [], fresh=True,
-                                   extra={'issue_targets': targets})
+            state = self.store.get_run(run_id).state
+            ruling_key = state.get('final_ruling_task_key', f'round{number}.moderator')
+            requests = state.get(ruling_key + '_evidence_requests', [])
+            await self.investigate(run_id, f'round{number}.retrieval',
+                [request['question'] for request in requests], fresh=True,
+                extra={'issue_targets': targets, 'evidence_requests': requests})
         else:
             raise WorkflowPause('PAUSED_PROTOCOL', 'invalid_next_action')
         self.checkpoint(run_id, last_action_handled=number)
