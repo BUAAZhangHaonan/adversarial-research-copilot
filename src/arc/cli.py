@@ -243,8 +243,17 @@ def test_ablation(ctx: typer.Context, source_run: str = typer.Option(...),
     if not (legacy_prompt_root / 'manifest.json').is_file():
         raise typer.BadParameter('historical prompt directory must contain manifest.json',
                                  param_hint='--legacy-prompt-root')
-    asyncio.run(run_ablation(ctx.obj, source_run, experiment_id=experiment_id,
+    report = asyncio.run(run_ablation(ctx.obj, source_run, experiment_id=experiment_id,
         parent_id=parent_budget, budget_cny=budget_cny, seed=seed, legacy_prompt_root=legacy_prompt_root))
+    summary = {'experiment_id': report['experiment_id'], 'status': report['status'],
+        'conditions': {key: report.get('conditions', {}).get(key, {}).get('status', 'NOT_STARTED')
+                       for key in 'ABCDE'},
+        'judge_status': report.get('judge_status', 'NOT_STARTED'),
+        'report_path': str(ctx.obj.data_dir.resolve() / 'artifacts' / 'functional-evaluations'
+                           / experiment_id / 'report.json')}
+    typer.echo(json.dumps(summary, ensure_ascii=False))
+    if report['status'] != 'completed':
+        raise typer.Exit(code=1)
 
 @app.command(name='retry-comparison-task')
 def retry_comparison_task(ctx: typer.Context, source_run: str,
