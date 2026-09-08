@@ -174,3 +174,47 @@ async def test_invalid_finding_pointer_is_corrected_without_rewriting_its_object
         assert 'SCIENTIFIC_FINDING_REQUIRES_JSON_POINTER' in requests[1]['messages'][1]['content']
     finally:
         await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('repair_quote', [True, False])
+async def test_source_and_card_quote_errors_share_one_existing_correction(tmp_path, repair_quote):
+    from arc.schemas import SourceRecord
+    from arc.runtime import correction_counts
+    runtime,store,ledger,requests,responses,payload,subject,valid=setup_review(tmp_path)
+    source=store.register_source(SourceRecord(title='Synthetic comparison',
+        url='https://example.org/comparison', source_type='paper', access_status='retrieved',
+        content_origin='original'),content='Synthetic original passage.')
+    payload['source_ids']=[source.source_id]
+    target=payload['review_target']['minimal_test']['outcome_interpretations'][0]
+    valid['action']='revise'
+    valid['decisive_findings']=[defect().model_dump(mode='json')]
+    valid['decisive_findings'][0].update(location='/minimal_test/outcome_interpretations/0',
+        quoted_text=target['interpretation'],source_ids=[source.source_id])
+    malformed=deepcopy(valid)
+    malformed['decisive_findings'][0].update(source_ids=['unknown_comparison'],
+        quoted_text='outcome: '+target['outcome']+'; interpretation: '+target['interpretation'])
+    corrected=deepcopy(valid)
+    if not repair_quote:
+        corrected['decisive_findings'][0]['quoted_text']=malformed['decisive_findings'][0]['quoted_text']
+    responses.extend([encoded_result(malformed,subject),encoded_result(corrected,subject)])
+    try:
+        if repair_quote:
+            result=await invoke_review(runtime,payload,subject)
+            assert result.result.model_dump(mode='json')==valid
+        else:
+            with pytest.raises(RuntimePaused,match='INVALID_OUTPUT_AFTER_REPAIR'):
+                await invoke_review(runtime,payload,subject)
+            assert store.get_task('task_fixture').accepted_result is None
+        assert len(requests)==2 and len(ledger.list_calls())==2
+        feedback=requests[1]['messages'][1]['content']
+        assert 'unknown_source_id' in feedback and 'SCIENTIFIC_FINDING_QUOTE_NOT_AT_LOCATION' in feedback
+        assert 'finding_index' in feedback and valid['decisive_findings'][0]['finding_id'] in feedback
+        assert 'supplied_quote' in feedback and 'target_value' in feedback
+        assert target['outcome'] in feedback and target['interpretation'] in feedback
+        state=json.loads(store.read_artifact(store.get_task('task_fixture').response_artifact_path))
+        assert correction_counts(state)=={'tool_arguments':0,'output_json':1}
+        if not repair_quote:
+            assert 'SCIENTIFIC_FINDING_QUOTE_NOT_AT_LOCATION' in str(state['final_validation_errors'])
+    finally:
+        await runtime.close()

@@ -47,26 +47,38 @@ def pointer_value(body, pointer):
     return target
 
 
-def validate_scientific_review(store, draft, review: ScientificReview, *, previous=None, previous_draft=None):
-    """Check that the actual review refers to this draft; do not decide scientific truth in code."""
-    store.validate_references(review)
+def validate_scientific_review(store, draft, review: ScientificReview, *, previous=None, previous_draft=None,
+                               check_references=True):
+    """Check draft addressing; independent errors must share one correction view."""
+    if check_references:
+        store.validate_references(review)
     body = draft.model_dump(mode='json')
-    for finding in review.decisive_findings:
-        target = pointer_value(body, finding.location)
+    errors = []
+    for index, finding in enumerate(review.decisive_findings):
+        try:
+            target = pointer_value(body, finding.location)
+        except ProtocolViolation as exc:
+            errors.append(str(exc) + '; ' + json.dumps({'finding_index': index,
+                'finding_id': finding.finding_id, 'location': finding.location}, ensure_ascii=False))
+            continue
         target_text = target if isinstance(target, str) else json.dumps(target, ensure_ascii=False)
         if finding.quoted_text and finding.quoted_text not in target_text:
-            raise ProtocolViolation('SCIENTIFIC_FINDING_QUOTE_NOT_AT_LOCATION')
+            errors.append('SCIENTIFIC_FINDING_QUOTE_NOT_AT_LOCATION; ' + json.dumps({
+                'loc': ['result', 'decisive_findings', index, 'quoted_text'],
+                'finding_index': index, 'finding_id': finding.finding_id,
+                'location': finding.location, 'supplied_quote': finding.quoted_text,
+                'target_value': target}, ensure_ascii=False))
     expected = {f.finding_id for f in previous.decisive_findings} if previous else set()
     supplied = [f.finding_id for f in review.prior_findings]
     if set(supplied) != expected:
-        raise ProtocolViolation('SCIENTIFIC_RECHECK_MUST_ADDRESS_PREVIOUS_FINDINGS; '
+        errors.append('SCIENTIFIC_RECHECK_MUST_ADDRESS_PREVIOUS_FINDINGS; '
             'expected_previous_decisive_ids=' + json.dumps(sorted(expected)) +
             '; supplied_prior_ids=' + json.dumps(supplied))
     if previous_draft is not None:
         statuses = {f.finding_id: f.status for f in review.prior_findings}
         old_body = previous_draft.model_dump(mode='json')
         for finding in previous.decisive_findings:
-            if statuses[finding.finding_id] != 'resolved':
+            if statuses.get(finding.finding_id) != 'resolved':
                 continue
             old_value = pointer_value(old_body, finding.location)
             try:
@@ -74,14 +86,16 @@ def validate_scientific_review(store, draft, review: ScientificReview, *, previo
             except ProtocolViolation:
                 continue  # Removing the faulty claim is a legitimate revision.
             if old_value == new_value:
-                raise ProtocolViolation('SCIENTIFIC_REPAIR_LEFT_FAULTY_FIELD_UNCHANGED')
+                errors.append('SCIENTIFIC_REPAIR_LEFT_FAULTY_FIELD_UNCHANGED')
     for work in review.verification_work:
         if work.method == 'source_read' and not (work.evidence_ids or work.source_ids):
-            raise ProtocolViolation('SCIENTIFIC_SOURCE_REVIEW_REQUIRES_REFERENCE')
+            errors.append('SCIENTIFIC_SOURCE_REVIEW_REQUIRES_REFERENCE')
+    if errors:
+        raise ProtocolViolation('\n'.join(errors))
     return review
 
 
-def validate_scientific_output_contract(store, payload, result):
+def validate_scientific_output_contract(store, payload, result, *, check_references=True):
     """Validate output addressing/coverage before the existing JSON repair gate.
 
     This never classifies a claim's meaning or checks whether a scientific
@@ -107,7 +121,7 @@ def validate_scientific_output_contract(store, payload, result):
     from .validation import claim_edit_assessments
     target = CardDraft.model_validate(payload['review_target'])
     previous = ScientificReview.model_validate(payload['previous_review']) if payload.get('previous_review') else None
-    validate_scientific_review(store, target, result, previous=previous)
+    validate_scientific_review(store, target, result, previous=previous, check_references=check_references)
     if payload.get('original_card') and payload.get('proposed_revision'):
         original = ResearchCard.model_validate(payload['original_card'])
         proposed = CardDraft.model_validate(payload['proposed_revision'])

@@ -329,6 +329,35 @@ class Runtime:
         except (ValueError, KeyError, TypeError, FileNotFoundError) as exc:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
+    def _validate_output_contracts(self, envelope, payload, state):
+        """Collect independent read-only errors before spending JSON correction."""
+        from .store import StateError
+        from .scientific import validate_scientific_output_contract
+        from .schemas import LibrarianResult, EvaluatorResult
+        from .validation import validate_archive_comparisons, validate_evaluator_coverage
+        checks = [
+            lambda: self._validate_output_reference_targets(envelope, payload, state),
+            lambda: self._validate_evidence_request_targets(envelope, payload),
+            # References are checked independently above, so an address typo
+            # must not hide a second, independent draft-location error.
+            lambda: validate_scientific_output_contract(self.store, payload, envelope.result,
+                                                        check_references=False),
+        ]
+        if isinstance(envelope.result, LibrarianResult):
+            checks.append(lambda: validate_archive_comparisons(envelope.result,
+                payload.get('records_to_compare', []), self.store))
+        if isinstance(envelope.result, EvaluatorResult):
+            checks.append(lambda: validate_evaluator_coverage(envelope.result,
+                payload.get('candidates', [])))
+        errors = []
+        for check in checks:
+            try:
+                check()
+            except (ValueError, StateError) as exc:
+                errors.append(str(exc))
+        if errors:
+            raise ValueError('\n'.join(errors))
+
     def _validate_output_reference_targets(self, envelope, payload, state):
         """Read-only address diagnostics; no citation replacement or evidence writes."""
         from .store import StateError
@@ -664,22 +693,7 @@ class Runtime:
                 raise RuntimePaused('PAUSED_PROTOCOL', 'STOP_WITH_TOOL_CALLS')
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
-                from .store import StateError
-                self._validate_output_reference_targets(envelope, payload, state)
-                try:
-                    self._validate_evidence_request_targets(envelope, payload)
-                except StateError as exc:
-                    # Only addressing errors enter JSON correction; provenance
-                    # and authorization remain in post-parse semantic checks.
-                    raise ValueError(str(exc)) from exc
-                from .scientific import validate_scientific_output_contract
-                validate_scientific_output_contract(self.store, payload, envelope.result)
-                from .schemas import LibrarianResult, EvaluatorResult
-                from .validation import validate_archive_comparisons, validate_evaluator_coverage
-                if isinstance(envelope.result, LibrarianResult):
-                    validate_archive_comparisons(envelope.result, payload.get('records_to_compare', []), self.store)
-                if isinstance(envelope.result, EvaluatorResult):
-                    validate_evaluator_coverage(envelope.result, payload.get('candidates', []))
+                self._validate_output_contracts(envelope, payload, state)
             except (ValueError, ValidationError) as exc:
                 errors = (output_validation_errors(message.get('content') or '', envelope_type, exc)
                           if isinstance(exc, ValidationError) else [str(exc)])

@@ -31,20 +31,21 @@ async def invoke(runtime, payload):
 
 
 @pytest.mark.asyncio
-async def test_unknown_source_gets_located_single_correction_before_scientific_contract(tmp_path, monkeypatch):
+async def test_unknown_source_gets_located_single_correction_with_independent_scientific_contract(tmp_path, monkeypatch):
     responses = []
     runtime, store, ledger, requests = setup_runtime(tmp_path, responses)
     known = source(store)
     responses.extend([sse(json.dumps(reference_answer(['src_typo']))),
                       sse(json.dumps(reference_answer([known.source_id])))])
     seen = []
-    def scientific_contract(store, payload, result):
+    def scientific_contract(store, payload, result, *, check_references=True):
         seen.append(result.source_ids)
-        store.validate_references(result)
+        if check_references:
+            store.validate_references(result)
     monkeypatch.setattr('arc.scientific.validate_scientific_output_contract', scientific_contract)
     result = await invoke(runtime, {'source_ids': [known.source_id]})
     assert result.result.source_ids == [known.source_id]
-    assert seen == [[known.source_id]] and len(requests) == 2
+    assert seen == [['src_typo'], [known.source_id]] and len(requests) == 2
     state = json.loads(store.read_artifact(store.get_task('task_fixture').response_artifact_path))
     errors = json.loads(state['repair_validation_errors'][0].split('; ', 1)[1])
     assert errors == [{'loc': ['result', 'source_ids', 0], 'type': 'unknown_source_id',
