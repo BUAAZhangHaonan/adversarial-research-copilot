@@ -78,17 +78,64 @@ def validate_scientific_review(store, draft, review: ScientificReview, *, previo
     return review
 
 
+def _accepted_result_task(engine, run_id, key, result, card, role):
+    """Resolve the accepted physical task, including explicit/research retries."""
+    result_data = result.model_dump(mode='json')
+    for task_id in reversed(engine.trace_tasks(run_id, key)):
+        task = engine.store.get_task(task_id)
+        accepted = task.accepted_result if task else None
+        if (task is None or task.run_id != run_id or task.status != 'ACCEPTED'
+                or not accepted or accepted.get('result') != result_data):
+            continue
+        subject = accepted.get('subject', {})
+        if (subject.get('card_id'), subject.get('card_version')) != (card.card_id, card.version):
+            raise ProtocolViolation('SCIENTIFIC_ACCEPTED_TASK_CARD_MISMATCH')
+        snapshot = json.loads(engine.store.read_artifact(task.rendered_prompt_path)) if task.rendered_prompt_path else {}
+        if snapshot.get('prompt_id') != role + '.INVOKE':
+            raise ProtocolViolation('SCIENTIFIC_ACCEPTED_TASK_ROLE_MISMATCH')
+        return task
+    raise ProtocolViolation('SCIENTIFIC_ACCEPTED_RESULT_TASK_MISSING')
+
+
+def _registered_support_findings(engine, run_id, key, result, card):
+    # WorkflowEngine.investigate has already registered these findings under
+    # the actual accepted task. Revalidate/read them; never register duplicates
+    # under the logical key of a rejected request.
+    task = _accepted_result_task(engine, run_id, key, result, card, 'investigator')
+    records = engine.store.validate_findings(result.findings + result.contrary_findings,
+        task_id=task.task_id, allowed_claims=card.draft.claims)
+    registered = engine.store.list_evidence(ids=[record.evidence_id for record in records])
+    if {record.evidence_id for record in records} != {record.evidence_id for record in registered}:
+        raise ProtocolViolation('SCIENTIFIC_SUPPORT_FINDINGS_NOT_REGISTERED')
+    return registered
+
+
 async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_profile=None, original=None, proposed=None):
     """Initial review -> optional targeted change -> independent recheck; never refresh a draw."""
     state = engine.store.get_run(run_id).state
+    saved_input = state.get('task_inputs', {}).get(key + '.review', {})
+    run = engine.store.get_run(run_id)
+    if saved_input:
+        subject = saved_input['subject']
+        frozen_original = engine.store.get_card(subject['card_id'], subject['card_version'])
+        frozen_target = CardDraft.model_validate(saved_input['payload']['review_target'])
+        if original is not None and (original.card_id, original.version, original.draft) != (
+                frozen_original.card_id, frozen_original.version, frozen_original.draft):
+            raise ProtocolViolation('SCIENTIFIC_ORIGINAL_INPUT_CHANGED')
+        if proposed is not None and proposed != frozen_target:
+            raise ProtocolViolation('SCIENTIFIC_PROPOSED_INPUT_CHANGED')
+        original, target = frozen_original, frozen_target
+        proposed = frozen_target if saved_input['payload'].get('proposed_revision') is not None else None
+    else:
+        original = original or engine.store.get_card(run.card_id, run.card_version)
+        if (run.card_id, run.card_version) != (original.card_id, original.version):
+            raise ProtocolViolation('SCIENTIFIC_INITIAL_SUBJECT_CHANGED')
+        target = proposed or original.draft
     completed = state.get('scientific_cycles', {}).get(key)
     if completed:
-        return engine.store.get_card(completed['card_id'], completed['version']), ScientificReview.model_validate(completed['review'])
-    saved_input = state.get('task_inputs', {}).get(key + '.review', {})
-    subject = saved_input.get('subject') or {}
-    run = engine.store.get_run(run_id)
-    original = original or engine.store.get_card(subject.get('card_id') or run.card_id, subject.get('card_version') or run.card_version)
-    target = proposed or original.draft
+        card = engine.store.get_card(completed['card_id'], completed['version'])
+        engine.store.update_run(run_id, card_id=card.card_id, card_version=card.version)
+        return card, ScientificReview.model_validate(completed['review'])
     review = await engine.call(run_id, key + '.review', 'scientific_reviewer', payload={
         **engine.context(run_id), 'original_card': original.model_dump(mode='json') if proposed else None,
         'proposed_revision': proposed.model_dump(mode='json') if proposed else None,
@@ -126,11 +173,14 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
     if target != original.draft:
         derived, _, _ = derive_claim_versions(original, target, edit_assessments=review.edit_assessments)
         derived, removed = remove_superseded_claim_evidence(engine.store, derived)
-        review_task = engine.trace_tasks(run_id, accepted_key)[-1]
+        review_task = _accepted_result_task(engine, run_id, accepted_key, review, original, 'scientific_reviewer').task_id
         card = engine.store.save_card(derived, card_id=original.card_id, parent_version=original.version,
             creation_key=f'{run_id}.{key}.science_revision.card', run_id=run_id,
             edit_assessments=review.edit_assessments, review_task_id=review_task,
             state_patch={'scientific_last_revision': revision.model_dump(mode='json') if revision else None})
+        # Idempotent save_card returns early when the card already exists; put
+        # the run cursor back on that reviewed version before any next task.
+        engine.store.update_run(run_id, card_id=card.card_id, card_version=card.version)
         if removed:
             engine.checkpoint(run_id, **{key + '.support_removals': removed})
             evidence_key = key + '.support_recheck'
@@ -139,9 +189,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
                 'claim_evidence_recheck': {'removed_references': removed},
                 'target_source_ids': sorted({item['source_id'] for item in removed}),
             })
-            # Only the investigator's explicit new claim-target declarations are attached.
-            registered = engine.store.register_findings(result.findings + result.contrary_findings,
-                task_id=f'{run_id}.{evidence_key}', allowed_claims=card.draft.claims)
+            registered = _registered_support_findings(engine, run_id, evidence_key, result, card)
             supported = card.draft.model_copy(deep=True)
             for claim in supported.claims:
                 claim.evidence_ids = sorted(set(claim.evidence_ids) | {
@@ -162,6 +210,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
     elif original.selection_result is not None:
         card = engine.store.save_card(original.draft, card_id=original.card_id, parent_version=original.version,
             creation_key=f'{run_id}.{key}.reviewed.card', run_id=run_id)
+    engine.store.update_run(run_id, card_id=card.card_id, card_version=card.version)
     cycles = dict(engine.store.get_run(run_id).state.get('scientific_cycles', {}))
     cycles[key] = {'card_id': card.card_id, 'version': card.version, 'review': review.model_dump(mode='json')}
     engine.checkpoint(run_id, scientific_cycles=cycles)
