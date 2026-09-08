@@ -81,6 +81,20 @@ def test_v1_is_preserved_as_development_history_not_relabelled():
     assert old_case['model_visible']['card']['closest_work_delta']['remaining_claim'] == '候选中的拟检验量尚未测得。'
     assert old_case['expected']['not_a_quality_label'] is True
 
+
+def test_interaction_positive_control_is_artificial_software_input_not_known_system_response():
+    for case in load_scientific_cases():
+        if case['pair_id'] != 'interaction':
+            continue
+        payload = model_payload(case)
+        controls = payload['card']['minimal_test']['positive_controls']
+        assert '人工构造四格输入' in controls[0]
+        assert '(1,2,3,7)' in controls[0] and '应得I=3' in controls[0]
+        assert '应得I=0' in controls[0]
+        assert '不是目标系统的已知响应或实测证据' in controls[1]
+        assert '不能替代目标系统四条件的实际测量' in controls[1]
+        assert '未有任何条件的已知响应常数' in payload['sources'][0]['content']
+
 def test_explicit_registration_does_not_create_runs_or_tasks(tmp_path):
     for case in load_scientific_cases():
         store=Store(tmp_path/(case['case_id']+'.sqlite'))
