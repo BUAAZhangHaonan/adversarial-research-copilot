@@ -133,3 +133,24 @@ async def test_post_support_card_commit_crash_recovers_without_new_cards_or_call
     card,result=await review_and_revise(engine,run.run_id,'science')
     assert card.version==3 and len(store.list_cards(run_id=run.run_id))==3
     assert len(engine.invocations)==count and store.get_run(run.run_id).card_version==3
+
+
+@pytest.mark.asyncio
+async def test_misbound_accepted_review_cannot_authorize_a_card_revision(tmp_path):
+    store,run,original,proposed,initial=setup_support(tmp_path)
+    engine=SupportEngine(store,{'science.review':initial,'science.support_review':review()})
+    real_trace=engine.trace_tasks
+    def misbound(run_id,key):
+        if key=='science.review':
+            accepted=store.get_task(run_id+'.'+key)
+            wrong=deepcopy(accepted.accepted_result)
+            wrong['subject']['card_version']=999
+            task=accepted.model_copy(update={'task_id':run_id+'.misbound','accepted_result':wrong})
+            store.put_task(task)
+            return [task.task_id]
+        return real_trace(run_id,key)
+    engine.trace_tasks=misbound
+    with pytest.raises(ProtocolViolation,match='SCIENTIFIC_ACCEPTED_TASK_CARD_MISMATCH'):
+        await review_and_revise(engine,run.run_id,'science',original=original,proposed=proposed)
+    assert store.get_card(original.card_id).version==1
+    assert engine.invocations==['science.review']

@@ -128,3 +128,21 @@ async def test_inconsistent_retain_is_diagnosed_and_action_corrected_without_val
         assert result.result.value_reason==valid['value_reason']
     finally:
         await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_invalid_finding_pointer_is_corrected_without_rewriting_its_objection(tmp_path):
+    runtime,store,ledger,requests,responses,payload,subject,valid=setup_review(tmp_path)
+    valid['action']='revise'
+    valid['decisive_findings']=[defect().model_dump(mode='json')]
+    malformed=deepcopy(valid)
+    malformed['decisive_findings'][0]['location']='minimal_test.measurements'
+    responses.extend([encoded_result(malformed,subject),encoded_result(valid,subject)])
+    try:
+        result=await invoke_review(runtime,payload,subject)
+        assert len(requests)==2 and result.result.decisive_findings[0].location=='/minimal_test/measurements'
+        assert result.result.decisive_findings[0].reason==malformed['decisive_findings'][0]['reason']
+        assert result.result.decisive_findings[0].required_change==malformed['decisive_findings'][0]['required_change']
+        assert 'SCIENTIFIC_FINDING_REQUIRES_JSON_POINTER' in requests[1]['messages'][1]['content']
+    finally:
+        await runtime.close()
