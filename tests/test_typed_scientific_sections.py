@@ -83,6 +83,32 @@ async def test_nested_revision_error_gets_original_json_correction_before_accept
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('defect_kind',['unknown_removal','empty_update','missing_finding','duplicate_finding'])
+async def test_revision_addressing_errors_are_repaired_before_acceptance(tmp_path,defect_kind):
+    runtime,store,ledger,requests,responses,payload,subject,_=setup_review(tmp_path)
+    runtime.role_models['discovery']='deepseek-v4-pro'
+    payload['scientific_review']=review('revise',findings=[defect()]).model_dump(mode='json')
+    valid=revision_payload(payload['review_target'])
+    bad=deepcopy(valid)
+    if defect_kind=='unknown_removal':
+        bad['remove_claim_ids']=['never_supplied_claim']
+    elif defect_kind=='empty_update':
+        bad['section_updates']=[]
+    elif defect_kind=='missing_finding':
+        bad['addressed_findings']=[]
+    else:
+        bad['addressed_findings']*=2
+    responses.extend([encoded_result(bad,subject),encoded_result(valid,subject)])
+    try:
+        result=await runtime.invoke('discovery','REVISE',payload,ScientificRevision,subject,'task_fixture',tool_profile=[])
+        assert result.result.model_dump(mode='json')==valid and len(requests)==2
+        assert store.get_task('task_fixture').status=='ACCEPTED'
+        assert len(store.list_cards(run_id=subject['run_id']))==1  # The correction only validates output.
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_two_bad_nested_revisions_stop_after_shared_single_allowance(tmp_path):
     runtime,store,ledger,requests,responses,payload,subject,_=setup_review(tmp_path)
     runtime.role_models['discovery']='deepseek-v4-pro'

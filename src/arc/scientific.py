@@ -85,6 +85,19 @@ def validate_scientific_output_contract(store, payload, result):
     objection is true. Those decisions remain explicit model outputs and the
     independent revision/recheck cycle.
     """
+    if isinstance(result, ScientificRevision):
+        target = CardDraft.model_validate(payload['review_target'])
+        # Parse every typed section and check update/removal addressing. This
+        # only validates the proposed shape; it neither saves a card nor claims
+        # the scientific defect has been fixed.
+        apply_scientific_revision(target, result)
+        previous = ScientificReview.model_validate(payload['scientific_review'])
+        expected = {item.finding_id for item in previous.decisive_findings}
+        supplied = [item.finding_id for item in result.addressed_findings]
+        if len(supplied) != len(set(supplied)) or set(supplied) != expected:
+            raise ProtocolViolation('SCIENTIFIC_REVISION_MUST_ADDRESS_FINDINGS; expected=' +
+                json.dumps(sorted(expected)) + '; supplied=' + json.dumps(supplied))
+        return
     if not isinstance(result, ScientificReview):
         return
     from .schemas import ResearchCard
