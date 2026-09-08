@@ -45,8 +45,8 @@
             "source_ids": [
               "src_scope"
             ],
-            "established_claim": "材料定义冲突单元和两种选择规则，没有报告冲突单元上的策略准确率。",
-            "remaining_claim": "尚未测量给定冲突分布中加权选择相对固定选择的准确率差。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
@@ -107,7 +107,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -222,8 +222,8 @@
             "source_ids": [
               "src_scope"
             ],
-            "established_claim": "材料定义冲突单元和两种选择规则，没有报告冲突单元上的策略准确率。",
-            "remaining_claim": "尚未测量给定冲突分布中加权选择相对固定选择的准确率差。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
@@ -284,7 +284,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -364,16 +364,16 @@
       "pair_id": "attribution",
       "model_visible": {
         "original_task": {
-          "topic": "本地复现能否重现表1已经报告的压缩表示准确率优势？",
+          "topic": "压缩表示能否提高同一任务的低预算准确率？",
           "boundaries": [
             "比较对象和准确率必须对应同一给定设置"
           ],
           "proposal_details_are_user_constraints": false
         },
         "card": {
-          "title": "本地复现能否重现表1已经报告的压缩表示准确率优势？",
+          "title": "压缩表示能否提高同一任务的低预算准确率？",
           "problem_anchor": {
-            "question": "本地复现能否重现表1已经报告的压缩表示准确率优势？",
+            "question": "压缩表示能否提高同一任务的低预算准确率？",
             "research_object": "本例给定的合成研究系统",
             "conditions": [
               "比较对象和准确率必须对应同一给定设置"
@@ -386,8 +386,8 @@
           "contribution": {
             "primary_type": "new_boundary",
             "secondary_types": [],
-            "knowledge_increment": "只检查已报告结论能否在本地固定实现中复现；不把原报告的总体差值当成未知科学效应。",
-            "decision_changed": "决定本地实现是否通过复现检查；复现成功本身不构成新的科学贡献。"
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
           },
           "motivation": {
             "observation_or_deficit": "在表1的相同设置中，压缩表示准确率为71%，未压缩基线为62%。",
@@ -402,36 +402,36 @@
             "source_ids": [
               "src_attribution"
             ],
-            "established_claim": "表1已经测量两种表示在同一给定设置的准确率，并报告压缩表示优于未压缩基线。",
-            "remaining_claim": "尚未执行本地复现，未知的是本地实现是否重现报告结果；原报告中的效应已经测得。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
           },
           "hypotheses": {
             "main_or_competing_explanations": [
-              "本地实现重现已报告的两方法准确率。",
-              "本地实现未重现已报告的两方法准确率。"
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
             ],
             "distinct_predictions": [
-              "同一固定测试集上每种方法的正确实例数均与表1一致。",
-              "至少一种方法的正确实例数与表1不一致。"
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
             ],
             "favored_only_if_justified": null
           },
           "method": {
-            "simplest_path": "运行提供的两种固定实现，在相同固定测试集逐实例复算准确率，并逐方法对照表1。无需训练模型。",
+            "simplest_path": "在固定测试集上复现两种表示，并记录低预算条件下的准确率。",
             "necessary_components": [],
             "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
           },
           "minimal_test": {
-            "intervention": "使用固定的两种表示实现，保持测试集、训练产物和一次推理设置不变。",
+            "intervention": "仅替换表示方式，保持训练样本和推理次数相同。",
             "controls": [
-              "相同数据、固定训练产物与一次推理",
-              "表1是已知复现目标；测试前固定实现版本、随机状态与逐实例统计规则"
+              "相同数据、训练样本数与一次推理",
+              "实现先复现给定表格设置"
             ],
             "measurements": [
-              "逐方法记录正确实例数、准确率，以及相对表1的偏差；另外记录两方法准确率差"
+              "每种表示的准确率及差值"
             ],
             "positive_controls": [
               "先用已知答案的小样本确认测量实现符合材料中的定义。"
@@ -439,7 +439,7 @@
             "outcome_interpretations": [
               {
                 "outcome": "得到预先定义的核心测量量",
-                "interpretation": "两方法均复现表1只支持本地实现通过复现检查；出现偏差应排查实现或记录，不能直接推翻原报告或宣称新效应。",
+                "interpretation": "只有在同等预算下得到正差值，才支持在本设置采用压缩表示。",
                 "validity_limit": "仅限原问题条件，不能推成普遍结论。"
               }
             ],
@@ -464,7 +464,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -502,7 +502,7 @@
           {
             "source_id": "src_attribution",
             "title": "合成研究材料 attribution",
-            "content": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。本例提供100个固定测试单元、真实标签及两种已训练的固定实现；实现和随机状态可冻结，无需重新训练。本地复现尚未执行。",
+            "content": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
             "source_type": "user_material",
             "content_origin": "original",
             "access_status": "retrieved"
@@ -518,8 +518,8 @@
             "conditions": [
               "比较对象和准确率必须对应同一给定设置"
             ],
-            "excerpt": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。本例提供100个固定测试单元、真实标签及两种已训练的固定实现；实现和随机状态可冻结，无需重新训练。本地复现尚未执行。",
-            "locator": "chars:0:144",
+            "excerpt": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
+            "locator": "chars:0:86",
             "relation": "motivates",
             "origin": "original",
             "locator_status": "verified",
@@ -541,16 +541,16 @@
       "pair_id": "attribution",
       "model_visible": {
         "original_task": {
-          "topic": "本地复现能否重现表1已经报告的压缩表示准确率优势？",
+          "topic": "压缩表示能否提高同一任务的低预算准确率？",
           "boundaries": [
             "比较对象和准确率必须对应同一给定设置"
           ],
           "proposal_details_are_user_constraints": false
         },
         "card": {
-          "title": "本地复现能否重现表1已经报告的压缩表示准确率优势？",
+          "title": "压缩表示能否提高同一任务的低预算准确率？",
           "problem_anchor": {
-            "question": "本地复现能否重现表1已经报告的压缩表示准确率优势？",
+            "question": "压缩表示能否提高同一任务的低预算准确率？",
             "research_object": "本例给定的合成研究系统",
             "conditions": [
               "比较对象和准确率必须对应同一给定设置"
@@ -563,8 +563,8 @@
           "contribution": {
             "primary_type": "new_boundary",
             "secondary_types": [],
-            "knowledge_increment": "只检查已报告结论能否在本地固定实现中复现；不把原报告的总体差值当成未知科学效应。",
-            "decision_changed": "决定本地实现是否通过复现检查；复现成功本身不构成新的科学贡献。"
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
           },
           "motivation": {
             "observation_or_deficit": "在表1的相同设置中，未压缩基线准确率为71%，压缩表示为62%。",
@@ -579,36 +579,36 @@
             "source_ids": [
               "src_attribution"
             ],
-            "established_claim": "表1已经测量两种表示在同一给定设置的准确率，并报告压缩表示优于未压缩基线。",
-            "remaining_claim": "尚未执行本地复现，未知的是本地实现是否重现报告结果；原报告中的效应已经测得。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
           },
           "hypotheses": {
             "main_or_competing_explanations": [
-              "本地实现重现已报告的两方法准确率。",
-              "本地实现未重现已报告的两方法准确率。"
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
             ],
             "distinct_predictions": [
-              "同一固定测试集上每种方法的正确实例数均与表1一致。",
-              "至少一种方法的正确实例数与表1不一致。"
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
             ],
             "favored_only_if_justified": null
           },
           "method": {
-            "simplest_path": "运行提供的两种固定实现，在相同固定测试集逐实例复算准确率，并逐方法对照表1。无需训练模型。",
+            "simplest_path": "在固定测试集上复现两种表示，并记录低预算条件下的准确率。",
             "necessary_components": [],
             "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
           },
           "minimal_test": {
-            "intervention": "使用固定的两种表示实现，保持测试集、训练产物和一次推理设置不变。",
+            "intervention": "仅替换表示方式，保持训练样本和推理次数相同。",
             "controls": [
-              "相同数据、固定训练产物与一次推理",
-              "表1是已知复现目标；测试前固定实现版本、随机状态与逐实例统计规则"
+              "相同数据、训练样本数与一次推理",
+              "实现先复现给定表格设置"
             ],
             "measurements": [
-              "逐方法记录正确实例数、准确率，以及相对表1的偏差；另外记录两方法准确率差"
+              "每种表示的准确率及差值"
             ],
             "positive_controls": [
               "先用已知答案的小样本确认测量实现符合材料中的定义。"
@@ -616,7 +616,7 @@
             "outcome_interpretations": [
               {
                 "outcome": "得到预先定义的核心测量量",
-                "interpretation": "两方法均复现表1只支持本地实现通过复现检查；出现偏差应排查实现或记录，不能直接推翻原报告或宣称新效应。",
+                "interpretation": "只有在同等预算下得到正差值，才支持在本设置采用压缩表示。",
                 "validity_limit": "仅限原问题条件，不能推成普遍结论。"
               }
             ],
@@ -641,7 +641,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -679,7 +679,7 @@
           {
             "source_id": "src_attribution",
             "title": "合成研究材料 attribution",
-            "content": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。本例提供100个固定测试单元、真实标签及两种已训练的固定实现；实现和随机状态可冻结，无需重新训练。本地复现尚未执行。",
+            "content": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
             "source_type": "user_material",
             "content_origin": "original",
             "access_status": "retrieved"
@@ -695,8 +695,8 @@
             "conditions": [
               "比较对象和准确率必须对应同一给定设置"
             ],
-            "excerpt": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。本例提供100个固定测试单元、真实标签及两种已训练的固定实现；实现和随机状态可冻结，无需重新训练。本地复现尚未执行。",
-            "locator": "chars:0:144",
+            "excerpt": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
+            "locator": "chars:0:86",
             "relation": "motivates",
             "origin": "original",
             "locator_status": "verified",
@@ -759,8 +759,8 @@
             "source_ids": [
               "src_interaction"
             ],
-            "established_claim": "材料定义四个可独立设置的干预条件，并说明随机顺序和完全复位；没有提供任何条件响应。",
-            "remaining_claim": "四条件响应及其加性尺度交互值尚未测量。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
@@ -822,7 +822,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -937,8 +937,8 @@
             "source_ids": [
               "src_interaction"
             ],
-            "established_claim": "材料定义四个可独立设置的干预条件，并说明随机顺序和完全复位；没有提供任何条件响应。",
-            "remaining_claim": "四条件响应及其加性尺度交互值尚未测量。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
@@ -1000,7 +1000,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -1108,7 +1108,7 @@
             "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
           },
           "motivation": {
-            "observation_or_deficit": "每个真实实例按顺序接受流水线判定，后续阶段只对满足前阶段条件的实例评价，需要区分失败阶段与成功结果。",
+            "observation_or_deficit": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
             "evidence_ids": [
               "ev_partition"
             ],
@@ -1120,8 +1120,8 @@
             "source_ids": [
               "src_partition"
             ],
-            "established_claim": "材料已定义固定真实实例分母、匹配、ID和位姿的顺序判定条件，尚未提供实例统计。",
-            "remaining_claim": "阶段结果的发生率尚未测量；分类的逻辑关系可以由定义检查，不是有待实验发现的事实。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
@@ -1183,7 +1183,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -1206,7 +1206,7 @@
             {
               "claim_id": "claim_partition",
               "version": 1,
-              "text": "每个真实实例按顺序接受流水线判定，后续阶段只对满足前阶段条件的实例评价，需要区分失败阶段与成功结果。",
+              "text": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
               "conditions": [
                 "以全体真实实例为分母",
                 "分类按流水线顺序互斥，不统计额外无匹配预测"
@@ -1234,7 +1234,7 @@
             "source_id": "src_partition",
             "claim_id": "claim_partition",
             "claim_version": 1,
-            "claim": "每个真实实例按顺序接受流水线判定，后续阶段只对满足前阶段条件的实例评价，需要区分失败阶段与成功结果。",
+            "claim": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
             "conditions": [
               "以全体真实实例为分母",
               "分类按流水线顺序互斥，不统计额外无匹配预测"
@@ -1290,7 +1290,7 @@
             "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
           },
           "motivation": {
-            "observation_or_deficit": "每个真实实例按顺序接受流水线判定，后续阶段只对满足前阶段条件的实例评价，需要区分失败阶段与成功结果。",
+            "observation_or_deficit": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
             "evidence_ids": [
               "ev_partition"
             ],
@@ -1302,8 +1302,8 @@
             "source_ids": [
               "src_partition"
             ],
-            "established_claim": "材料已定义固定真实实例分母、匹配、ID和位姿的顺序判定条件，尚未提供实例统计。",
-            "remaining_claim": "阶段结果的发生率尚未测量；分类的逻辑关系可以由定义检查，不是有待实验发现的事实。",
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
             "search_limits": [
               "只有本例合成材料，不作全球文献新颖性判断。"
             ]
@@ -1365,7 +1365,7 @@
             },
             "workload_assumptions": {
               "model_size": "固定合成系统，无模型训练",
-              "precision": "原始记录精度；不涉及量化模型",
+              "precision": "4-bit",
               "sequence_length": null,
               "data_amount": "100个固定测试单元",
               "steps": null,
@@ -1388,7 +1388,7 @@
             {
               "claim_id": "claim_partition",
               "version": 1,
-              "text": "每个真实实例按顺序接受流水线判定，后续阶段只对满足前阶段条件的实例评价，需要区分失败阶段与成功结果。",
+              "text": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
               "conditions": [
                 "以全体真实实例为分母",
                 "分类按流水线顺序互斥，不统计额外无匹配预测"
@@ -1416,7 +1416,7 @@
             "source_id": "src_partition",
             "claim_id": "claim_partition",
             "claim_version": 1,
-            "claim": "每个真实实例按顺序接受流水线判定，后续阶段只对满足前阶段条件的实例评价，需要区分失败阶段与成功结果。",
+            "claim": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
             "conditions": [
               "以全体真实实例为分母",
               "分类按流水线顺序互斥，不统计额外无匹配预测"
@@ -1441,7 +1441,5 @@
         "not_a_quality_label": true
       }
     }
-  ],
-  "fixture_version": 2,
-  "revision_note": "v1保留为历史开发材料。v2明确归因对只检验本地复现，不把表1已报告的效应称为尚未测得；分解对明确阶段条件判定。正确对照只表示没有指定硬错误，不表示研究价值已获认可。"
+  ]
 }
