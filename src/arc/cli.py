@@ -217,10 +217,12 @@ def test_e2e(ctx: typer.Context, campaign: str = typer.Option('ARC_VNEXT_VALIDAT
     asyncio.run(run_e2e(ctx.obj, campaign, topic, total_budget_cny))
 
 @app.command(name='test-compare')
-def test_compare(ctx: typer.Context, source_run: str = typer.Option(...)):
+def test_compare(ctx: typer.Context, source_run: str = typer.Option(...),
+                 seed: int = typer.Option(20260907),
+                 swap_order: bool = typer.Option(True, '--swap-order/--no-swap-order')):
     """开发用：冻结同材料比较，自动评价不代表人类认可。"""
     from .evaluation import run_comparison
-    asyncio.run(run_comparison(ctx.obj, source_run))
+    asyncio.run(run_comparison(ctx.obj, source_run, seed=seed, include_swapped_order=swap_order))
 
 @app.command(name='retry-comparison-task')
 def retry_comparison_task(ctx: typer.Context, source_run: str,
