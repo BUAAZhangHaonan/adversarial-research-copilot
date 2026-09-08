@@ -2,7 +2,7 @@
 
 本轮依据用户提供的[功能重构文档](FUNCTIONAL_REDESIGN_REQUEST.md)执行，目标是产生有研究价值的想法并分析可行性。ARC 不执行研究训练实验，也不代写从实验到论文的完整流程。CodeX 只参与本轮开发评估；正式服务中的能力改进需求由用户评估和实现。
 
-截至 2026-09-09（运行记录使用 UTC），四组八个已知语义对照完成目标纠错验收；新主题无科学反馈的 discover 也已按五次上限结束。ARC 把 draw1/2 留为 NEEDS_EVIDENCE，把 draw3/4/5 推荐为 PROMISING，但五张当前均未通过 CodeX 独立科学验收，三张推荐卡构成科学误放。已选择 draw1 v2 作为后续开发辅助修订起点，这不是批准实验，也不能倒算为无辅助抽卡成功。A–E、辅助 develop/run 和旧卡定向后续仍待完成，不能宣称科研质量已提高。具体结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)。
+截至 2026-09-09（运行记录使用 UTC），四组八个已知语义对照完成目标纠错验收；新主题无科学反馈的 discover 也已按五次上限结束。ARC 把 draw1/2 留为 NEEDS_EVIDENCE，把 draw3/4/5 推荐为 PROMISING，但五张当前均未通过 CodeX 独立科学验收，三张推荐卡构成科学误放。已选择 draw1 v2 作为后续开发辅助修订起点，这不是批准实验，也不能倒算为无辅助抽卡成功。辅助 develop/run 已跑完全流程，但仍有独立检出的错误；后续两个独立 final-correction 分别保存并通过自然卡两项、旧卡四项已知目标的辅助定向验收，不倒算为自主查错或整卡穷尽通过。A–E r1 在途、r2 尚未启动，不能宣称科研质量已提高。具体结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)。
 
 ## 默认工作链与边界
 
@@ -25,19 +25,19 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 | §2.3：verified 只证明出处定位 | Store 原文定位检查、上下文 `provenance_verification`、科学支持关系审查 | 数字归属对照与旧卡原文核验有真实证据；仍须检查对象、设置与推论，不把摘录匹配当结论正确 |
 | §2.4：检索、工作材料、正式引用分开 | `research_context.py` 按当前卡/争点/登记证据选择来源；`reports.py` 将搜索轨迹另列 | 旧 v7 装配为43工作来源、57证据；新自然最终报告22正式来源均有卡片/审核引用，157检索来源中135未进正式引用。引用分层有效不等于科学理解正确；没有域名黑名单或领域猜测过滤 |
 | §2.5：按变化复核，检索不可达不解决科学争点 | semantic claim edits、support review scope；调查与审核提示词 | 等价/实质修改与受影响支持关系测试；旧卡补证仍发现新问题并保留 NEEDS_EVIDENCE，没有用访问失败证明贡献新颖 |
-| §3：短主干、最多五次、显式后续阶段 | `scientific.discover`、新 develop/run、自然启动器；阶段及恢复测试 | 只有 DeepSeek v4 Flash/Pro，当前 max、Pro 默认核心构思；自然 discover 已完成五个 draw；开发辅助 develop→run 尚未完成，默认分工不是已证最优 |
+| §3：短主干、最多五次、显式后续阶段 | `scientific.discover`、新 develop/run、自然启动器；阶段及恢复测试 | 只有 DeepSeek v4 Flash/Pro，当前 max、Pro 默认核心构思；自然 discover 已完成五个 draw；开发辅助 develop→run 已完成，最终仍有独立查出的错误；后续独立纠正仅通过两项已知目标，默认分工不是已证最优 |
 | §4：Markdown 管理认知任务，代码处理契约 | `prompts/manifest.json`、角色/task Markdown、类型化局部 SectionUpdate | 装配、字段诊断和恢复检查；v1 结构失败保留。必要引用/claim/工具契约仍存在，不声称所有元数据已消除 |
 | §6：调查形成关系判断，支持按需深读 | investigator、curated excerpt/locator、read_record；`evidence_request_handoff` 按当前候选链交接具体问题 | 新主题四篇冻结全文；draw2 实际 64000 字符连续分页并查近邻。complete 响应的请求已接入后续判断/修订，复核保留初审与修订请求；交接不等于补证完成，已有冻结输入不改 |
 | §7：先核心认识，再推最小检验 | discovery CONCEIVE 与当前分步提示词；机制、边界、简洁方法的校准例子 | draw1 探索充分性/可恢复性错位，draw2 探索漂移文本特征，draw3 分析稳定停止事件，但最终概念增量依赖错误公式；draw4 比较评分通道及成本、draw5 比较候选概率与正确性，两者核心成本/统计推论也未通过独立核对。候选与 substantial 自评都不等于已验证洞察 |
 | §8：独立重建论证，给具体位置、依据和后果 | scientific reviewer 的 source_read/counterexample 与位置化 findings | v2 四类目标错误均有具体修订；draw1 复核用纯位置反例指出 AUC 结论规则错误。draw3 公式误放、draw4 事实与成本推论漏检、draw5 概率/成本与来源误读获推荐，显示最终语义验收仍失败；不能由 scope_faithful 或 resolved 自报验收 |
-| §9：定向修改，可删减；风险附注不算修复 | `apply_scientific_revision`、recheck；无实际改动/错误位置/恢复去重测试 | 已有真实前后版本；draw3 参数真修复与错误公式继承并存，缺少对审查建议本身的可靠复核。旧卡首次修好六处等式，剩余算术与推论的定向纠正已启动但未完成 |
-| §10：方案展开只服务决定性检验和可行性 | developer 提示词、新 develop 后独立审查 | 阶段与资源契约检查；新主题真实 develop 的必要性、复杂度和资源假设仍待验收 |
-| §11：压力审查与裁决是职责，不是必经长辩论 | 新 run 调 `pressure.science`，按被审卡版本写最终判断 | 旧卡初轮 NEEDS_EVIDENCE；自然新卡的最终 run 尚未完成，不能提前宣布 PROMISING |
+| §9：定向修改，可删减；风险附注不算修复 | `apply_scientific_revision`、recheck；无实际改动/错误位置/恢复去重测试 | 已有真实前后版本；draw3 参数真修复与错误公式继承并存，缺少对审查建议本身的可靠复核。旧卡首次修好六处等式，targeted仍误放；最终独立纠正已保存四项算术/推论实改并通过定向验收，不升级为整卡穷尽通过 |
+| §10：方案展开只服务决定性检验和可行性 | developer 提示词、新 develop 后独立审查 | 真实develop v3已完成：反馈引导下数值/定义/方案改善，自主初审零finding却漏四项核心推论及资源错误；run进一步修订。阶段完成和契约检查不证明方案科学成立 |
+| §11：压力审查与裁决是职责，不是必经长辩论 | 新 run 调 `pressure.science`，按被审卡版本写最终判断 | 旧卡初轮NEEDS_EVIDENCE；自然run v4已COMPLETED/PROMISING，复核仍漏双减t*及不显著归因错误；独立final-correction v2只通过上述两项已知反馈目标 |
 | §12：首页先展示洞察与风险，零推荐也解释原因 | 生效的 reports.py 与报告模板；当前版本判断、引用隔离、零推荐报告测试 | 已修未推荐理由、COST_REPORT 状态及 LEAD_ONLY 洞察前置。最终自然报告22正式来源、157检索附录；f9aad60 已按5候选/9版本分类并只读重渲染，3主报告/2线索正确；9份详情和修复前报告保留，22来源集合与源卡/账本不变 |
 | §13：校准区分成立、平凡、简洁而重要及改题 | `selection_examples.md` 与价值校准测试 | value-v3 对已见正确交互卡 routine/reject、无硬错误；不覆盖初轮价值高估，不当泛化分数 |
 | §14 第一层：正确/错误成对、真实前后对照 | v1/v2 fixtures、只读 controls 导出器及人工核对 | v2 8/8 为 4 错修好＋4 对不误报目标错误；不是 8 个有价值 idea。v1 失败完整保留 |
-| §14 第二层：冻结材料 A–E、交换顺序、独立费用 | `functional_evaluation.py`、ablation 导出器；候选/初审复用与 phase 测试 | A Pro 连贯，B Pro 当前分步，C Flash 当前分步，ABC 统一旧审；D 复用 A 卡新审，E 复用 A 卡及 D 初审修订。真实全条件、双序评价与人工比较未完成；seed 支持不等于已做独立重复 |
-| §14 最后：新主题自然全流程 | `start_natural_validation.py` 分步建立新 campaign，不把 material_only 当生成结果 | discover 已 COMPLETED / draw_limit_reached：五候选、九历史版本，2 LEAD_ONLY＋3 PROMISING；独立验收五张均未过。draw1 v2 仅选入开发辅助修订，后续 develop/run 未完成；旧三个主题与旧 v7 不称未见主题 |
+| §14 第二层：冻结材料 A–E、交换顺序、独立费用 | `functional_evaluation.py`、ablation 导出器；候选/初审复用与 phase 测试 | A Pro 连贯，B Pro 当前分步，C Flash 当前分步，ABC 统一旧审；D 复用 A 卡新审，E 复用 A 卡及 D 初审修订。r1已启动且恢复首轮零成本凭据缺失；全条件/双序评价/人工比较未完成，r2尚未启动；seed支持不等于已做独立重复 |
+| §14 最后：新主题自然全流程 | `start_natural_validation.py` 分步建立新 campaign，不把 material_only 当生成结果 | discover 已 COMPLETED / draw_limit_reached：五候选、九历史版本，2 LEAD_ONLY＋3 PROMISING；独立验收五张均未过。draw1 v2仅作为开发辅助修订起点；develop/run已完成但仍误放，新独立final-correction仅两项已知目标通过；旧三个主题与旧v7不称未见主题 |
 | §15：公开研究仅作设计借鉴 | 原任务书参考资料与本次实现/结果分开记录 | SciMON、CoVe 等不能代替 DeepSeek/ARC 实测，更不能作为当前质量提升证明 |
 
 ## 本轮运行期修复与软件验证范围
@@ -57,12 +57,14 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 
 真实 draw3 随后暴露了另一条接入链缺陷：两份 read_paper 原件成功返回，但因 title 为空未登记，旧来源缓存耗尽后发生跨轮空读。修复原文登记并给出明确缓存耗尽错误后，同一任务仍持续空读；CodeX 在两次已保存且无活跃预算调用的安全点停止任务，再用原 raw 零 API 登记两份独立表示，显式建立 `review.protocol_retry1`。这属于开发运维恢复，不是 ARC 已完成科学自纠；原 trace、费用、卡片及五次 draw 上限均不重置。`2074cce` 仅压缩重试工作视图中的重复空读，不把失败当证据，也不向任务注入科学答案；20 项相关测试通过。此后 retry 初审、修订及复核已经结束：原文参数修好，数学错误却被最终推荐；接入恢复与科学验收须分别报告。完整事故证据与费用归因边界见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)。
 
-最近完成的整套软件验证是 **0afa47c：695 passed，0 failed/error/skipped**，于 2026-09-08 16:35:18 UTC 完成。sdist 构建 wheel、仓库外隔离安装、38 份提示词文件/18 个注册任务/3 份配置资源、4 个 CLI 帮助和依赖检查均通过，原件为 `work/software-validation-20260908T163216677905Z/SOFTWARE_VALIDATION.json`。Windows 唯一 wheel/sdist 与同组 JSON 已更新到该快照。
+最近完成的整套软件验证是 **31fc58c：694 passed，0 failed/error/skipped**，于2026-09-08 17:58:20 UTC完成。sdist→wheel、仓库外隔离安装、38份提示词/18个注册任务/3份配置资源、4个CLI帮助及依赖检查均通过，原件为 `work/software-validation-20260908T175518443480Z/SOFTWARE_VALIDATION.json`，Windows唯一包组和同组JSON已同步。
 
-该快照包含 c44e775 的机械搜索日志与科学引用检查分离、6668234 的论文获取说明、f9aad60 的候选/历史版本正确分类，以及旧卡 followup 暴露后的两项修复：**5c12dcf** 在一次纠正中汇总可独立发现的 source/quote 等输出诊断；**0afa47c** 将用户/开发显式 retry reason 实际传入新任务。旧任务先修 source 才暴露 quote 的失败和费用保留，不刷新同一任务纠错额度、不将协议接受视作科学通过。新 `protocol_retry1` 已接受并进入 revision，尚无完整 followup 结论。
+该快照包含c44e775的搜索日志与科学引用分离、6668234论文接入说明、f9aad60候选/历史版本分类、5c12dcf在一次纠正中汇总独立source/quote诊断，以及0afa47c传递显式retry reason。旧targeted的首任务协议失败保留，retry/revision/recheck已完成，但其PROMISING仍有独立残余错误；后续另建old-final-correction才通过四项已知目标。协议接受不等于科学通过。
 
-这些提交均晚于无辅助 discover，不能声称该轮五卡已经使用。4dad9d4 的完整快照为 684 passed / 8 failed，失败保留；f70b937/637、eb9e0bf/673、83bac05/685、6668234/692 也分别作为历史保留。695 只认证 0afa47c，后续源码变化需按影响补验和打包；软件通过不等于科学验收通过。
+**695→694是删除过期文案断言，不是跳过检查。** 195240b将机械搜索trace重建交回runtime，上一完整快照实际694 passed / 1 failed：旧测试仍要求模型提示词逐字复制全部搜索日志。31fc58c删除该过期断言，剩余694项重新全量通过；195失败JSON/XML/日志保留。`work/empty-actual-searches-check.json`另有正常/中断恢复两例，各2次mock请求、0 JSON纠正、0付费，验证empty actual_searches从实际trace恢复，不是科研质量实验。
 
-本轮科学功能验收仍有实质缺口：八个已知对照的成功没有迁移成可靠的自然判断。五个无辅助候选均未通过独立验收，其中三张被 ARC 推荐。`work/NATURAL_SCIENCE_AUDIT.md` 保留自主查错、真实修订、误放及 CodeX 自我更正；独立反馈没有输入已冻结的 discover。后续显式 `development_assisted` 结果必须单列，不能覆盖该组原始结果。
+4dad9d4的684 passed / 8 failed及f70b937/637、eb9e0bf/673、83bac05/685、6668234/692、0afa47c/695均保留历史范围。晚于候选生成的修复不能回填为其当时能力；软件通过不等于科学验收通过。
 
-旧 MASTER_STATUS、L4 和自然运行报告是历史记录，最终交付时更新入口，不覆盖历史结果。费用沿用既有父/子账本；本文不固定正在变化的余额或最终总额。
+本轮科学功能验收仍有实质缺口：八个已知对照的成功没有迁移成可靠的自然判断。五个无辅助候选均未通过独立验收，其中三张被 ARC 推荐。`work/NATURAL_SCIENCE_AUDIT.md` 保留自主查错、真实修订、误放及 CodeX 自我更正；独立反馈没有输入已冻结的 discover。显式 `development_assisted` 的develop/run及两个final-correction结果已单列；最后六项已知目标纠正通过，不能覆盖原五卡失败或改写为自主成功。
+
+[MASTER_STATUS](MASTER_STATUS.md)与[DELIVERY](DELIVERY.md)已分开当前入口与历史快照；L4和旧自然报告保持原记录。A–E r1在途、r2未启动，完整比较仍待完成。费用沿用既有父/子账本；本文不固定正在变化的余额或最终总额。
