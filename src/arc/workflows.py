@@ -401,7 +401,9 @@ class WorkflowEngine:
         if not window['records']:
             return {'comparisons': [], 'retrieval_scope': window,
                     'unsearched_limits': window.get('unsearched_limits', [])}
+        original_context = self.context(run_id)
         result = await self.call(run_id, key, 'librarian', payload={
+            'original_task': original_context['original_task'], 'mandate': original_context['mandate'],
             'candidate': candidate, 'retrieval': window,
             'records_to_compare': window['records'],
         }, tool_profile=['lookup_archive', 'read_record'], on_admitted=on_admitted)

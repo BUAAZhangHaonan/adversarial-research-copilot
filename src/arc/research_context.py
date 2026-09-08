@@ -48,6 +48,11 @@ def build_research_context(store, run) -> dict:
     campaign_ids = ([run['campaign_id']] if run.get('campaign_id') else
                     provenance.get('provenance_campaign_ids', []))
     campaigns = [as_data(store.get_campaign(cid)) for cid in campaign_ids]
+    user_inputs = []
+    for origin in [run, *[as_data(store.get_run(rid)) for rid in provenance.get('provenance_run_ids', [])]]:
+        raw = origin.get('state', {}).get('imported_input')
+        if raw and raw not in user_inputs:
+            user_inputs.append(raw)
     original_task = {
         'topic': campaigns[0]['topic'] if len(campaigns) == 1 else None,
         'boundaries': campaigns[0]['boundaries'] if len(campaigns) == 1 else [],
@@ -57,7 +62,8 @@ def build_research_context(store, run) -> dict:
                             'card_version': provenance.get('card_version'),
                             'provenance_run_ids': provenance.get('provenance_run_ids', [])}
                            if provenance else None),
-        'scope_origin': 'user_campaign' if campaigns else 'input_proposal_only',
+        'user_inputs': user_inputs,
+        'scope_origin': 'user_campaign' if campaigns else ('user_input' if user_inputs else 'input_proposal_only'),
         'proposal_details_are_user_constraints': False,
     }
     frame = state.get('frame') or {}

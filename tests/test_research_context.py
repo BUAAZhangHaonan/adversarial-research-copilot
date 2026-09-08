@@ -68,3 +68,18 @@ def test_issue_referenced_counterevidence_remains_visible_without_card_citation(
     context = build_research_context(store, run)
     assert context['evidence'][0]['evidence_id'] == evidence.evidence_id
     assert context['sources'][0]['source_id'] == source.source_id
+
+
+def test_direct_user_input_survives_import_and_later_stage_provenance(tmp_path):
+    store, _, _ = research_store(tmp_path)
+    raw = 'Compare the two methods only on conflict examples; keep the same information.'
+    origin = store.create_run('develop', state={'imported_input': raw})
+    card = store.save_card(research_draft(), run_id=origin.run_id)
+    direct = build_research_context(store, store.get_run(origin.run_id))
+    assert direct['original_task']['user_inputs'] == [raw]
+    provenance = store.card_provenance_context(card.card_id, card.version)
+    later = store.create_run('run', card_id=card.card_id, card_version=card.version,
+                             state={'input_provenance': provenance})
+    context = build_research_context(store, later)
+    assert context['original_task']['user_inputs'] == [raw]
+    assert context['original_task']['scope_origin'] == 'user_input'
