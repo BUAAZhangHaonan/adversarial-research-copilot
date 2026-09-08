@@ -486,7 +486,8 @@ def test_new_card_claim_can_cite_background_without_transferring_verification(st
     assert bindings==[{"claim_id":"new_synthesis","claim_version":1,
         "evidence_id":ev.evidence_id,"evidence_claim_id":ev.claim_id,"evidence_claim_version":1,
         "source_id":ev.source_id,"binding":"background_premise","relation":"supports",
-        "evidence_verification_status":"verified","verification_transferred":False}]
+        "evidence_verification_status":"verified","verification_transferred":False,
+        "equivalence_reviews":[],"support_semantics":"requires_scientific_review_not_proven_by_source_verification"}]
     assert store.list_evidence(ids=[ev.evidence_id])[0].model_dump(mode="json")==original_evidence
     run=store.create_run("run",card_id=card.card_id,card_version=card.version)
     issue=Issue(issue_id="new_issue",claim_id="new_synthesis",claim_version=1,content="Does the new claim hold?",status="resolved",evidence_ids=[ev.evidence_id],resolution_criterion="Evidence for this claim under new conditions",change_this_round="claimed support",next_action="STOP")

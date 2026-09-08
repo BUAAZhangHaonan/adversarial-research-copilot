@@ -31,6 +31,7 @@ def claim_fingerprint(claim):
     claim=Claim.model_validate(claim)
     return hashlib.sha256(_dump(claim.model_dump(exclude={"evidence_ids"})).encode("utf-8")).hexdigest()
 
+
 def _tokens(text):
     """Latin terms and overlapping CJK bigrams; retrieval only, never judgment."""
     latin = re.findall(r"[a-z0-9_]+", text.casefold())
@@ -71,6 +72,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS draws(id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL REFERENCES campaigns(id),ordinal INTEGER NOT NULL,started_at TEXT NOT NULL,UNIQUE(campaign_id,ordinal));
                 CREATE TABLE IF NOT EXISTS cards(card_id TEXT NOT NULL,version INTEGER NOT NULL,data TEXT NOT NULL,PRIMARY KEY(card_id,version));
                 CREATE TABLE IF NOT EXISTS card_creation(creation_key TEXT PRIMARY KEY,card_id TEXT NOT NULL,version INTEGER NOT NULL,input_hash TEXT NOT NULL,FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
+                CREATE TABLE IF NOT EXISTS claim_edit_reviews(card_id TEXT NOT NULL,card_version INTEGER NOT NULL,claim_id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(card_id,card_version,claim_id),FOREIGN KEY(card_id,card_version) REFERENCES cards(card_id,version));
                 CREATE TABLE IF NOT EXISTS run_cards(run_id TEXT NOT NULL REFERENCES runs(id),card_id TEXT NOT NULL,version INTEGER NOT NULL,PRIMARY KEY(run_id,card_id,version),FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
                 CREATE TABLE IF NOT EXISTS selections(card_id TEXT NOT NULL,version INTEGER NOT NULL,run_id TEXT REFERENCES runs(id),data TEXT NOT NULL,PRIMARY KEY(card_id,version),FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
                 CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY,canonical_id TEXT NOT NULL,version TEXT NOT NULL,origin TEXT NOT NULL,data TEXT NOT NULL);
@@ -222,7 +224,7 @@ class Store:
         with self._transaction() as db:
             db.execute("INSERT OR IGNORE INTO run_cards VALUES (?,?,?)",(run_id,card_id,version))
 
-    def save_card(self,draft,card_id=None,parent_version=None,selection=None,assessment=None,creation_key=None,run_id=None,state_patch=None):
+    def save_card(self,draft,card_id=None,parent_version=None,selection=None,assessment=None,creation_key=None,run_id=None,state_patch=None,*,edit_assessments=(),review_task_id=None):
         draft=CardDraft.model_validate(draft)
         self.validate_references(draft)
         self._validate_claim_evidence(draft)
@@ -237,14 +239,31 @@ class Store:
             latest=db.execute("SELECT version,data FROM cards WHERE card_id=? ORDER BY version DESC LIMIT 1",(actual_id,)).fetchone()
             if latest:
                 if parent_version!=latest["version"]: raise StateError("card_parent_not_latest")
-                prior=ResearchCard.model_validate_json(latest["data"])
-                self.validate_claim_dependencies(prior,draft)
+                prior=self.get_card(actual_id,parent_version) if review_task_id else ResearchCard.model_validate_json(latest["data"])
+                self.validate_claim_dependencies(prior,draft,edit_assessments=edit_assessments,review_task_id=review_task_id)
                 version=latest["version"]+1
             else:
                 if parent_version is not None: raise StateError("card_parent_missing")
+                if edit_assessments or review_task_id: raise StateError("claim_edit_review_requires_previous_card")
                 version=1
             record=ResearchCard(card_id=actual_id,version=version,draft=draft,parent_version=parent_version,selection=selection,assessment=assessment)
             db.execute("INSERT INTO cards VALUES (?,?,?)",(actual_id,version,_dump(record)))
+            if review_task_id:
+                old_claims={claim.claim_id:claim for claim in prior.draft.claims}
+                new_claims={claim.claim_id:claim for claim in draft.claims}
+                for item in edit_assessments:
+                    item=item.model_dump(mode="json") if isinstance(item,BaseModel) else dict(item)
+                    old,new=old_claims.get(item["claim_id"]),new_claims.get(item["claim_id"])
+                    declaration={**item,"review_task_id":review_task_id,"card_id":actual_id,
+                        "original_card_version":parent_version,"card_version":version,
+                        "original_claim":old.model_dump(mode="json") if old else None,
+                        "revised_claim":new.model_dump(mode="json") if new else None,
+                        "from_target":claim_fingerprint(old) if old else None,
+                        "to_target":claim_fingerprint(new) if new else None,
+                        "claim_version":new.version if new else old.version,
+                        "evidence_originals_modified":False,"created_at":utc_now()}
+                    db.execute("INSERT INTO claim_edit_reviews VALUES (?,?,?,?)",
+                        (actual_id,version,item["claim_id"],_dump(declaration)))
             if creation_key:
                 db.execute("INSERT INTO card_creation VALUES (?,?,?,?)",(creation_key,actual_id,version,input_hash))
             if run_id:
@@ -641,7 +660,7 @@ class Store:
                         basis=self.list_evidence(ids=transition.basis_evidence_ids)
                         target=claim_fingerprint(resolution_claim) if resolution_claim else None
                         if not any(e.verification_status=="verified" and e.claim_id==issue.claim_id and e.claim_version==issue.claim_version and e.relation in {"supports","challenges"}
-                            and (run.card_id is None or (target is not None and e.target_claim_fingerprint==target)) for e in basis):
+                            and (run.card_id is None or (resolution_claim is not None and self.evidence_targets_claim(e,resolution_claim))) for e in basis):
                             error=StateError("empirical_resolution_requires_verified_claim_evidence")
                             error.diagnostics=[{"type":str(error),"issue_id":issue.issue_id,
                                 "loc":["result","issue_transitions",changes.index(transition),"basis_evidence_ids"],
@@ -649,7 +668,7 @@ class Store:
                                 "required":"verified supports/challenges evidence for the exact claim target; select current evidence or keep the issue unresolved",
                                 "provided_evidence":[{"evidence_id":e.evidence_id,"claim_id":e.claim_id,
                                     "claim_version":e.claim_version,"verification_status":e.verification_status,
-                                    "relation":e.relation,"target_matches":target is not None and e.target_claim_fingerprint==target}
+                                    "relation":e.relation,"target_matches":resolution_claim is not None and self.evidence_targets_claim(e,resolution_claim)}
                                     for e in basis]}]
                             raise error
                     if not (transition.basis_evidence_ids or transition.basis_argument):
@@ -668,17 +687,86 @@ class Store:
                 db.execute("UPDATE runs SET data=? WHERE id=?",(_dump(run),run_id))
         return incoming
 
-    def validate_claim_dependencies(self,original,draft):
+    def _validated_claim_edit_reviews(self,original,draft,edit_assessments,review_task_id):
+        from .validation import claim_edit_assessments, derive_claim_versions, remove_superseded_claim_evidence
+        if not review_task_id:
+            if edit_assessments: raise StateError("claim_edit_review_task_required")
+            return {}
+        task=self.get_task(review_task_id)
+        if task is None or task.status!="ACCEPTED" or not task.accepted_result or not task.rendered_prompt_path:
+            raise StateError("claim_edit_review_not_accepted")
+        snapshot=json.loads(self.read_artifact(task.rendered_prompt_path))
+        if snapshot.get("prompt_id")!="scientific_reviewer.INVOKE":
+            raise StateError("claim_edit_requires_independent_scientific_reviewer")
+        accepted=task.accepted_result
+        expected_subject=(original.card_id,original.version)
+        if (accepted.get("subject",{}).get("card_id"),accepted.get("subject",{}).get("card_version"))!=expected_subject:
+            raise StateError("claim_edit_review_subject_changed")
+        submitted=[item.model_dump(mode="json") if isinstance(item,BaseModel) else dict(item) for item in edit_assessments]
+        if accepted.get("result_status")!="complete" or (accepted.get("result") or {}).get("edit_assessments")!=submitted:
+            raise StateError("claim_edit_review_assessments_changed")
+        run=self.get_run(task.run_id)
+        key=task.task_id.removeprefix(task.run_id+".")
+        frozen=run.state.get("task_inputs",{}).get(key,{})
+        payload=frozen.get("payload",{})
+        if (frozen.get("subject")!=accepted.get("subject")
+                or payload.get("original_card")!=original.model_dump(mode="json") or not payload.get("proposed_revision")):
+            raise StateError("claim_edit_review_input_changed")
+        reviewed=CardDraft.model_validate(payload["proposed_revision"])
+        reviews=claim_edit_assessments(original,reviewed,submitted,require_complete=True)
+        derived,_,_=derive_claim_versions(original,reviewed,edit_assessments=submitted)
+        derived,_=remove_superseded_claim_evidence(self,derived)
+        if derived!=draft:
+            raise StateError("claim_edit_review_draft_changed")
+        return reviews
+
+    def validate_claim_dependencies(self,original,draft,*,edit_assessments=(),review_task_id=None):
         draft=CardDraft.model_validate(draft)
-        if original.draft.problem_anchor!=draft.problem_anchor: raise StateError("problem_anchor_changed")
         self.validate_references(draft)
+        reviews=self._validated_claim_edit_reviews(original,draft,edit_assessments,review_task_id)
+        if original.draft.problem_anchor!=draft.problem_anchor:
+            reviewed_scope=review_task_id and self.get_task(review_task_id).accepted_result["result"].get("scope_faithful") is True
+            if not reviewed_scope: raise StateError("problem_anchor_changed")
         old={c.claim_id:c for c in original.draft.claims}
         for claim in draft.claims:
             previous=old.get(claim.claim_id)
             if previous and claim.version<previous.version: raise StateError("claim_version_cannot_regress")
             changed=previous and (previous.text!=claim.text or previous.conditions!=claim.conditions or previous.kind!=claim.kind)
-            if changed and claim.version<=previous.version: raise StateError("changed_claim_requires_new_version")
+            equivalent=reviews.get(claim.claim_id,{}).get("change_kind")=="unchanged_meaning"
+            if changed and claim.version<=previous.version and not equivalent: raise StateError("changed_claim_requires_new_version")
         self._validate_claim_evidence(draft)
+
+    def list_claim_edit_reviews(self,card_id=None,card_version=None):
+        with self._connect() as db:
+            rows=db.execute("SELECT data FROM claim_edit_reviews ORDER BY card_id,card_version,claim_id").fetchall()
+        return [item for row in rows if (item:=json.loads(row[0]))
+                and (card_id is None or item["card_id"]==card_id)
+                and (card_version is None or item["card_version"]==card_version)]
+
+    def claim_equivalence_reviews(self,evidence,claim):
+        """Return explicit semantic-equivalence declarations, not new evidence."""
+        if evidence.claim_id!=claim.claim_id or evidence.claim_version!=claim.version or not evidence.target_claim_fingerprint:
+            return []
+        target=claim_fingerprint(claim)
+        if target==evidence.target_claim_fingerprint: return []
+        reviews=[item for item in self.list_claim_edit_reviews() if item["claim_id"]==claim.claim_id
+                 and item["claim_version"]==claim.version and item["change_kind"]=="unchanged_meaning"]
+        queue=[(target,[])]; visited=set()
+        while queue:
+            current,path=queue.pop(0)
+            if current in visited: continue
+            visited.add(current)
+            for item in reviews:
+                if item["to_target"]!=current: continue
+                chain=[item,*path]
+                if item["from_target"]==evidence.target_claim_fingerprint: return chain
+                queue.append((item["from_target"],chain))
+        return []
+
+    def evidence_targets_claim(self,evidence,claim):
+        return (evidence.claim_id==claim.claim_id and evidence.claim_version==claim.version
+            and (evidence.target_claim_fingerprint==claim_fingerprint(claim)
+                 or bool(self.claim_equivalence_reviews(evidence,claim))))
 
     def _validate_claim_evidence(self,draft):
         for claim in draft.claims:
@@ -694,12 +782,16 @@ class Store:
         bindings=[]
         for claim in draft.claims:
             for evidence in self.list_evidence(ids=claim.evidence_ids):
+                equivalence=self.claim_equivalence_reviews(evidence,claim)
                 bindings.append({"claim_id":claim.claim_id,"claim_version":claim.version,
                     "evidence_id":evidence.evidence_id,"evidence_claim_id":evidence.claim_id,
                     "evidence_claim_version":evidence.claim_version,"source_id":evidence.source_id,
-                    "binding":"current_claim_target" if evidence.claim_id==claim.claim_id and evidence.claim_version==claim.version
+                    "binding":"reviewed_equivalent_claim_target" if equivalence else "current_claim_target" if evidence.claim_id==claim.claim_id and evidence.claim_version==claim.version
                         and evidence.target_claim_fingerprint==claim_fingerprint(claim) else "background_premise",
                     "relation":evidence.relation,"evidence_verification_status":evidence.verification_status,
+                    "equivalence_reviews":[{"card_id":item["card_id"],"card_version":item["card_version"],
+                        "review_task_id":item["review_task_id"],"reason":item["reason"]} for item in equivalence],
+                    "support_semantics":"requires_scientific_review_not_proven_by_source_verification",
                     "verification_transferred":False})
         return bindings
 

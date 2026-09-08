@@ -3,7 +3,7 @@ import json
 
 from pydantic import ValidationError
 
-from .schemas import LibrarianResult, SelectorResult, DeveloperResult, ModeratorResult, ProposerResult, SkepticResult, Envelope
+from .schemas import LibrarianResult, SelectorResult, DeveloperResult, ModeratorResult, ProposerResult, SkepticResult, Envelope, CardDraft
 
 
 class ProtocolViolation(ValueError):
@@ -39,28 +39,63 @@ def output_validation_errors(raw: str, envelope_type, original_error: Validation
 PROPOSED_ISSUE_VERSION_CONTRACT = 'same_round_new_issues_target_proposed_revision_v1'
 
 
-def derive_claim_versions(original, result, *, prior_issues=(), new_issue_contract=False):
+def claim_edit_assessments(original, draft, assessments, *, require_complete=False):
+    """Validate explicit review coverage; never infer meaning from string edits."""
+    old = {c.claim_id: c for c in original.draft.claims}
+    new = {c.claim_id: c for c in draft.claims}
+    changed = {key for key in old.keys() | new.keys() if key not in old or key not in new
+               or any(getattr(old[key], field) != getattr(new[key], field)
+                      for field in ('text', 'conditions', 'kind'))}
+    reviews = {}
+    for item in assessments:
+        item = item.model_dump(mode='json') if hasattr(item, 'model_dump') else dict(item)
+        key = item.get('claim_id')
+        if (key in reviews or key not in old.keys() | new.keys()
+                or item.get('change_kind') not in {'unchanged_meaning', 'substantive'}
+                or not isinstance(item.get('reason'), str) or not item['reason'].strip()):
+            raise ProtocolViolation('CLAIM_EDIT_REVIEW_INVALID')
+        if item['change_kind'] == 'unchanged_meaning' and (
+                key not in old or key not in new or old[key].kind != new[key].kind):
+            raise ProtocolViolation('CLAIM_EDIT_EQUIVALENCE_CANNOT_CHANGE_IDENTITY_OR_KIND')
+        reviews[key] = item
+    if require_complete and not changed <= reviews.keys():
+        raise ProtocolViolation('CLAIM_EDIT_REVIEW_COVERAGE')
+    return reviews
+
+
+def derive_claim_versions(original, result, *, prior_issues=(), new_issue_contract=False, edit_assessments=()):
     """Assign omitted increments in a copy; never transfer evidence or judgments."""
     if isinstance(result, DeveloperResult):
         field = 'proposed_revision'
     elif isinstance(result, ModeratorResult):
         field = 'proposed_card_revision'
+    elif isinstance(result, CardDraft):
+        field = None
     else:
         raise TypeError('claim_version_derivation_requires_revision_result')
     derived = result.model_copy(deep=True)
-    draft = getattr(derived, field)
+    draft = getattr(derived, field) if field else derived
     changes, references = [], []
     if draft is None:
         return derived, changes, references
     old = {claim.claim_id: claim for claim in original.draft.claims}
+    reviews = claim_edit_assessments(original, draft, edit_assessments,
+                                    require_complete=bool(edit_assessments))
     for claim in draft.claims:
         previous = old.get(claim.claim_id)
         if previous is None:
             continue
         changed_fields = [name for name in ('text', 'conditions', 'kind')
                           if getattr(previous, name) != getattr(claim, name)]
-        # Regressions stay invalid. Already incremented versions stay untouched.
-        if changed_fields and claim.version == previous.version:
+        review = reviews.get(claim.claim_id)
+        if review and changed_fields:
+            effective = previous.version + (review['change_kind'] == 'substantive')
+            changes.append({'claim_id': claim.claim_id, 'original_version': previous.version,
+                            'submitted_version': claim.version, 'effective_version': effective,
+                            'changed_fields': changed_fields, **review})
+            claim.version = effective
+        # Without a reviewed classification retain the conservative old rule.
+        elif changed_fields and claim.version == previous.version:
             changes.append({'claim_id': claim.claim_id, 'original_version': previous.version,
                             'submitted_version': claim.version, 'effective_version': previous.version + 1,
                             'changed_fields': changed_fields})
@@ -78,7 +113,7 @@ def derive_claim_versions(original, result, *, prior_issues=(), new_issue_contra
     if isinstance(derived, DeveloperResult):
         for index, review in enumerate(derived.evidence_review):
             update(review, f'evidence_review.{index}.claim_version')
-    else:
+    elif isinstance(derived, ModeratorResult):
         existing = {issue['issue_id'] if isinstance(issue, dict) else issue.issue_id
                     for issue in prior_issues}
         for index, issue in enumerate(derived.updated_issues):
@@ -94,8 +129,8 @@ def derive_claim_versions(original, result, *, prior_issues=(), new_issue_contra
 def remove_superseded_claim_evidence(store, result):
     """Remove earlier same-claim targets in a copy, without rebinding evidence."""
     derived = result.model_copy(deep=True)
-    draft = (derived.proposed_revision if isinstance(derived, DeveloperResult)
-             else derived.proposed_card_revision)
+    draft = (derived if isinstance(derived, CardDraft) else derived.proposed_revision
+             if isinstance(derived, DeveloperResult) else derived.proposed_card_revision)
     removed = []
     if draft is None:
         return derived, removed
@@ -210,7 +245,7 @@ def validate_selection(store, card, judgment: SelectorResult, novelty):
                     raise ProtocolViolation('COVERAGE_EVIDENCE_UNVERIFIED')
 
 
-def validate_revision(store, original, revision: DeveloperResult):
+def validate_revision(store, original, revision: DeveloperResult, *, edit_assessments=(), review_task_id=None):
     if revision.unchanged_problem_anchor != original.draft.problem_anchor:
         raise ProtocolViolation('ORIGINAL_ANCHOR_CHANGED')
     if revision.proposed_revision is None:
@@ -233,4 +268,5 @@ def validate_revision(store, original, revision: DeveloperResult):
             raise ProtocolViolation('CLAIM_REVIEW_VERSION')
         if new[claim_id].evidence_ids and not review.still_applicable:
             raise ProtocolViolation('REVISED_CLAIM_INHERITS_INVALID_EVIDENCE')
-    store.validate_claim_dependencies(original, revision.proposed_revision)
+    store.validate_claim_dependencies(original, revision.proposed_revision,
+        edit_assessments=edit_assessments,review_task_id=review_task_id)
