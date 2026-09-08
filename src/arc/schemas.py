@@ -579,8 +579,6 @@ class DeveloperResult(StrictModel):
             raise ValueError("revision_xor_direction_change")
         if self.direction_change is not None and self.next_action != "PROPOSE_SCOPE_CHANGE":
             raise ValueError("scope_change_action_required")
-        if self.proposed_revision is not None and self.proposed_revision.problem_anchor != self.unchanged_problem_anchor:
-            raise ValueError("problem_anchor_changed")
         return self
 
 class IssueResponse(StrictModel):
@@ -688,7 +686,7 @@ class ConceptionResult(StrictModel):
 
 class ScientificFinding(StrictModel):
     finding_id: str = Field(min_length=1)
-    location: str = Field(min_length=1)
+    location: str = Field(min_length=1, description='JSON Pointer relative to CardDraft; for a missing item point to its containing field, e.g. /minimal_test/controls.')
     quoted_text: str
     reason: str = Field(min_length=1)
     consequence: str = Field(min_length=1)
