@@ -1,20 +1,16 @@
-# 当前软件交付快照
+# 当前功能与软件交付
 
-**31fc58c：694 passed，0 failed/error/skipped**，已于2026-09-08 17:58:20 UTC完成全套测试、sdist→wheel构建、仓库外隔离安装、38份提示词/18个注册任务/3份配置资源、4个CLI帮助及依赖检查。Windows唯一wheel/sdist与同组 `SOFTWARE_VALIDATION.json` 已更新；服务器原件为 `work/software-validation-20260908T175518443480Z/`。
+**55a134c：707 passed，0 failed/error/skipped**，2026-09-08 21:08:02 UTC完成全套、sdist→wheel、仓库外隔离安装、38提示词/18任务/3配置、4CLI及依赖检查。唯一两包和SOFTWARE_VALIDATION.json已于21:08:53 UTC同步Windows，原件`work/software-validation-20260908T210458748151Z/`，回执`work/FINAL_PACKAGE_DELIVERY_RECEIPT.json`。
 
-**695→694的原因是删除过期文案断言，不是跳过检查。** 195240b把机械搜索记录重建交回runtime后，旧 `test_investigator_searches_copy_actual_trace_identity_and_coverage` 仍要求提示词逐字出现“让模型复制全部搜索trace”的三句旧指导，因此上一快照实际为694 passed / 1 failed，记录保留在 `work/software-validation-20260908T175026940841Z/`。31fc58c只删除该过期文案测试；当前694项重新完整运行，没有skip。搜索来源与科学引用行为的运行时检查仍在。
+05cf26e上一完整快照为706 passed/1 failed，旧测试精确错误字符串落后于结构化诊断；55a134c改为检查type/loc/supplied，未删除测试，9相关与707全套通过。更早31fc58c/694（当时删除过期逐字trace文案断言）及195失败也是独立历史事件，不能混为本次少测；所有原失败保留。`empty-actual-searches-check.json`仅证明0付费离线恢复。
 
-`work/empty-actual-searches-check.json` 另记录零付费离线恢复验证：模型不回显actual_searches时，从实际工具trace重建一条搜索；正常路径和规范化前中断恢复两例都通过，各两次mock模型请求、0次JSON纠正、paid_calls=0。它验证软件恢复，不是新付费科研效果；该JSON已同步Windows交付目录。
+## 已交付结果与边界
 
-软件验收不等于科学验收。当前各真实阶段结果见本轮独立阶段报告及[功能验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)；下方原06de446交付、费用和三组对照仅作历史，不是当前包或本轮效果证明。
+已完成八个已知语义对照、新主题discover→辅助develop→run、两个最终定向纠正和A–E两轮双序比较。原五张无辅助候选均未通过独立科学验收，三张推荐为误放；后续已知2＋4目标辅助修复通过，不能倒算为自主检出或整卡穷尽正确。两轮D/E有局部真实改善，但最终E仍有硬错误，r2自身recheck为revise、新finding未修。计划内运行完成，**自主科学质量验收未通过，不宣称ARC优于直接Pro**。
 
-## 当前功能交付与仍待完成
+先读[功能验收](FUNCTIONAL_VALIDATION_RESULTS.md)、[两轮消融](FUNCTIONAL_ABLATION_RESULTS.md)、[旧卡变化](OLD_CARD_CORRECTION.md)，再看模型原报告及独立审计。完整阶段/两轮报告、前后字段、方法成本、双序映射均已复制Windows。最终功能新增上界95.066385 CNY，包含两轮及恢复；父历史累计和授权账本余额见[COST_REPORT](COST_REPORT.md)，不是在线钱包查询。
 
-已完成八个已知语义对照，以及新主题discover→开发辅助develop→run全流程。无辅助discover五张候选均未通过独立科学验收，其中三张被ARC误推荐；develop/run真实改善但仍漏检。之后另建的自然final-correction两项、旧卡final-correction四项已知目标均已实改保存并通过定向核对，不能倒算为自主检出、整卡穷尽正确或未见科研质量提高。
-
-完整阶段报告、实际前后字段、独立审计和费用已复制Windows交付目录。建议先读[本轮验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)与[旧卡各轮变化](OLD_CARD_CORRECTION.md)，再对照各运行报告中的ARC推荐。当前已完成子账户费用上界83.246771 CNY，包含r1的10.081649、不包含在途r2，也不是父账本历史总额。
-
-[A–E r1](FUNCTIONAL_ABLATION_RESULTS.md)已完成全条件和双序评价，r2在途。新审推动局部实改但E仍有硬错误；跨轮独立核对和人工研究价值判断待完成。首启动漏传`--env-file`产生的0调用/0费用凭据错误已独立保留，随后同ID恢复，不能把它当模型效果。当前没有完成的ARC优于Pro结论。源码、运行原件与当前软件包按[状态入口](MASTER_STATUS.md)分别定位。
+r1零成本凭据启动错误、r2 B前置矛盾暂停和显式retry均保留，费用未重置。软件接线通过不能替代科学判断。主线程最后清理尚待真实执行记录，五个Windows历史阻断路径不重试删除；源码、付费原件与验证日志保留。以下内容仅为重构前原记录，不是当前包或效果证明。
 
 ## 功能重构前的交付原记录
 

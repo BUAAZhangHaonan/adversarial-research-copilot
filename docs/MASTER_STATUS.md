@@ -9,16 +9,18 @@
 | 自然辅助develop→run | 已跑完全流程，原卡v2→v3→v4；真实改善同时保留复核漏检，未执行训练或研究实验 |
 | 自然最终定向纠正 | 独立卡151cd v2，双减t*、不显著与残差归因两项已知目标实改通过 |
 | 旧卡最终定向纠正 | 独立卡bd770 v2，四项已知目标实改通过；前三CodeX反馈、第四ARC原发现署名保持 |
-| A–E消融 | [r1完成、r2在途](FUNCTIONAL_ABLATION_RESULTS.md)；r1局部纠错有效，E仍有硬错误，无跨轮质量优势结论 |
-| 当前软件包 | 31fc58c，694全套通过及sdist/wheel隔离安装；同组验收JSON与唯一两包已同步Windows |
+| A–E消融 | [两轮完成](FUNCTIONAL_ABLATION_RESULTS.md)，40实际调用与双序核对结束；E均未通过独立验收，r2自身review仍revise，无质量优势结论 |
+| 当前软件包 | 55a134c，707全套通过及sdist/wheel隔离安装；同组JSON与唯一两包已同步Windows |
 
 最终两次定向通过仅覆盖已知反馈目标，不是整卡穷尽科学通过或未见质量提高。无辅助只指discover未注入CodeX科学答案；期间有显式开发运维恢复，develop/run和final-correction均有开发反馈。原五卡及各轮误放、失败、费用不回写。
 
-当前已完成独立运行费用上界83.246771 CNY，**包含r1的10.081649、不包含在途r2**，不是账户余额或父历史总额。A–E r1首次启动漏传`--env-file`造成A/B/C Missing credentials、0调用0成本，原诊断另存`work/ABLATION_R1_AUTH_STARTUP_FAILURE.md/.json`；同ID补充`.env`后恢复，不能把启动错误当模型比较结果。
+最终功能重构新增费用上界95.066385 CNY，**包含r1的10.081649与r2的11.819614及其恢复费用**，不是账户余额或父历史总额。A–E r1首次启动漏传`--env-file`造成A/B/C Missing credentials、0调用0成本，原诊断另存`work/ABLATION_R1_AUTH_STARTUP_FAILURE.md/.json`；同ID补充`.env`后恢复，不能把启动错误当模型比较结果。
 
-31fc58c软件原件为`work/software-validation-20260908T175518443480Z/SOFTWARE_VALIDATION.json`。695→694源于删除过期逐字文案断言，余下694重新全量通过，195240b的694通过/1失败历史记录保留；不是省略检查。正式20元阶段默认、Flash/Pro模型范围、工具参数/JSON各一次纠正及CodeX仅开发在环边界未变。
+55a134c软件原件为`work/software-validation-20260908T210458748151Z/SOFTWARE_VALIDATION.json`，707通过、0失败/跳过。05cf26e旧精确错误码测试导致706通过/1失败；55改为检查结构化type/loc/supplied，没有删测试，相关9项与全套通过。31fc58c/694及此前失败按各自历史范围保留。正式20元阶段默认、Flash/Pro、工具参数/JSON各一次纠正及CodeX仅开发在环未变。
 
-清理明细保留于私有`work/CLEANUP_PLAN.md`及`cleanup-completed-*.json`：已结束软件副本与过期包按明确路径清理，当前31fc58c dist、所有外层验证日志、付费原件及在用helpers保留。5个Windows历史阻断路径未重试删除；下方早期列出的3处仅是当时快照，不代表当前总数。没有新增文件哈希校验。
+r2原B.selection应用暂停与显式retry费用保留；retry重评资源前提，没有修原科学卡。E最终v2的新增finding未修，COMPLETED不能写PROMISING。计划内两轮运行和审计已结束，未证明自主科学可靠性；详见[两轮结果](FUNCTIONAL_ABLATION_RESULTS.md)与[最终费用口径](COST_REPORT.md)。
+
+清理明细保留于私有`work/CLEANUP_PLAN.md`及`cleanup-completed-*.json`：已结束软件副本与过期包按明确路径清理，当前55a134c dist、所有外层验证日志、付费原件及必要helpers保留；主线程最后清理尚待实际记录。5个Windows历史阻断路径未重试删除；下方早期列出的3处仅是当时快照，不代表当前总数。没有新增文件哈希校验。
 
 ## 功能重构前的历史快照（原结果保留）
 
