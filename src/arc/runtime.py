@@ -582,6 +582,8 @@ class Runtime:
                 raise RuntimePaused('PAUSED_PROTOCOL', 'STOP_WITH_TOOL_CALLS')
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
+                from .scientific import validate_scientific_output_contract
+                validate_scientific_output_contract(self.store, payload, envelope.result)
             except (ValueError, ValidationError) as exc:
                 errors = (output_validation_errors(message.get('content') or '', envelope_type, exc)
                           if isinstance(exc, ValidationError) else [str(exc)])

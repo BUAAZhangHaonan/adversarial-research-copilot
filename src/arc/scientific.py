@@ -78,6 +78,40 @@ def validate_scientific_review(store, draft, review: ScientificReview, *, previo
     return review
 
 
+def validate_scientific_output_contract(store, payload, result):
+    """Validate output addressing/coverage before the existing JSON repair gate.
+
+    This never classifies a claim's meaning or checks whether a scientific
+    objection is true. Those decisions remain explicit model outputs and the
+    independent revision/recheck cycle.
+    """
+    if not isinstance(result, ScientificReview):
+        return
+    from .schemas import ResearchCard
+    from .validation import claim_edit_assessments
+    target = CardDraft.model_validate(payload['review_target'])
+    previous = ScientificReview.model_validate(payload['previous_review']) if payload.get('previous_review') else None
+    validate_scientific_review(store, target, result, previous=previous)
+    if payload.get('original_card') and payload.get('proposed_revision'):
+        original = ResearchCard.model_validate(payload['original_card'])
+        proposed = CardDraft.model_validate(payload['proposed_revision'])
+        try:
+            claim_edit_assessments(original, proposed, result.edit_assessments, require_complete=True)
+        except ProtocolViolation as exc:
+            old = {item.claim_id: item for item in original.draft.claims}
+            new = {item.claim_id: item for item in proposed.claims}
+            changed = {cid: ['added'] if cid not in old else ['deleted'] if cid not in new else
+                       [field for field in ('text', 'conditions', 'kind')
+                        if getattr(old[cid], field) != getattr(new[cid], field)]
+                       for cid in sorted(old.keys() | new.keys())}
+            changed = {cid: fields for cid, fields in changed.items() if fields}
+            supplied = [item.claim_id for item in result.edit_assessments]
+            raise ProtocolViolation(str(exc) + '; changed_claims=' + json.dumps(changed, ensure_ascii=False)
+                + '; supplied_claim_ids=' + json.dumps(supplied, ensure_ascii=False)
+                + '; required change_kind is unchanged_meaning or substantive, with nonempty reason; '
+                  'added/deleted claims cannot be unchanged_meaning') from exc
+
+
 def _accepted_result_task(engine, run_id, key, result, card, role):
     """Resolve the accepted physical task, including explicit/research retries."""
     result_data = result.model_dump(mode='json')
