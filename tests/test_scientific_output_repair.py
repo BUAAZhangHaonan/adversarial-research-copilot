@@ -82,6 +82,34 @@ async def test_prior_finding_coverage_uses_same_repair_without_changing_review(t
 
 
 @pytest.mark.asyncio
+async def test_support_review_does_not_repeat_resolved_history_and_keeps_scientific_rejection(tmp_path):
+    runtime,store,ledger,requests,responses,payload,subject,valid=setup_review(tmp_path)
+    previous=review('reject',resolutions=[resolution()]).model_dump(mode='json')
+    payload['previous_review']=previous
+    valid['action']='reject'
+    valid['value_judgment']='routine'
+    valid['prior_findings']=[]
+    malformed=deepcopy(valid)
+    malformed['prior_findings']=deepcopy(previous['prior_findings'])
+    responses.extend([encoded_result(malformed,subject),encoded_result(valid,subject)])
+    try:
+        result=await invoke_review(runtime,payload,subject)
+        assert result.result.model_dump(mode='json')==valid
+        assert len(requests)==2 and len(ledger.list_calls())==2
+        feedback=requests[1]['messages'][1]['content']
+        assert 'expected_previous_decisive_ids=[]' in feedback
+        assert 'supplied_prior_ids=' in feedback
+        assert previous['prior_findings'][0]['finding_id'] in feedback
+        repaired=result.result.model_dump(mode='json')
+        malformed.pop('prior_findings');repaired.pop('prior_findings')
+        assert malformed==repaired
+        state=json.loads(store.read_artifact(store.get_task('task_fixture').response_artifact_path))
+        assert state['repair_count']==1
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_correct_scientific_output_gets_no_extra_call(tmp_path):
     runtime,store,ledger,requests,responses,payload,subject,valid=setup_review(tmp_path)
     responses.append(encoded_result(valid,subject))

@@ -57,8 +57,11 @@ def validate_scientific_review(store, draft, review: ScientificReview, *, previo
         if finding.quoted_text and finding.quoted_text not in target_text:
             raise ProtocolViolation('SCIENTIFIC_FINDING_QUOTE_NOT_AT_LOCATION')
     expected = {f.finding_id for f in previous.decisive_findings} if previous else set()
-    if {f.finding_id for f in review.prior_findings} != expected:
-        raise ProtocolViolation('SCIENTIFIC_RECHECK_MUST_ADDRESS_PREVIOUS_FINDINGS')
+    supplied = [f.finding_id for f in review.prior_findings]
+    if set(supplied) != expected:
+        raise ProtocolViolation('SCIENTIFIC_RECHECK_MUST_ADDRESS_PREVIOUS_FINDINGS; '
+            'expected_previous_decisive_ids=' + json.dumps(sorted(expected)) +
+            '; supplied_prior_ids=' + json.dumps(supplied))
     if previous_draft is not None:
         statuses = {f.finding_id: f.status for f in review.prior_findings}
         old_body = previous_draft.model_dump(mode='json')
