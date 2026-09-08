@@ -31,6 +31,9 @@ LABELS = {
     'spent_upper_cny':'已结算上界（元）','reserved_cny':'预留（元）','remaining_cny':'剩余额度（元）',
     'limit_cny':'授权上限（元）','cost_status':'费用可信度','account_id':'预算账户','parent_id':'父级账户',
     'recorded_run_id':'证据登记运行',
+    'remaining_uncertainty':'仍未解决的科学问题','decisive_findings':'决定性审查发现',
+    'location':'卡片位置','quoted_text':'被审查原句','reason':'依据','consequence':'对结论的影响',
+    'required_change':'必要修改','acceptance_test':'复核条件','value_reason':'研究价值判断',
 }
 SELECTIONS = {'MAIN_REPORT':'值得继续调查','LEAD_ONLY':'待补证线索','NOT_RETAINED':'本次不保留'}
 ASSESSMENTS = {'PROMISING':'值得继续调查','NEEDS_EVIDENCE':'缺少判断所需证据','REJECTED':'已有依据不支持继续','SCOPE_CHANGE_PROPOSED':'建议转向，当前已冻结'}
@@ -138,7 +141,9 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
         'insight_paragraph': _text(draft.get('contribution', {}).get('knowledge_increment')),
         'motivation_paragraph': _text(draft.get('motivation', {}).get('observation_or_deficit')),
         'knowledge_gain_paragraph': _text({'decision_changed': draft.get('contribution', {}).get('decision_changed')}),
-        'review_paragraph': _text(judgment.get('value_reason') or judgment.get('why_worth_investigating')),
+        'review_paragraph': _text(judgment.get('value_reason') or judgment.get('why_worth_investigating')) +
+            ('\n\n' + _text({'decisive_findings': judgment['decisive_findings']})
+             if judgment.get('decisive_findings') else ''),
         'bindings_paragraph': bindings_text,
         'nearest_work_paragraph': _text(draft.get('closest_work_delta')),
         'hypothesis_paragraph': _text(hypothesis.get('main_or_competing_explanations')),
@@ -147,7 +152,9 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
         'result_interpretation_paragraph': _text({key:test.get(key) for key in ['outcome_interpretations','confounds_not_yet_ruled_out']}),
         'resource_paragraph': _text(draft.get('resources')),
         'risks_paragraph': _text(judgment.get('decisive_risks',risks.get('decisive_risks'))),
-        'unresolved_paragraph': _text({'missing_prerequisites':risks.get('missing_prerequisites'), 'unresolved_assumptions':draft.get('motivation',{}).get('unresolved_assumptions'), 'remaining_uncertainty':judgment.get('remaining_uncertainty')}) + '\n\n' + '\n'.join(f"- {issue['issue_id']}（{issue['status']}）：{_text(issue.get('content', issue.get('dispute')))}" for issue in unresolved),
+        'unresolved_paragraph': _text({'missing_prerequisites':risks.get('missing_prerequisites'), 'unresolved_assumptions':draft.get('motivation',{}).get('unresolved_assumptions'), 'remaining_uncertainty':judgment.get('remaining_uncertainty')}) +
+            ('\n\n' + _text({'decisive_findings': judgment['decisive_findings']})
+             if judgment.get('decisive_findings') else '') + '\n\n' + '\n'.join(f"- {issue['issue_id']}（{issue['status']}）：{_text(issue.get('content', issue.get('dispute')))}" for issue in unresolved),
         'version_paragraph': f"研究卡 {card['card_id']}，版本 {card['version']}；原问题：{anchor['question']}。\n\n"+_text({'conditions':anchor.get('conditions'),'anti_scope':anchor.get('anti_scope')}),
         'next_step_paragraph': _text({'next_action':judgment.get('action') or judgment.get('next_action'), 'external_test_requirements':judgment.get('external_test_requirements'), 'reopening_condition':judgment.get('reopening_condition'), 'reopen_conditions':risks.get('reopen_conditions')}),
         'sources':sources,

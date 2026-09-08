@@ -329,6 +329,28 @@ def test_search_hits_remain_audit_only_and_insight_precedes_operational_ruling(t
     assert '不相关秘密' in appendix and '不表示相关、已读或支持当前结论' in appendix
     assert '版本纠错成功' not in overview
     assert detail.index('区分两个解释') < detail.index('版本纠错成功')
-    assert overview.index('区分两个解释') < overview.index('当前执行状态') if '当前执行状态' in overview else True
+    assert overview.index('区分两个解释') < overview.index('执行状态：COMPLETED')
     assert '出处可定位只确认摘录存在' in detail
     assert 'SEARCH_SOURCES.md' in overview and 'SEARCH_SOURCES.md' in detail
+
+
+def test_scientific_review_exposes_the_defect_and_required_action_for_a_lead(tmp_path, monkeypatch):
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    store = FakeStore(tmp_path)
+    candidate = card('LEAD_ONLY')
+    candidate['selection_result'] = {
+        'action': 'revise', 'value_reason': '核心认识值得讨论，但目前测量不能支持结论。',
+        'remaining_uncertainty': ['测量规则尚未区分竞争解释。'],
+        'decisive_findings': [{'location': '/minimal_test/measurements',
+            'quoted_text': '召回', 'reason': '两种相反干预可以产生相同汇总召回。',
+            'consequence': '无法辨认哪个因素造成改变。',
+            'required_change': '分别记录每个干预条件的召回。',
+            'acceptance_test': '每个比较量都有实际测量条件。'}],
+    }
+    store.cards = [candidate]
+    paths = render_run(store, 'run-1', tmp_path / 'scientific-lead')
+    for path in (paths['overview'], paths['card:card-1:2']):
+        text = path.read_text(encoding='utf-8')
+        assert '两种相反干预可以产生相同汇总召回' in text
+        assert '分别记录每个干预条件的召回' in text
+        assert '测量规则尚未区分竞争解释' in text
