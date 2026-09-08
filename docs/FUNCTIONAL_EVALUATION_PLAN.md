@@ -24,6 +24,23 @@
 
 `run_comparison(..., seed=..., include_swapped_order=True)` 提供同一候选的两序匿名评价；两序有独立任务结果及私有身份映射。该开关只追加评价，不重抽候选。不同 seed 是不同展示序记录，不自动等于独立生成重复。独立生成重复要显式采用新的任务身份并保留全部输出，不能只挑每条路径表现最好的一次。已有历史冻结比较仍是原来的发现阶段对照，不可重新命名为完整 A–E 消融。
 
+### 公开 CLI
+
+在仓库根目录执行以下命令，替换运行 ID、实验 ID 和已授权父账本 ID。`test-compare` 默认 seed 为 `20260907`，默认执行两个展示次序；显式加 `--no-swap-order` 只运行正序。恢复同一 seed 会复用已有任务。
+
+```bash
+arc test-compare --source-run SOURCE_RUN --seed 20260907 --swap-order
+```
+
+`test-ablation` 要求显式指定五个执行参数。`--budget-cny` 是每个条件/评价子账户的上限，所有账户共同受 `--parent-budget` 指定的现有父账本限制；该命令不会新授权父级额度。A–E 与匿名评价由既有 harness 串行执行。使用相同实验 ID 和相同参数恢复冻结实验，不能借恢复更换原始材料或展示 seed。
+
+```bash
+arc test-ablation --source-run SOURCE_RUN --experiment-id ablation-01 \
+  --parent-budget AUTHORIZED_PARENT --budget-cny 20 --seed 20260907
+```
+
+历史 prompt 目录默认是当前工作目录下的 `tests/fixtures/prompts_pre_redesign`；从其他目录执行或使用另一份明确冻结的历史快照时，传入 `--legacy-prompt-root /absolute/path/to/prompts_pre_redesign`。目录不存在或缺少 `manifest.json` 会在启动 harness 前明确报错，不查找其他目录代替历史模板。完整模板内容仍由 PromptLoader 验证。
+
 ## 材料、费用与结论范围
 
 已有渲染、分割、冲突三个主题都进入开发回归；它们被反复分析，不能继续叫未见留出。下一步迁移测试使用新主题，先固定用户问题和材料，再生成全部预定条件，不根据看到的输赢更换主题或筛除失败。
