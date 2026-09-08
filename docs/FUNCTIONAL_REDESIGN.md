@@ -53,7 +53,7 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 | `72e09e5` | 补证请求的 claim/issue/draw 目标绑定错误进入同一次 JSON 纠正诊断 | `test_evidence_target_repair.py` 检查三类未知目标的 expected/supplied 诊断及额度已用后继续暂停；相关落地回归记录为 114 passed，不代表完整软件或科学验收 |
 | `eb9e0bf` | complete 响应中的核验请求沿当前候选链传递，保留实际任务来源与 claim 对应并按来源任务/request_local_id 去重 | 相关六文件 70 项通过，随后新增 support 分支用例后独立交接文件 7 项通过。检查覆盖 conception/development→review、初审/修订→recheck、已有 support 分支及冻结输入恢复；请求存在既不证明已完成，也不证明仍未完成 |
 
-行为指导写在科学目标 Markdown：接收角色对照已有证据和前序核验判断是否需要补读，不增加自动必经调查阶段，不重复购买已有充分核验。新接线不回写历史任务的冻结输入；draw3 交接后的实际补证与科学审查仍待核对。
+行为指导写在科学目标 Markdown：接收角色对照已有证据和前序核验判断是否需要补读，不增加自动必经调查阶段，不重复购买已有充分核验。新接线不回写历史任务的冻结输入。真实 draw3.science.review 已冻结输入含 `er1_es_cot_full_text` 完整问题及 claim/source/draw 对应，来源为原 draw3.conception，原始 boundaries 正确；这证明运行时交接接通，是否完成补证与科学问题是否解决仍待核对。
 
 最近完成的整套软件验证是 **f70b937：637 passed**，并完成从 sdist 构建 wheel、隔离安装及依赖检查。之后的提交不能借用这一结果宣称已经全量验收；最终软件验证与包仍待统一收尾。软件记录位于私有 `work/software-closeout-final/SOFTWARE_VALIDATION.json`。A–E、自然后续和旧卡定向纠正的最终结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)中的待完成项。
 

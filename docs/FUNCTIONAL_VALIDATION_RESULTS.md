@@ -45,7 +45,7 @@ CodeX 的独立清单还指出：规则可能更早在正确段已停止，轨�
 
 draw2 conception 的已完成工具 trace 在 11:45 UTC 实际对 `src_earlystop_2606_02835v1` 使用 `read_record(limit=64000, offset=0)`，随后同源 `offset=64000` 成功，并定向检索近邻。初审读取范围核对也未见本地同源区间重复；一次空读与扩大远端抓取存在有限效率损失。这是具体分页与读取行为证据，不是 64K token，更不能单独覆盖全部费用预留和恢复测试。
 
-**draw3：缓存首稿 v1 已接受，科学审查尚未结束。** 题目为“停在一个「稳定」的错误上”，试图用停止事件与自然终态的交叉表解释稳定型停止的准确率/有害过度思考异常。此前因候选新 claim 的补证请求绑定协议暂停；修复后复用已保存响应，已推进 `draw3.card_archive`，没有重新购买 conception。这里的接受是结构接受，不是科学推荐。
+**draw3：缓存首稿 v1 已接受，科学审查尚未结束。** 题目为“停在一个「稳定」的错误上”，试图用停止事件与自然终态的交叉表解释稳定型停止的准确率/有害过度思考异常。此前因候选新 claim 的补证请求绑定协议暂停；修复后复用已保存响应，经 `draw3.card_archive` 进入 review，没有重新购买 conception。真实 `draw3.science.review` 冻结输入的 `evidence_request_handoff` 已含 `er1_es_cot_full_text` 完整问题、claim/source/draw 对应及原 conception 的 source_task_id，原题 boundaries 也正确。这证明交接在真实任务中接通，不能据此认为 ES-CoT 剩余全文已经核验；首稿接受是结构接受，不是科学推荐。
 
 在 ARC 科学审查结束前，CodeX 对原缓存候选完成了独立核对，记录于私有 `work/NATURAL_DRAW3_INDEPENDENT_CHECKLIST.md`，没有把清单输入模型。核心问题包括：净 H 变化应包含增加与抵消两类事件，不能只算 B 类；准确率净变化与 H 增量不是同一账目；Figure 4 条件概率与 `1−H` 口径不同；ES-CoT 已报告准确率，不能称评估完全看不见稳定错误。另有阈值/协议归因外推、分类与正控及用户约束混淆问题。这些目前均是 **CodeX 独立发现**，不能提前记成 ARC 自主查错、实际修订或最终价值结论。
 
