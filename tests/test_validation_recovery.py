@@ -167,7 +167,8 @@ async def test_round_limit_and_resume_cover_each_control_branch(tmp_path, action
     draft.claims = [Claim(claim_id='claim_test', version=1, text='The two interventions can be distinguished.',
                          conditions=['synthetic factorial task'], kind='hypothesis', evidence_ids=[])]
     card = store.save_card(draft)
-    run = store.create_run('run', card_id=card.card_id, card_version=card.version)
+    run = store.create_run('run', card_id=card.card_id, card_version=card.version,
+            state={'research_flow': 'legacy_debate_v1'})
     class ActionRuntime(ScriptedRuntime):
         def reply(self, role, task, payload, task_id):
             result = super().reply(role, task, payload, task_id)

@@ -68,7 +68,8 @@ async def execute_with_trace(store, run, stage, trace):
 def gate_run(store, stage):
     if stage == 'develop':
         card = store.save_card(research_draft())
-        return store.create_run('develop', card_id=card.card_id, card_version=card.version)
+        return store.create_run('develop', card_id=card.card_id, card_version=card.version,
+            state={'research_flow': 'legacy_debate_v1'})
     return campaign_run(store, max_draws=1)[1]
 
 
