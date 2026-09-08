@@ -3,7 +3,7 @@
 ARC 帮助研究者找到值得调查的问题，形成可比较的研究卡，再展开方案和压力测试。
 实验和论文由人完成。`PROMISING` 表示值得下一步调查，不表示结果已证明或论文会被录用。
 
-当前代码只维护master。同一自然卡 discover → develop → run 三阶段执行完成。工程验证与三组对照的实际结果、费用和科学边界见[当前收尾状态](docs/MASTER_STATUS.md)。
+当前代码只维护 master。新默认流程以核心洞察和实质纠错为主线；本轮改动与验证边界见[功能重构进度](docs/FUNCTIONAL_REDESIGN.md)。此前三组对照和自然运行保留为历史开发记录，不能作为新流程已经改善研究质量的证明。
 
 ## 安装和运行
 
@@ -18,8 +18,8 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run -
 ```
 
 三个入口默认各自结束即停。一次 discover 的最多五次机会共用 20 元和同一份原始文献；
-次数不是产出目标，零张推荐卡也是合法结果。每次聚焦一个问题族和一张卡，同族控制项不另算方向。
-develop 保留问题和原卡，改方法生成新版本；遇到必须靠实验解决的争点，写出最小验证后停止。
+次数不是产出目标，零张推荐卡也是合法结果。每次由 Pro 连贯构思一张卡，独立审查关键事实、逻辑和研究价值；有必要时定向修订一次并复核。修订不新增抽卡机会。
+develop 用于用户选中后的方案展开，run 用于独立压力检查。两者沿用科学审查和必要修订，不默认追加旧多角色辩论。原始研究范围保持稳定，模型提出的方法、数据集和指标可以修改。实验尚未执行时只交付可行性分析和最小验证方案。
 
 已有问题可以直接使用 `develop --question "具体问题"` 或 `run --proposal proposal.md`，
 无需先 discover。`import-card card.json` 接受严格的 ResearchCard draft JSON。
@@ -48,10 +48,10 @@ SQLite 保存状态、版本、争点、来源索引和预算；原文、模型�
 
 新主张可以引用已有观察作为背景依据；报告和后续角色会看到这类引用不会转移原主张的验证状态。
 直接针对主张的证据仍绑定其 ID 和版本。旧版本证据不能直接用于新版主张，也不能靠背景引用关闭经验争点。
-主张内容或条件改变却遗漏递增时，runtime 记录并派生新版本。新版移除同目标旧版本证据引用，
-由 Agent 重新选择或补充证据；原卡、旧证据和原始响应保留。受引用移除影响的裁决经过补证后重新判断。
+独立科学审查区分表达修正与实质主张变更。前者保留语义版本并记录等价审查，后者派生新版本，只移除并复核受影响的支持关系；原卡、来源、旧证据和原始响应保留。
+证据的 `verified` 仅表示摘录可在原文定位，不能证明它支持卡片的解读。数字归属、适用条件、分母、因果推断和最近工作差异仍须科学审查。
 
-每个 run 输出 `REPORT.md`、单卡详情、`PROMPT_TRACE_INDEX.md` 和 `COST_REPORT.md`。
+每个 run 输出 `REPORT.md`、单卡详情、`PROMPT_TRACE_INDEX.md` 和 `COST_REPORT.md`。主报告先呈现洞察、价值、最小检验与关键风险；只有实际引用进入正式来源。检索中碰到的其他链接放在 `SEARCH_SOURCES.md`，不自动进入后续工作材料。
 缺少工具能力或提出改进需求时输出 `MCP_REQUIREMENTS.md`，正式运行默认交给用户评估和实施。
 `requirements list/review/export` 支持比较方案并导出用户执行说明；不会自动改限额或创建任务。
 开发时可显式选择 CodeX 评估；正式服务不依赖 CodeX。使用说明见[改进需求流程](docs/CAPABILITY_REQUESTS.md)。
@@ -89,8 +89,8 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/validation tes
 arc --env-file /path/to/existing/.env --data-dir /path/to/private/validation test-compare --source-run RUN_ID
 ```
 
-开发验证始终复用同一个 `.arc-validation/arc.sqlite` 和 100 元父账户，不能改目录重新获得预算。
-先完成工程契约（L1），再实际入口（L2）、自然发现同卡贯穿（L3）和同材料小规模对照（L4）。
+开发验证复用同一个私有 `.arc-validation/arc.sqlite` 和已有父账户，追加预算必须有用户授权，不能改目录重置花费。本轮沿用用户已追加的账户余额授权；正式阶段默认仍为 20 元。
+新验证先检查四组正误对照的发现、修订与复核，再做同材料构思/模型/审查消融和新主题迁移，最后验证同卡三入口。原先三个主题均已成为开发回归，不能再称作未见留出集。
 开发命令的串联不改变正式命令默认停止。自动评价只是初步检查，不代替研究者认可。
 实际完成范围、成本与阻塞见 `docs/E2E_REPORT.md`、`docs/COST_REPORT.md` 和 `docs/IMPLEMENTATION_AUDIT.md`。
 
