@@ -104,6 +104,9 @@ def test_explicit_v1_fixture_and_input_mismatch_are_visible(tmp_path):
     assert report['cases'][0]['fixture_target_input_matches'] is False
     assert exporter.at_path({}, '/absent/0') == {'location_missing': True}
     assert exporter.at_path(['one'], '/-1') == {'location_missing': True}
+    claim = {'claims': [{'text': 'The original method receives 62%.'}]}
+    assert exporter.at_path(claim, 'claims[0].text') == exporter.at_path(claim, '/claims/0/text') == claim['claims'][0]['text']
+    assert exporter.at_path(claim, 'claims[-1].text') == {'location_missing': True}
 
 
 def test_correct_control_displays_its_paired_error_location_without_changing_expected_label(tmp_path):

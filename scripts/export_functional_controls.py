@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import sqlite3
 
 from arc.budget import BudgetLedger
@@ -16,7 +17,7 @@ from arc.budget import BudgetLedger
 
 def at_path(value, path):
     """Resolve fixture dot paths or review JSON Pointers without guessing keys."""
-    parts = path[1:].split('/') if path.startswith('/') else path.split('.')
+    parts = path[1:].split('/') if path.startswith('/') else re.sub(r'\[(\d+)\]', r'.\1', path).split('.')
     for part in parts:
         part = part.replace('~1', '/').replace('~0', '~')
         if isinstance(value, dict) and part in value:
