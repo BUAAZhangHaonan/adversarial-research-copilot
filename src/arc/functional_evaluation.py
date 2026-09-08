@@ -134,9 +134,11 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                        seed, legacy_prompt_root, runtime_factory=None):
     """Run/resume A–E and two anonymous orders. Failures remain explicit results.
 
-    A: Pro CONCEIVE + old review; B: Pro old split generation + old review;
-    C: Flash old split generation + old Pro review; D: A candidate + new review;
+    A: Pro CONCEIVE + old review; B: Pro split generation + old review;
+    C: Flash split generation + old Pro review; D: A candidate + new review;
     E: same A candidate and D initial review + one revision/recheck when warranted.
+    All A/B/C generation uses the same current prompt snapshot and shared
+    scientific rules/examples. Only their novelty/selector review uses legacy.
     """
     from .cli import services
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', experiment_id) or '..' in experiment_id:
@@ -156,8 +158,10 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
     specification = {'source_run_id': source_run_id, 'experiment_id': experiment_id,
         'parent_id': parent_id, 'budget_cny': str(budget_cny), 'seed': seed,
         'legacy_prompt_root': str(Path(legacy_prompt_root).resolve()), 'material': material,
-        'conditions': {'A': 'Pro coherent, old review', 'B': 'Pro split, old review',
-            'C': 'Flash split, old Pro review', 'D': 'A candidate, scientific review only',
+        'conditions': {'A': 'Pro coherent, current generation prompts, old Pro review',
+            'B': 'Pro split, current generation prompts, old Pro review',
+            'C': 'Flash split, current generation prompts, old Pro review',
+            'D': 'A candidate, scientific review only',
             'E': 'A candidate, reused D review, bounded revision and recheck'}}
     _stable_artifact(store, manifest_path, specification)
     factory = runtime_factory or _prompt_factory(store, ledger, experiment_id, legacy_prompt_root)
@@ -203,16 +207,16 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                         draft = conceived.card_candidate
                     else:
                         frame = await engine.call(run.run_id, 'frame', 'discovery', 'FRAME',
-                            payload=engine.context(run.run_id), phase='legacy')
+                            payload=engine.context(run.run_id), phase='current')
                         engine.checkpoint(run.run_id, functional_mandate=as_data(frame.mandate))
                         task_context = {**engine.context(run.run_id), 'mandate': as_data(frame.mandate)}
                         family = await engine.call(run.run_id, 'family', 'discovery', 'NEXT_DRAW',
-                            payload={**task_context, 'previous_draws': {}}, phase='legacy')
+                            payload={**task_context, 'previous_draws': {}}, phase='current')
                         if family.continue_or_stop == 'STOP':
                             draft = None
                         else:
                             composed = await engine.call(run.run_id, 'compose', 'discovery', 'COMPOSE',
-                                payload={**task_context, 'approved_family': as_data(family)}, phase='legacy')
+                                payload={**task_context, 'approved_family': as_data(family)}, phase='current')
                             draft = composed.card_candidate
                     judgment = None
                     if draft is not None:
