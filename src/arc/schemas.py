@@ -681,7 +681,7 @@ class ConceptionResult(StrictModel):
     @model_validator(mode='after')
     def stopped_card(self):
         if self.continue_or_stop == 'STOP' and self.card_candidate is not None:
-            raise ValueError('stopped_conception_cannot_propose_card')
+            raise ValueError('STOP_requires_card_candidate_null; use_CONTINUE_to_submit_candidate')
         return self
 
 class ScientificFinding(StrictModel):
