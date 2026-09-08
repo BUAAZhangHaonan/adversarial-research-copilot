@@ -2,7 +2,7 @@
 
 本轮依据用户提供的[功能重构文档](FUNCTIONAL_REDESIGN_REQUEST.md)执行，目标是产生有研究价值的想法并分析可行性。ARC 不执行研究训练实验，也不代写从实验到论文的完整流程。CodeX 只参与本轮开发评估；正式服务中的能力改进需求由用户评估和实现。
 
-截至 2026-09-09（运行记录使用 UTC），四组八个已知语义对照完成目标纠错验收；新主题无科学反馈的 discover 也已按五次上限结束。ARC 把 draw1/2 留为 NEEDS_EVIDENCE，把 draw3/4/5 推荐为 PROMISING，但五张当前均未通过 CodeX 独立科学验收，三张推荐卡构成科学误放。已选择 draw1 v2 作为后续开发辅助修订起点，这不是批准实验，也不能倒算为无辅助抽卡成功。辅助 develop/run 已跑完全流程，但仍有独立检出的错误；后续两个独立 final-correction 分别保存并通过自然卡两项、旧卡四项已知目标的辅助定向验收，不倒算为自主查错或整卡穷尽通过。A–E r1 在途、r2 尚未启动，不能宣称科研质量已提高。具体结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)。
+截至 2026-09-09（运行记录使用 UTC），四组八个已知语义对照完成目标纠错验收；新主题无科学反馈的 discover 也已按五次上限结束。ARC 把 draw1/2 留为 NEEDS_EVIDENCE，把 draw3/4/5 推荐为 PROMISING，但五张当前均未通过 CodeX 独立科学验收，三张推荐卡构成科学误放。已选择 draw1 v2 作为后续开发辅助修订起点，这不是批准实验，也不能倒算为无辅助抽卡成功。辅助 develop/run 已跑完全流程，但仍有独立检出的错误；后续两个独立 final-correction 分别保存并通过自然卡两项、旧卡四项已知目标的辅助定向验收，不倒算为自主查错或整卡穷尽通过。[A–E r1已完成、r2在途](FUNCTIONAL_ABLATION_RESULTS.md)；r1新审推动局部实改，但E仍未通过独立科学核对，不能宣称科研质量已提高。具体结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)。
 
 ## 默认工作链与边界
 
@@ -36,7 +36,7 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 | §12：首页先展示洞察与风险，零推荐也解释原因 | 生效的 reports.py 与报告模板；当前版本判断、引用隔离、零推荐报告测试 | 已修未推荐理由、COST_REPORT 状态及 LEAD_ONLY 洞察前置。最终自然报告22正式来源、157检索附录；f9aad60 已按5候选/9版本分类并只读重渲染，3主报告/2线索正确；9份详情和修复前报告保留，22来源集合与源卡/账本不变 |
 | §13：校准区分成立、平凡、简洁而重要及改题 | `selection_examples.md` 与价值校准测试 | value-v3 对已见正确交互卡 routine/reject、无硬错误；不覆盖初轮价值高估，不当泛化分数 |
 | §14 第一层：正确/错误成对、真实前后对照 | v1/v2 fixtures、只读 controls 导出器及人工核对 | v2 8/8 为 4 错修好＋4 对不误报目标错误；不是 8 个有价值 idea。v1 失败完整保留 |
-| §14 第二层：冻结材料 A–E、交换顺序、独立费用 | `functional_evaluation.py`、ablation 导出器；候选/初审复用与 phase 测试 | A Pro 连贯，B Pro 当前分步，C Flash 当前分步，ABC 统一旧审；D 复用 A 卡新审，E 复用 A 卡及 D 初审修订。r1已启动且恢复首轮零成本凭据缺失；全条件/双序评价/人工比较未完成，r2尚未启动；seed支持不等于已做独立重复 |
+| §14 第二层：冻结材料 A–E、交换顺序、独立费用 | `functional_evaluation.py`、ablation 导出器；候选/初审复用与 phase 测试 | A Pro 连贯，B Pro 当前分步，C Flash 当前分步，ABC 统一旧审；D 复用 A 卡新审，E 复用 A 卡及 D 初审修订。r1全条件及双序评价已完成，18实际调用；A/D同稿、E复用D初审，局部实改但E仍有硬错误。r2在途；两轮冻结材料、current38/legacy35文本分别相等，真实跨轮科学比较待完成；seed只用于匿名顺序 |
 | §14 最后：新主题自然全流程 | `start_natural_validation.py` 分步建立新 campaign，不把 material_only 当生成结果 | discover 已 COMPLETED / draw_limit_reached：五候选、九历史版本，2 LEAD_ONLY＋3 PROMISING；独立验收五张均未过。draw1 v2仅作为开发辅助修订起点；develop/run已完成但仍误放，新独立final-correction仅两项已知目标通过；旧三个主题与旧v7不称未见主题 |
 | §15：公开研究仅作设计借鉴 | 原任务书参考资料与本次实现/结果分开记录 | SciMON、CoVe 等不能代替 DeepSeek/ARC 实测，更不能作为当前质量提升证明 |
 
@@ -48,7 +48,7 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 
 | 提交 | 修复内容 | 已验证范围 |
 | --- | --- | --- |
-| `ca6b222` | evaluator 缺候选、重复或未知候选 ID，在接受前进入已有一次 JSON 纠正，返回期望与实际覆盖 | `test_evaluator_output_repair.py` 检查覆盖纠正、无候选时允许无偏好，以及不得刷新已用额度；不是强制选择赢家，也未完成 A–E 真实双序评价 |
+| `ca6b222` | evaluator 缺候选、重复或未知候选 ID，在接受前进入已有一次 JSON 纠正，返回期望与实际覆盖 | `test_evaluator_output_repair.py` 检查覆盖纠正、无候选时允许无偏好，以及不得刷新已用额度；不是强制选择赢家，这项本地测试本身不代表真实双序评价；r1实结果另见消融报告 |
 | `913b989` | CONCEIVE 可为本次返回候选中新声明的 claim 提出补证请求 | `test_conception_target_resume.py` 模拟旧协议暂停，修复后复用同一原始响应，不增加模型请求；真实 draw3 也已复用缓存接受 v1，仅证明结构恢复 |
 | `72e09e5` | 补证请求的 claim/issue/draw 目标绑定错误进入同一次 JSON 纠正诊断 | `test_evidence_target_repair.py` 检查三类未知目标的 expected/supplied 诊断及额度已用后继续暂停；相关落地回归记录为 114 passed，不代表完整软件或科学验收 |
 | `eb9e0bf` | complete 响应中的核验请求沿当前候选链传递，保留实际任务来源与 claim 对应并按来源任务/request_local_id 去重 | 相关六文件 70 项通过，随后新增 support 分支用例后独立交接文件 7 项通过。检查覆盖 conception/development→review、初审/修订→recheck、已有 support 分支及冻结输入恢复；请求存在既不证明已完成，也不证明仍未完成 |
@@ -67,4 +67,11 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 
 本轮科学功能验收仍有实质缺口：八个已知对照的成功没有迁移成可靠的自然判断。五个无辅助候选均未通过独立验收，其中三张被 ARC 推荐。`work/NATURAL_SCIENCE_AUDIT.md` 保留自主查错、真实修订、误放及 CodeX 自我更正；独立反馈没有输入已冻结的 discover。显式 `development_assisted` 的develop/run及两个final-correction结果已单列；最后六项已知目标纠正通过，不能覆盖原五卡失败或改写为自主成功。
 
-[MASTER_STATUS](MASTER_STATUS.md)与[DELIVERY](DELIVERY.md)已分开当前入口与历史快照；L4和旧自然报告保持原记录。A–E r1在途、r2未启动，完整比较仍待完成。费用沿用既有父/子账本；本文不固定正在变化的余额或最终总额。
+[MASTER_STATUS](MASTER_STATUS.md)与[DELIVERY](DELIVERY.md)已分开当前入口与历史快照；L4和旧自然报告保持原记录。A–E r1已完成，r2在途，完整重复比较仍待完成。费用沿用既有父/子账本；本文不固定正在变化的余额或最终总额。
+
+## r2结束后的统一收尾清单
+
+- 按实际call_id核对r2各任务模型/effort、请求起止、纠错与失败费用，不套固定调用数；更新两轮总额与E完整链成本，不重复加入A旧审或judge。
+- 核对r2所有实际任务使用的冻结材料/提示词、A=D正文与E复用D初审；已完成的跨轮静态文本相等不能替代这些运行时检查。
+- 完成r2候选与D/E修改的独立科学审计，对照双序findings和映射；保留无偏好与失败，不为补排名增加模型调用，不据自动偏好宣布质量提高。
+- 将两轮结果、逐条任务书验收边界、总费用与Windows入口统一同步；当前31fc58c软件包不因文档更新而换版本。剩余清理只按已确认叶路径处理，付费原件、验证日志及五个阻断Windows路径保留。

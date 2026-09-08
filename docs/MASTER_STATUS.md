@@ -9,12 +9,12 @@
 | 自然辅助develop→run | 已跑完全流程，原卡v2→v3→v4；真实改善同时保留复核漏检，未执行训练或研究实验 |
 | 自然最终定向纠正 | 独立卡151cd v2，双减t*、不显著与残差归因两项已知目标实改通过 |
 | 旧卡最终定向纠正 | 独立卡bd770 v2，四项已知目标实改通过；前三CodeX反馈、第四ARC原发现署名保持 |
-| A–E消融 | r1在途，r2未启动；无完整模型/构思/审查优势结论 |
+| A–E消融 | [r1完成、r2在途](FUNCTIONAL_ABLATION_RESULTS.md)；r1局部纠错有效，E仍有硬错误，无跨轮质量优势结论 |
 | 当前软件包 | 31fc58c，694全套通过及sdist/wheel隔离安装；同组验收JSON与唯一两包已同步Windows |
 
 最终两次定向通过仅覆盖已知反馈目标，不是整卡穷尽科学通过或未见质量提高。无辅助只指discover未注入CodeX科学答案；期间有显式开发运维恢复，develop/run和final-correction均有开发反馈。原五卡及各轮误放、失败、费用不回写。
 
-当前已完成独立运行费用上界73.165122 CNY，**不包含在途A–E**，不是账户余额或父历史总额。A–E r1首次启动漏传`--env-file`造成A/B/C Missing credentials、0调用0成本，原诊断另存`work/ABLATION_R1_AUTH_STARTUP_FAILURE.md/.json`；同ID补充`.env`后恢复，不能把启动错误当模型比较结果。
+当前已完成独立运行费用上界83.246771 CNY，**包含r1的10.081649、不包含在途r2**，不是账户余额或父历史总额。A–E r1首次启动漏传`--env-file`造成A/B/C Missing credentials、0调用0成本，原诊断另存`work/ABLATION_R1_AUTH_STARTUP_FAILURE.md/.json`；同ID补充`.env`后恢复，不能把启动错误当模型比较结果。
 
 31fc58c软件原件为`work/software-validation-20260908T175518443480Z/SOFTWARE_VALIDATION.json`。695→694源于删除过期逐字文案断言，余下694重新全量通过，195240b的694通过/1失败历史记录保留；不是省略检查。正式20元阶段默认、Flash/Pro模型范围、工具参数/JSON各一次纠正及CodeX仅开发在环边界未变。
 
