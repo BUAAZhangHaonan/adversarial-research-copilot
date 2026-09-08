@@ -1,6 +1,14 @@
-> 历史记录：本文描述功能重构前的交付状态。当前实现与验证以 [FUNCTIONAL_REDESIGN](FUNCTIONAL_REDESIGN.md) 为准；旧三组对照不是新流程的有效性证明。
+# 当前软件交付快照
 
-# ARC 当前交付说明
+**31fc58c：694 passed，0 failed/error/skipped**，已于2026-09-08 17:58:20 UTC完成全套测试、sdist→wheel构建、仓库外隔离安装、38份提示词/18个注册任务/3份配置资源、4个CLI帮助及依赖检查。Windows唯一wheel/sdist与同组 `SOFTWARE_VALIDATION.json` 已更新；服务器原件为 `work/software-validation-20260908T175518443480Z/`。
+
+**695→694的原因是删除过期文案断言，不是跳过检查。** 195240b把机械搜索记录重建交回runtime后，旧 `test_investigator_searches_copy_actual_trace_identity_and_coverage` 仍要求提示词逐字出现“让模型复制全部搜索trace”的三句旧指导，因此上一快照实际为694 passed / 1 failed，记录保留在 `work/software-validation-20260908T175026940841Z/`。31fc58c只删除该过期文案测试；当前694项重新完整运行，没有skip。搜索来源与科学引用行为的运行时检查仍在。
+
+`work/empty-actual-searches-check.json` 另记录零付费离线恢复验证：模型不回显actual_searches时，从实际工具trace重建一条搜索；正常路径和规范化前中断恢复两例都通过，各两次mock模型请求、0次JSON纠正、paid_calls=0。它验证软件恢复，不是新付费科研效果；该JSON已同步Windows交付目录。
+
+软件验收不等于科学验收。当前各真实阶段结果见本轮独立阶段报告及[功能验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)；下方原06de446交付、费用和三组对照仅作历史，不是当前包或本轮效果证明。
+
+## 功能重构前的交付原记录
 
 ARC聚焦研究idea抽卡、方案展开与可行性压力测试；实验和论文由人完成。正式源码在g203，唯一master。
 
