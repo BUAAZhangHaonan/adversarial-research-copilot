@@ -14,6 +14,38 @@ from arc.reports import render_run
 ASSETS=Path(__file__).resolve().parents[1]/'prompts'
 
 
+def test_zero_retained_report_explains_routine_value_and_resolved_scientific_error(tmp_path, monkeypatch):
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    store = FakeStore(tmp_path)
+    store.cards = [card('NOT_RETAINED')]
+    store.run.update(mode='run', status='COMPLETED', assessment='REJECTED', card_id='card-1', card_version=2)
+    store.run['state'] = {'final_scientific_card_version': 2, 'final_scientific_review': {
+        'action': 'reject', 'value_reason': '这是常规分解，尚未形成会改变研究决定的新认识。',
+        'decisive_findings': [], 'prior_findings': [{'finding_id': 'F1', 'status': 'resolved',
+            'reason': '修订加入成功类别，全实例分母下分类已互斥且穷尽。'}]}}
+    paths = render_run(store, 'run-1', tmp_path / 'zero-retained', PromptLoader(ASSETS))
+    overview = paths['overview'].read_text(encoding='utf-8')
+    section = overview.split('## 本次未推荐的候选', 1)[1].split('## 调查范围与当前状态', 1)[0]
+    assert '这是常规分解，尚未形成会改变研究决定的新认识。' in section
+    assert '复核已解决：修订加入成功类别' in section
+    assert 'cards/card-1/v2.md' in section
+    assert '当前必要缺陷' not in section and '科学失败' not in section
+    assert '具体原因见调查范围和未完成事项' not in overview
+
+
+def test_unrecommended_candidate_shows_current_decisive_defect_without_task_logs(tmp_path, monkeypatch):
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    store = FakeStore(tmp_path)
+    store.cards = [card('NOT_RETAINED')]
+    store.cards[0]['selection_result'] = {'action': 'reject', 'value_reason': '结论超出可识别范围。',
+        'decisive_findings': [{'location': '/minimal_test/controls', 'reason': '未处理条件没有观测。',
+                              'required_change': '补齐未处理条件。'}]}
+    paths = render_run(store, 'run-1', tmp_path / 'unrecommended', PromptLoader(ASSETS))
+    section = paths['overview'].read_text(encoding='utf-8').split('## 本次未推荐的候选', 1)[1].split('## 调查范围与当前状态', 1)[0]
+    assert '未处理条件没有观测' in section and '补齐未处理条件' in section
+    assert '尚未确认远端结果' not in section
+
+
 def card(selection='MAIN_REPORT',card_id='card-1'):
     return {'card_id':card_id,'version':2,'selection':selection,'assessment':'PROMISING' if selection=='MAIN_REPORT' else 'NEEDS_EVIDENCE' if selection=='LEAD_ONLY' else 'REJECTED',
             'selection_result':{'why_worth_investigating':'已登记判断的原句，不能改变。','decisive_risks':['最致命风险：测量无法分离两个因素'],'next_action':'HANDOFF_EXPERIMENT','reopening_condition':'拿到分离测量后重新判断','evidence_ids':['e-1']},

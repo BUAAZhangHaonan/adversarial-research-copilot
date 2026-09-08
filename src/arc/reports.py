@@ -197,6 +197,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     calls = ledger.list_calls(run['budget_account_id']) if run.get('budget_account_id') else []
     paths: dict[str, Path] = {}
     main, leads, rejected, pending_cards = [], [], [], []
+    latest_versions = {card['card_id']: max(item['version'] for item in cards if item['card_id'] == card['card_id']) for card in cards}
     all_sources = {source['id']: source for source in _source_links(formal_source_ids, sources, output_dir, store)}
     for card in cards:
         # A later stage owns its assessment. Never display a prior discovery
@@ -247,8 +248,19 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             leads.append({'title':context['title'],'missing_prerequisite_paragraph':context['unresolved_paragraph'],
                           'reopening_action_paragraph':context['next_step_paragraph']+f'\n\n[查看研究卡详情]({relative})'})
         elif category == 'NOT_RETAINED':
-            rejected.append({'title':context['title'],'decision':context['decision_paragraph'],
-                             'reopen':_text((card.get('selection_result') or {}).get('reopening_condition') or card['draft'].get('risks',{}).get('reopen_conditions')),'path':relative})
+            if card['version'] == latest_versions[card['card_id']]:
+                judgment = card.get('selection_result') or {}
+                corrections = [
+                    ('复核已解决：' if item.get('status') == 'resolved' else '复核撤回先前判断：') + _text(item.get('reason'))
+                    for item in judgment.get('prior_findings', []) if item.get('status') in {'resolved', 'reviewer_error'}]
+                rejected.append({'title':context['title'],'decision':context['decision_paragraph'],
+                    'reason':_text(judgment.get('value_reason') or judgment.get('why_worth_investigating') or
+                                   f"当前决策为 {judgment.get('action', '不保留')}，尚未记录具体价值理由。"),
+                    'corrections':corrections,
+                    'defects':[{'location':item.get('location'), 'reason':item.get('reason'),
+                                'required_change':item.get('required_change')}
+                               for item in judgment.get('decisive_findings', [])],
+                    'reopen':_text(judgment.get('reopening_condition') or card['draft'].get('risks',{}).get('reopen_conditions')),'path':relative})
         else:
             pending_cards.append({'title':context['title'],'decision':context['decision_paragraph'],'path':relative})
     status = str(run['status'])
@@ -275,7 +287,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             for task in historical)
     overview = {'report_title': f"ARC {_heading(run['mode'])} 研究总览",
                 'executive_summary':f"本次已保存 {len(cards)} 张研究卡，其中 {len(main)} 张进入主报告，{len(leads)} 张为待补证线索。以下是当前候选的认识与风险；保留判断不代表假设已被实验验证。",
-                'main_cards':main,'leads':leads,
+                'main_cards':main,'leads':leads,'rejected':rejected,
                 'scope_changes':[{'summary':_text(change.get('proposed_problem_anchor')),'original_evidence_audit':_text({'original_sources_revisited':change.get('original_sources_revisited'),'missed_evidence_analysis':change.get('missed_evidence_analysis'),'trigger_evidence_ids':change.get('trigger_evidence_ids')})} for change in changes],
                 'scope_paragraph':_text({'run_id':run_id,'campaign_id':run.get('campaign_id'),'card_id':run.get('card_id'),'card_version':run.get('card_version')}),
                 'execution_status_paragraph':f"执行状态：{status}；停止原因：{_text(run.get('stop_reason'))}。已保存任务 {len(tasks)} 项，当前未完成 {len(pending)} 项，历史失败与未验收记录 {len(historical)} 项。" + historical_details,

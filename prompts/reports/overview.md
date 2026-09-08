@@ -19,7 +19,7 @@
 
 [查看研究卡详情]({{ card.relative_path }})
 {% else %}
-本次没有形成可进入主报告的研究卡。具体原因见调查范围和未完成事项，不能据此断言整个领域没有研究空间。
+本次没有形成可进入主报告的研究卡。候选的具体判断见下方；不能据此断言整个领域没有研究空间。
 {% endfor %}
 
 {% if leads %}
@@ -31,6 +31,24 @@
 {{ lead.missing_prerequisite_paragraph }}
 
 {{ lead.reopening_action_paragraph }}
+{% endfor %}
+{% endif %}
+
+{% if rejected %}
+## 本次未推荐的候选
+
+{% for card in rejected %}
+### [{{ card.title }}]({{ card.path }})
+
+{{ card.reason }}
+
+{% for correction in card.corrections %}
+{{ correction }}
+{% endfor %}
+
+{% for defect in card.defects %}
+当前必要缺陷（{{ defect.location }}）：{{ defect.reason }} 必要修改：{{ defect.required_change }}
+{% endfor %}
 {% endfor %}
 {% endif %}
 
