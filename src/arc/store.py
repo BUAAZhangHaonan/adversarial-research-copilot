@@ -651,7 +651,8 @@ class Store:
                 if issue.status=="resolved" and (previous is None or previous.status!="resolved"):
                     if issue.claim_kind=="empirical" and not transition.basis_evidence_ids:
                         raise StateError("empirical_issue_not_resolved_by_agreement")
-                    if issue.claim_kind=="empirical":
+                    retrieval_resolution=previous is not None and previous.status=="needs_retrieval"
+                    if issue.claim_kind=="empirical" or retrieval_resolution:
                         resolution_claim=canonical_claim
                         if run.card_id and resolution_claim is None:
                             resolution_claim=next((claim for card in self.list_cards(run_id=run_id)
@@ -661,7 +662,8 @@ class Store:
                         target=claim_fingerprint(resolution_claim) if resolution_claim else None
                         if not any(e.verification_status=="verified" and e.claim_id==issue.claim_id and e.claim_version==issue.claim_version and e.relation in {"supports","challenges"}
                             and (run.card_id is None or (resolution_claim is not None and self.evidence_targets_claim(e,resolution_claim))) for e in basis):
-                            error=StateError("empirical_resolution_requires_verified_claim_evidence")
+                            reason="empirical_resolution_requires_verified_claim_evidence" if issue.claim_kind=="empirical" else "retrieval_resolution_requires_verified_claim_evidence"
+                            error=StateError(reason)
                             error.diagnostics=[{"type":str(error),"issue_id":issue.issue_id,
                                 "loc":["result","issue_transitions",changes.index(transition),"basis_evidence_ids"],
                                 "expected_claim":{"claim_id":issue.claim_id,"claim_version":issue.claim_version},
