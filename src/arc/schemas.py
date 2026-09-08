@@ -272,7 +272,7 @@ class ResearchCard(StrictModel):
     draft: CardDraft
     selection: Selection | None = None
     assessment: Assessment | None = None
-    selection_result: SelectorResult | None = None
+    selection_result: SelectorResult | ScientificReview | None = None
     parent_version: int | None = Field(default=None, ge=1)
     created_at: str = Field(default_factory=utc_now)
 
@@ -674,6 +674,106 @@ class ReporterResult(StrictModel):
     scope_and_limits: str
     citation_ids: list[str]
 
+class ConceptionResult(StrictModel):
+    card_candidate: CardDraft | None
+    continue_or_stop: Literal['CONTINUE', 'STOP']
+    composition_reason: str = Field(min_length=1)
+    distinct_from_retained: str
+
+    @model_validator(mode='after')
+    def stopped_card(self):
+        if self.continue_or_stop == 'STOP' and self.card_candidate is not None:
+            raise ValueError('stopped_conception_cannot_propose_card')
+        return self
+
+class ScientificFinding(StrictModel):
+    finding_id: str = Field(min_length=1)
+    location: str = Field(min_length=1)
+    quoted_text: str
+    reason: str = Field(min_length=1)
+    consequence: str = Field(min_length=1)
+    evidence_ids: list[str]
+    source_ids: list[str]
+    severity: Literal['repairable', 'fatal', 'missing_evidence']
+    required_change: str = Field(min_length=1)
+    acceptance_test: str = Field(min_length=1)
+
+class VerificationWork(StrictModel):
+    question: str = Field(min_length=1)
+    method: Literal['source_read', 'counterexample', 'derivation', 'comparison']
+    answer: str = Field(min_length=1)
+    evidence_ids: list[str]
+    source_ids: list[str]
+
+class FindingResolution(StrictModel):
+    finding_id: str
+    status: Literal['resolved', 'unresolved', 'reviewer_error']
+    reason: str = Field(min_length=1)
+
+class ClaimEditAssessment(StrictModel):
+    claim_id: str
+    change_kind: Literal['unchanged_meaning', 'substantive']
+    reason: str = Field(min_length=1)
+
+class ScientificReview(StrictModel):
+    original_question: str = Field(min_length=1)
+    scope_faithful: bool
+    core_insight: str = Field(min_length=1)
+    value_judgment: Literal['substantial', 'routine', 'unsupported']
+    value_reason: str = Field(min_length=1)
+    verification_work: list[VerificationWork] = Field(min_length=1)
+    decisive_findings: list[ScientificFinding]
+    prior_findings: list[FindingResolution]
+    edit_assessments: list[ClaimEditAssessment]
+    remaining_uncertainty: list[str]
+    action: Literal['retain', 'revise', 'needs_evidence', 'reject']
+
+    @model_validator(mode='after')
+    def concrete_action(self):
+        for items in (self.decisive_findings, self.prior_findings):
+            ids = [item.finding_id for item in items]
+            if len(ids) != len(set(ids)):
+                raise ValueError('duplicate_scientific_finding')
+        if len({x.claim_id for x in self.edit_assessments}) != len(self.edit_assessments):
+            raise ValueError('duplicate_edit_assessment')
+        if self.action == 'retain' and (not self.scope_faithful or self.value_judgment != 'substantial'
+                or self.decisive_findings or any(x.status == 'unresolved' for x in self.prior_findings)):
+            raise ValueError('retention_requires_scope_value_and_no_decisive_error')
+        if self.action == 'revise' and not self.decisive_findings:
+            raise ValueError('revision_requires_located_scientific_defect')
+        return self
+
+    @property
+    def selection(self):
+        return 'MAIN_REPORT' if self.action == 'retain' else 'NOT_RETAINED' if self.action == 'reject' else 'LEAD_ONLY'
+
+    @property
+    def assessment(self):
+        return 'PROMISING' if self.action == 'retain' else 'REJECTED' if self.action == 'reject' else 'NEEDS_EVIDENCE'
+
+class SectionUpdate(StrictModel):
+    field: Literal['title', 'problem_anchor', 'contribution', 'motivation', 'closest_work_delta',
+                   'hypotheses', 'method', 'minimal_test', 'resources', 'risks']
+    value: JsonValue
+
+class ScientificRevision(StrictModel):
+    section_updates: list[SectionUpdate]
+    claim_updates: list[Claim]
+    remove_claim_ids: list[str]
+    addressed_findings: list[FindingResolution]
+    change_summary: list[str]
+    abandon: bool
+
+    @model_validator(mode='after')
+    def unique_changes(self):
+        fields = [x.field for x in self.section_updates]
+        claims = [x.claim_id for x in self.claim_updates]
+        if len(fields) != len(set(fields)) or len(claims) != len(set(claims)):
+            raise ValueError('duplicate_scientific_patch_target')
+        if len(self.remove_claim_ids) != len(set(self.remove_claim_ids)) or set(claims) & set(self.remove_claim_ids):
+            raise ValueError('ambiguous_scientific_claim_patch')
+        return self
+
 class CandidateFinding(StrictModel):
     candidate_id: str
     findings: list[str]
@@ -691,6 +791,8 @@ RESULT_SCHEMAS: dict[str, type[StrictModel]] = {
     "investigator": InvestigatorResult, "librarian": LibrarianResult,
     "discovery.FRAME": FrameResult, "discovery.NEXT_DRAW": NextDrawResult,
     "discovery.COMPOSE": ComposeResult, "novelty_examiner": NoveltyResult,
+    "discovery.CONCEIVE": ConceptionResult, "discovery.REVISE": ScientificRevision,
+    "scientific_reviewer": ScientificReview,
     "selector": SelectorResult, "developer": DeveloperResult, "proposer": ProposerResult,
     "skeptic": SkepticResult, "moderator": ModeratorResult, "reporter": ReporterResult,
     "evaluator": EvaluatorResult,

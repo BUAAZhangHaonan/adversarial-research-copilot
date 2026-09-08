@@ -9,11 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field
 ModelName = Literal['deepseek-v4-flash', 'deepseek-v4-pro']
 DEFAULT_ROLES = {
     'investigator': 'deepseek-v4-flash', 'librarian': 'deepseek-v4-flash',
-    'discovery': 'deepseek-v4-flash', 'novelty_examiner': 'deepseek-v4-pro',
+    'discovery': 'deepseek-v4-pro', 'novelty_examiner': 'deepseek-v4-pro',
     'selector': 'deepseek-v4-pro', 'developer': 'deepseek-v4-flash',
     'proposer': 'deepseek-v4-flash', 'skeptic': 'deepseek-v4-pro',
     'moderator': 'deepseek-v4-pro', 'reporter': 'deepseek-v4-flash',
     'evaluator': 'deepseek-v4-pro',
+    'scientific_reviewer': 'deepseek-v4-pro',
 }
 
 
