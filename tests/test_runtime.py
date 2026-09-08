@@ -176,16 +176,17 @@ async def test_native_json_output_invalid_or_empty_keeps_single_repair_policy(tm
     await runtime.close()
 
 @pytest.mark.asyncio
-async def test_semantic_hallucination_not_repaired_into_success(tmp_path):
-    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(json.dumps(answer(evidence_ids=['made_up'])))])
-    with pytest.raises(RuntimePaused,match='unknown_evidence_id'):await invoke(runtime)
-    assert len(requests)==1 and store.get_task('task_fixture').accepted_result is None
+async def test_reference_hallucination_still_rejected_after_one_correction(tmp_path):
+    runtime,store,ledger,requests=setup_runtime(tmp_path,[sse(json.dumps(answer(evidence_ids=['made_up']))),
+        sse(json.dumps(answer(evidence_ids=['made_up'])))])
+    with pytest.raises(RuntimePaused,match='INVALID_OUTPUT_AFTER_REPAIR'):await invoke(runtime)
+    assert len(requests)==2 and store.get_task('task_fixture').accepted_result is None
     await runtime.close()
 
 @pytest.mark.asyncio
 async def test_repair_cannot_invent_reference(tmp_path):
     runtime,store,ledger,requests=setup_runtime(tmp_path,[sse('{}'),sse(json.dumps(answer(evidence_ids=['invented'])))])
-    with pytest.raises(RuntimePaused,match='unknown_evidence_id'):await invoke(runtime)
+    with pytest.raises(RuntimePaused,match='INVALID_OUTPUT_AFTER_REPAIR'):await invoke(runtime)
     assert len(requests)==2 and store.get_task('task_fixture').accepted_result is None
     await runtime.close()
 

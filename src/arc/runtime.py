@@ -329,6 +329,51 @@ class Runtime:
         except (ValueError, KeyError, TypeError, FileNotFoundError) as exc:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
+    def _validate_output_reference_targets(self, envelope, payload, state):
+        """Read-only address diagnostics; no citation replacement or evidence writes."""
+        from .store import StateError
+        visible = {kind: reference_ids([payload, state.get('tool_trace', [])], keys)
+                   for kind, keys in [('source', SOURCE_REF_KEYS), ('evidence', EVIDENCE_REF_KEYS)]}
+        errors = []
+        checked = {}
+
+        def walk(value, path=()):
+            if isinstance(value, list):
+                for index, item in enumerate(value):
+                    walk(item, path + (index,))
+            elif isinstance(value, dict):
+                for key, item in value.items():
+                    kind = 'source' if key in SOURCE_REF_KEYS else 'evidence' if key in EVIDENCE_REF_KEYS else None
+                    if kind is None:
+                        walk(item, path + (key,))
+                        continue
+                    if item is None:
+                        continue
+                    entries = enumerate(item) if isinstance(item, list) else [(None, item)]
+                    for index, identifier in entries:
+                        loc = path + (key,) + ((index,) if index is not None else ())
+                        reason = None
+                        if not isinstance(identifier, str):
+                            reason = 'REFERENCE_ID_NOT_STRING'
+                        else:
+                            address = (kind, identifier)
+                            if address not in checked:
+                                try:
+                                    self.store.validate_references({kind + '_id': identifier})
+                                except StateError as exc:
+                                    checked[address] = str(exc)
+                                else:
+                                    checked[address] = None
+                            reason = checked[address]
+                            if reason is None and identifier not in visible[kind]:
+                                reason = 'reference_not_supplied_to_task'
+                        if reason:
+                            errors.append({'loc': list(loc), 'type': reason, 'supplied': identifier,
+                                           'visible_candidates': sorted(visible[kind])})
+        walk(envelope.model_dump(mode='json'))
+        if errors:
+            raise ValueError('OUTPUT_REFERENCE_INVALID; ' + json.dumps(errors, ensure_ascii=False))
+
     def _validate_evidence_request_targets(self, envelope, payload):
         """Pure claim/issue/draw addressing; no source checks or registry writes."""
         from .schemas import ModeratorResult, ComposeResult, ConceptionResult
@@ -614,6 +659,7 @@ class Runtime:
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
                 from .store import StateError
+                self._validate_output_reference_targets(envelope, payload, state)
                 try:
                     self._validate_evidence_request_targets(envelope, payload)
                 except StateError as exc:
