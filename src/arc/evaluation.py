@@ -109,7 +109,7 @@ def _record_failure(store, run_id, exc):
     store.update_run(run_id, status=status, stop_reason=getattr(exc, 'reason', None) or str(exc))
 
 
-async def run_comparison(settings, source_run_id):
+async def run_comparison(settings, source_run_id, *, seed=20260907, include_swapped_order=False):
     from .cli import services, new_run
     from .bootstrap import make_runtime
     from .workflows import data
@@ -135,7 +135,8 @@ async def run_comparison(settings, source_run_id):
         for source in sources:
             if source.get('content_path'):
                 source['content'] = store.read_artifact(source['content_path'])
-        material = {'topic': campaign.topic, 'boundaries': campaign.boundaries, 'sources': sources,
+        material = {'topic': campaign.topic, 'boundaries': campaign.boundaries,
+            'mandate': source_run.state.get('frame', {}).get('mandate'), 'sources': sources,
             'evidence': [store.get_record(identifier) for identifier in evidence_ids]}
         material_bytes = json.dumps(material, ensure_ascii=False, sort_keys=True).encode('utf-8')
         frozen_text = json.dumps({'material': material,
@@ -150,6 +151,11 @@ async def run_comparison(settings, source_run_id):
         raise ProtocolViolation('COMPARISON_MATERIAL_HASH_MISMATCH')
     if not frozen['evidence']:
         raise ValueError('COMPARISON_REQUIRES_FROZEN_EVIDENCE')
+    # Derive shared task context from the immutable material, not a later live
+    # campaign or a candidate's self-authored problem anchor.
+    original_task = {'topic': frozen['topic'], 'boundaries': frozen['boundaries'],
+                     'proposal_details_are_user_constraints': False}
+    frozen = {**frozen, 'original_task': original_task, 'mandate': frozen.get('mandate')}
     candidates = []
     for system in ('ARC', 'direct-Pro'):
         config = settings if system == 'ARC' else settings.model_copy(update={
@@ -162,6 +168,7 @@ async def run_comparison(settings, source_run_id):
         config = type(settings).model_validate(run.config)
         runtime = await make_runtime(store, ledger, run, config)
         draft = judgments = None
+        task_context = dict(frozen)
         store.update_run(run_id, status='RUNNING', stop_reason=None)
         try:
             if system == 'ARC':
@@ -177,20 +184,21 @@ async def run_comparison(settings, source_run_id):
                 if not family.proposed_family or not family.anchor_evidence_ids:
                     raise ProtocolViolation('COMPARISON_DIRECTION_REQUIRES_EVIDENCE_ANCHOR')
                 approved = data(family)
+                task_context['mandate'] = data(frame.mandate)
             else:
                 approved = {'user_topic': frozen['topic'], 'mode': 'direct_frozen_material_generation'}
             composed = await _frozen_call(store, runtime, run_id, 'compose', 'discovery', 'COMPOSE',
-                {**frozen, 'approved_family': approved})
+                {**task_context, 'approved_family': approved})
             draft = composed.card_candidate
             judgments = None
             if draft is not None:
                 card = store.save_card(draft, creation_key=run_id + '.card')
                 store.update_run(run_id, card_id=card.card_id, card_version=card.version)
                 novelty = await _frozen_call(store, runtime, run_id, 'novelty', 'novelty_examiner', payload={
-                    **frozen, 'card': data(card), 'evaluation_mode': 'frozen_material_only',
+                    **task_context, 'card': data(card), 'evaluation_mode': 'frozen_material_only',
                     'claim_evidence_bindings': store.claim_evidence_bindings(card.draft)})
                 judgments = await _frozen_call(store, runtime, run_id, 'selection', 'selector', payload={
-                    **frozen, 'card': data(card), 'novelty': data(novelty),
+                    **task_context, 'card': data(card), 'novelty': data(novelty),
                     'claim_evidence_bindings': store.claim_evidence_bindings(card.draft)})
                 validate_selection(store, card, judgments, novelty)
                 store.record_selection(run_id, card.card_id, card.version, judgments)
@@ -205,14 +213,23 @@ async def run_comparison(settings, source_run_id):
             'status': latest.status, 'stop_reason': latest.stop_reason,
             'pending_envelopes': {k: v for k, v in latest.state.get('comparison_envelopes', {}).items()
                                   if v['result_status'] != 'complete'}, 'cost': ledger.summary(run_id)})
-    shuffle_seed = 20260907
+    shuffle_seed = seed
     report = {'automatic_screen_only': True, 'material_hash': material_hash, 'shuffle_seed': shuffle_seed,
               'candidates': candidates, 'comparison_status': 'incomplete',
-              'evaluation': None, 'parent_cost': ledger.summary(VALIDATION_PARENT)}
+              'evaluation': None, 'evaluations': [],
+              'include_swapped_order': include_swapped_order, 'parent_cost': ledger.summary(VALIDATION_PARENT)}
     if any(c['status'] != 'COMPLETED' for c in candidates):
         store.save_artifact(f'evaluations/{source_run_id}/comparison.json', json.dumps(report, ensure_ascii=False, indent=2))
         return report
     anonymous, identity = anonymous_candidates(candidates, seed=shuffle_seed)
+    orders = [('forward', anonymous, identity)]
+    if include_swapped_order:
+        reversed_cards, reversed_identity = [], {}
+        for number, candidate in enumerate(reversed(anonymous), 1):
+            identifier = f'candidate_{number}'
+            reversed_cards.append({'candidate_id': identifier, 'research_card': candidate['research_card']})
+            reversed_identity[identifier] = identity[candidate['candidate_id']]
+        orders.append(('swapped', reversed_cards, reversed_identity))
     eval_id = source_run_id + '.comparison.evaluator'
     try:
         evaluation = store.get_run(eval_id)
@@ -221,11 +238,20 @@ async def run_comparison(settings, source_run_id):
     runtime = await make_runtime(store, ledger, evaluation, type(settings).model_validate(evaluation.config))
     store.update_run(eval_id, status='RUNNING', stop_reason=None)
     try:
-        result = await _frozen_call(store, runtime, eval_id, 'judge', 'evaluator', payload={**frozen, 'candidates': anonymous})
-        identifiers = [finding.candidate_id for finding in result.per_candidate_findings]
-        if len(identifiers) != len(set(identifiers)) or set(identifiers) != set(identity):
-            raise ProtocolViolation('EVALUATOR_CANDIDATE_COVERAGE')
-        report['evaluation'] = data(result)
+        for order, presented, mapping in orders:
+            # Keep the historical default key; new seeds/orderings have separate
+            # cached outputs and can never silently reuse another presentation.
+            key = 'judge' if seed == 20260907 and order == 'forward' else f'judge.seed{seed}.{order}'
+            result = await _frozen_call(store, runtime, eval_id, key, 'evaluator',
+                payload={**frozen, 'candidates': presented})
+            identifiers = [finding.candidate_id for finding in result.per_candidate_findings]
+            if len(identifiers) != len(set(identifiers)) or set(identifiers) != set(mapping):
+                raise ProtocolViolation('EVALUATOR_CANDIDATE_COVERAGE')
+            item = {'order': order, 'task_key': key, 'identity_map_private': mapping,
+                    'evaluation': data(result)}
+            report['evaluations'].append(item)
+            if order == 'forward':
+                report['evaluation'] = data(result)
         report['comparison_status'] = 'completed'
         store.update_run(eval_id, status='COMPLETED', stop_reason='frozen_material_comparison')
     except Exception as exc:
@@ -235,4 +261,9 @@ async def run_comparison(settings, source_run_id):
     report.update(identity_map_private=identity, evaluator_status=store.get_run(eval_id).status,
                   evaluator_state=store.get_run(eval_id).state, parent_cost=ledger.summary(VALIDATION_PARENT))
     store.save_artifact(f'evaluations/{source_run_id}/comparison.json', json.dumps(report, ensure_ascii=False, indent=2))
+    # Separate artifacts retain earlier seeds even when comparison.json points
+    # to the latest requested comparison. This does not regenerate candidates.
+    suffix = 'both' if include_swapped_order else 'forward'
+    store.save_artifact(f'evaluations/{source_run_id}/comparison.seed{seed}.{suffix}.json',
+                        json.dumps(report, ensure_ascii=False, indent=2))
     return report

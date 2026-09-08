@@ -270,3 +270,43 @@ async def test_e2e_existing_campaign_rejects_different_topic_before_any_executio
     assert executed==[] and calls==[]
     assert store.get_campaign(run.campaign_id).model_dump(mode='json')==original_campaign
     assert store.get_run(run.run_id).model_dump(mode='json')==original_run
+
+
+@pytest.mark.asyncio
+async def test_original_question_and_frame_mandate_reach_compose_and_both_judges(tmp_path,monkeypatch):
+    settings,store,source,calls=environment(tmp_path,monkeypatch,boundaries=['Preserve the user condition.'])
+    await run_comparison(settings,source.run_id)
+    for call in calls:
+        assert call['payload']['original_task']['topic']=='Controlled recall mechanisms'
+        assert call['payload']['original_task']['boundaries']==['Preserve the user condition.']
+        assert call['payload']['original_task']['proposal_details_are_user_constraints'] is False
+    arc=[call for call in calls if '.ARC.' in call['task_id']]
+    family=next(call for call in arc if call['task']=='NEXT_DRAW')
+    for call in arc:
+        if call['task']=='COMPOSE' or call['role'] in ('novelty_examiner','selector'):
+            assert call['payload']['mandate']==family['payload']['mandate']
+
+
+@pytest.mark.asyncio
+async def test_swapped_orders_reuse_candidates_and_preserve_both_results(tmp_path,monkeypatch):
+    settings,store,source,calls=environment(tmp_path,monkeypatch)
+    report=await run_comparison(settings,source.run_id,seed=81,include_swapped_order=True)
+    assert report['comparison_status']=='completed'
+    assert report['shuffle_seed']==81
+    assert len(report['evaluations'])==2
+    first,second=report['evaluations']
+    assert first['identity_map_private']['candidate_1']==second['identity_map_private']['candidate_2']
+    assert first['identity_map_private']['candidate_2']==second['identity_map_private']['candidate_1']
+    evaluated=[call for call in calls if call['role']=='evaluator']
+    assert len(evaluated)==2
+    assert evaluated[0]['payload']['candidates'][0]['research_card']==evaluated[1]['payload']['candidates'][1]['research_card']
+    assert len([call for call in calls if call['task']=='COMPOSE'])==2
+    count=len(calls)
+    repeated=await run_comparison(settings,source.run_id,seed=81,include_swapped_order=True)
+    assert len(calls)==count and repeated['evaluations']==report['evaluations']
+    path=f'evaluations/{source.run_id}/comparison.seed81.both.json'
+    original=store.read_artifact(path)
+    await run_comparison(settings,source.run_id,seed=82,include_swapped_order=True)
+    assert len(calls)==count+2
+    assert len([call for call in calls if call['task']=='COMPOSE'])==2
+    assert store.read_artifact(path)==original
