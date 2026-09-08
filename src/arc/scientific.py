@@ -246,11 +246,31 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
                     ev.evidence_id for ev in registered
                     if (ev.claim_id, ev.claim_version) == (claim.claim_id, claim.version)})
             support_key = key + '.support_review'
+            affected_ids = {item['claim_id'] for item in removed}
+            edit_reasons = {item.claim_id: item.reason for item in review.edit_assessments}
+            affected_targets = {(claim.claim_id, claim.version) for claim in supported.claims
+                if claim.claim_id in affected_ids}
+            replacement_ids = {item.evidence_id for item in registered
+                if (item.claim_id, item.claim_version) in affected_targets}
+            original_versions = {claim.claim_id: claim.version for claim in original.draft.claims}
             support_review = await engine.call(run_id, support_key, 'scientific_reviewer', payload={
                 **engine.context(run_id), 'original_card': card.model_dump(mode='json'),
                 'proposed_revision': supported.model_dump(mode='json'),
                 'review_target': supported.model_dump(mode='json'),
                 'previous_review': review.model_dump(mode='json'),
+                'support_review_scope': {
+                    'kind': 'affected_support',
+                    'affected_claims': [{'claim_id': claim.claim_id, 'version': claim.version,
+                        'change_reason': edit_reasons.get(claim.claim_id)}
+                        for claim in supported.claims if claim.claim_id in affected_ids],
+                    'removed_bindings': removed,
+                    'replacement_bindings': [binding for binding in engine.store.claim_evidence_bindings(supported)
+                        if binding['claim_id'] in affected_ids and binding['evidence_id'] in replacement_ids],
+                    'registered_evidence_ids': sorted(replacement_ids),
+                    'unchanged_claim_ids': [claim.claim_id for claim in supported.claims
+                        if claim.claim_id not in affected_ids and original_versions.get(claim.claim_id) == claim.version],
+                    'support_recheck': result.model_dump(mode='json'),
+                },
             }, tool_profile=tool_profile)
             validate_scientific_review(engine.store, supported, support_review, previous=review)
             if supported != card.draft:
