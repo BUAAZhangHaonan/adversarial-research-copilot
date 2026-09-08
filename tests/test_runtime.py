@@ -830,8 +830,9 @@ async def test_completed_moderator_can_request_evidence_for_its_declared_new_iss
 @pytest.mark.asyncio
 @pytest.mark.parametrize('target, has_card, allowed', [
     ('claim_new',True,True),('claim_unowned',True,False),('claim_new',False,False)])
-async def test_compose_requests_may_target_claims_declared_in_the_same_card(tmp_path,target,has_card,allowed):
-    from arc.schemas import Envelope, ComposeResult, Claim
+@pytest.mark.parametrize('conception', [False, True])
+async def test_compose_requests_may_target_claims_declared_in_the_same_card(tmp_path,target,has_card,allowed,conception):
+    from arc.schemas import Envelope, ComposeResult, ConceptionResult, Claim
     from arc.store import StateError
     from tests.test_selection import research_store, research_draft
     research_store(tmp_path)
@@ -842,7 +843,10 @@ async def test_compose_requests_may_target_claims_declared_in_the_same_card(tmp_
     raw = request_answer(claim_id=target)
     raw['result'] = {'card_candidate':draft.model_dump(mode='json') if has_card else None,
                      'composition_reason':'The question merits testing.', 'unresolved_prerequisites':[]}
-    envelope = Envelope[ComposeResult].model_validate(raw)
+    if conception:
+        raw['result'].pop('unresolved_prerequisites')
+        raw['result'].update(continue_or_stop='CONTINUE', distinct_from_retained='A new question.')
+    envelope = Envelope[ConceptionResult if conception else ComposeResult].model_validate(raw)
     payload = {'evidence_ids':['ev_synthetic'],'source_ids':['src_synthetic']}
     if allowed:
         runtime._validate_semantics(envelope,payload,{'tool_trace':[]})

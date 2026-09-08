@@ -310,7 +310,7 @@ class Runtime:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
     def _validate_semantics(self, envelope, payload, state):
-        from .schemas import InvestigatorResult, ModeratorResult, ComposeResult
+        from .schemas import InvestigatorResult, ModeratorResult, ComposeResult, ConceptionResult
         from .store import StateError
         from .validation import validate_role_targets
         validate_role_targets(envelope, payload)
@@ -328,7 +328,7 @@ class Runtime:
             raise StateError('reference_not_supplied_to_task')
         for field in ('claim_id', 'issue_id', 'draw_id'):
             visible = reference_ids(payload, {field, field + 's'})
-            if field == 'claim_id' and isinstance(envelope.result, ComposeResult):
+            if field == 'claim_id' and isinstance(envelope.result, (ComposeResult, ConceptionResult)):
                 candidate = envelope.result.card_candidate
                 if candidate is not None:
                     visible.update(claim.claim_id for claim in candidate.claims)
