@@ -1,6 +1,6 @@
 # ARC 功能改版验收结果（草稿）
 
-更新：2026-09-09，运行时间保留 UTC。**八个已知对照通过目标纠错；无辅助自然 discover 完成五张候选，但五张均未通过独立科学验收。** ARC 自身推荐的 draw3/4/5 仍有核心错误，不能将三张 PROMISING 当抽卡成功。旧卡定向 followup 与 draw1 的开发辅助 develop 均已完成并被 ARC 推荐，但独立科学验收仍未通过；当前辅助 run 在途，A–E 待做。0afa47c 软件快照另有 695 项完整检查及隔离安装通过，不能据此认定研究质量提升。逐条映射见[功能重构与验收](FUNCTIONAL_REDESIGN.md)。
+更新：2026-09-09，运行时间保留 UTC。**八个已知对照通过目标纠错；无辅助自然 discover 完成五张候选，但五张均未通过独立科学验收。** ARC 自身推荐的 draw3/4/5 仍有核心错误，不能将三张 PROMISING 当抽卡成功。旧卡 targeted 与 draw1 的辅助 develop/run 已完成并被 ARC 推荐，但仍有独立查出的错误。随后两个独立 final-correction 已保存，分别通过旧卡四项、自然卡两项已知目标的辅助定向验收；不回写前述失败或扩大成整卡穷尽通过。A–E r1 正在运行，尚无最终比较。31fc58c 软件快照另有 694 项完整检查及隔离安装通过，不能据此认定研究质量提升。逐条映射见[功能重构与验收](FUNCTIONAL_REDESIGN.md)。
 
 ## 已完成：四组成对科学纠错
 
@@ -23,15 +23,17 @@ v2 case5（正确的四条件交互卡）最初被评为 `substantial / retain`�
 
 这是一次已知案例上的校准修正。v2 的原始 `retain` 记录保留；value-v3 不能替代 v2 原始结果，也不能当作未见主题泛化或科研品味整体提高的证据。
 
-## 旧真实卡：两轮均完成，部分真修复仍不足以通过验收
+## 旧真实卡：前两轮保留失败，最终四项辅助目标通过
 
 首轮 `functional-20260908-old-natural-v7.science` 保存独立副本 `card_4aa11de0acd4448c951f583ea90f48d3` v3，结果 **NEEDS_EVIDENCE / scientific_revision_unresolved**。原卡 v7 保留。六处“三种错误份额之和恒为1”已改为含成功类的四类穷尽划分，官方输出键与计时枚举也修复；最终 ARC 自主发现四条件被写成五个、总渲染量错为100K/250K，未给 PROMISING。CodeX 随后另提出可加性和测量异质性推论的独立异议。
 
 显式携带开发反馈的 `functional-20260908-old-natural-targeted.science` 现已完成，副本 `card_2e27585aa71943448ff218e97762e35f` v1→v2，ARC 为 **PROMISING / experiment_required**，但独立验收仍失败。四条件、80K/200K总量已实改，第四类成功项未回退，H1增加等效容差，H3把组成变化腿降为未决；同时还保留三项错误：额外两格+40%应为+50%；不落入等效容差不都等于“未发现交互”（容差[-1,1]、CI[3,5]即反例）；同实例重计分只能排除组成变化，不能单独证明测量地板主导。
 
-最终复核把三项原 findings 全部 resolved 并 retain，另自主指出升级样本工作量应为3.33倍而非卡内×2–2.5，但留在 remaining_uncertainty，未改正文。这项检出属于 ARC，不能算作 CodeX 原创；吞吐不确定不能使确定工作量算式变正确。结果是辅助修订确有收益，但不等于已清除已知科学错误。详情见[旧卡两轮对照](OLD_CARD_CORRECTION.md)及私有 `work/OLD_TARGETED_RESULT.md/.json`、`work/OLD_TARGETED_SCIENCE_AUDIT.md`。
+最终复核把三项原 findings 全部 resolved 并 retain，另自主指出升级样本工作量应为3.33倍而非卡内×2–2.5，但留在 remaining_uncertainty，未改正文。这项检出属于 ARC，不能算作 CodeX 原创；吞吐不确定不能使确定工作量算式变正确。结果是辅助修订确有收益，但不等于已清除已知科学错误。详情见[旧卡各轮对照](OLD_CARD_CORRECTION.md)及私有 `work/OLD_TARGETED_RESULT.md/.json`、`work/OLD_TARGETED_SCIENCE_AUDIT.md`。
 
 定向运行24条调用全SETTLED，费用上界 **6.615908 CNY**，已包含原 source/quote 协议失败的 **1.650115 CNY**。该原任务先修source才暴露quote、最终INVALID_OUTPUT_AFTER_REPAIR，后经5c12dcf诊断汇总、0afa47c显式retry reason接线建立新任务完成闭环；原失败和费用保留，不再重复相加，也不覆盖首轮5.691864元或其NEEDS_EVIDENCE结果。
+
+最终独立运行 `functional-20260908-old-final-correction.science` 已完成，`card_bd770ef8ad0d43368a0d1f1380ff0a84` v1→v2，ARC仍为PROMISING。直接核对最终保存卡，额外两格+50%/单格+25%、容差外显著交互不再统称未检出、同实例只证明度量/参考敏感、固定epoch工作量10/3≈3.33四项均实际修正；80K/200K与成功类闭合保持。前三项由CodeX显式反馈，第四项由此前ARC自主检出。**仅四项已知目标定向验收通过**，不是整卡穷尽验证或未见质量改善。18条记录全SETTLED，上界3.440905 CNY；前两轮结果不改写。证据为 `work/OLD_FINAL_CORRECTION_RESULT.md/.json`、`work/OLD_FINAL_CORRECTION_AUDIT.md`。
 
 ## 新主题无辅助 discover：五卡完成，科学验收未通过
 
@@ -83,7 +85,7 @@ draw2 conception 的已完成工具 trace 在 11:45 UTC 实际对 `src_earlystop
 
 **独立审计也保留自我更正：** PSC=70%、EFA=25% 确在 Table 4，数值本身正确，仅原 Table 2 出处错误；ARC 此处的阅读全文比 CodeX 初次窄查更完整。此外，不能只见结果条件里的 OR 就断言分支必然重叠，须同时检查显著/不显著条件；该早期异议已撤回，不用于最终否决。完整五卡发现/修订/复核矩阵见 `work/NATURAL_SCIENCE_AUDIT.md`。
 
-**后续开发辅助边界。** draw1 v2 被选中是修复投入决定，原因是其最直接触及“已有充分性信号能否在相同错误风险下提供位置之外的退出信息”。先修数值/AUC、收窄概念与调度因果主张，再判断是否仍有值得研究的增量；允许最终降级或拒绝。显式使用 `natural-draw1-development-feedback.json` 后标记为 `development_assisted`，保留 ARC 自主 R1/R2 与 CodeX 额外意见署名。后续成功不能倒算为这五张无辅助通过。该选择后的 develop 已完成但独立仍未通过；run 现已携带新的显式反馈开始，结果见下方阶段状态。
+**后续开发辅助边界。** draw1 v2 被选中是修复投入决定，原因是其最直接触及“已有充分性信号能否在相同错误风险下提供位置之外的退出信息”。先修数值/AUC、收窄概念与调度因果主张，再判断是否仍有值得研究的增量；允许最终降级或拒绝。显式使用 `natural-draw1-development-feedback.json` 后标记为 `development_assisted`，保留 ARC 自主 R1/R2 与 CodeX 额外意见署名。后续成功不能倒算为这五张无辅助通过。该选择后的 develop/run 均已完成但独立仍未通过；后续独立final-correction只通过两项已知辅助目标，结果见下方阶段状态。
 
 **最终报告与引用核对。** 已生成 discover 最终 REPORT、卡片、费用与追踪入口。正式来源为 **22 条**，均能对应卡片/已接受审核或争点的显式引用；检索附录 **157 条**，其中 **135 条未进入正式引用**。五个最新卡详情的核心认识均在第 5 行，版本说明位于第 223–315 行，未由版本日志开头。引用分层已接通，但不会证明主张理解正确。f9aad60 已修复原报告把九个历史版本误称“9 张研究卡”及把旧版本列为未完成判断的问题。真实只读重渲染显示5候选/9版本/3主报告/2线索，九份详情、修复前 REPORT 与最新版本入口均保留；正式22来源集合、源卡/判定/运行/该阶段账本完全不变。核对原件为 `work/NATURAL_FINAL_REPORT_AUDIT.json` 与 `work/NATURAL_REPORT_RERENDER.json`，Windows 已同步修复后报告。
 
@@ -93,7 +95,17 @@ draw2 conception 的已完成工具 trace 在 11:45 UTC 实际对 `src_earlystop
 
 独立审计仍不通过，关键缺口为：有限统计量没有增量不能推出信号完全无信息；α风险上限不是必须命中的校准正控制；相对事后偶然首正确oracle的残差不能证明自评分数缺乏精度；不同阈值的退出题集变化不能全算成校准消除的lag份额。另有6–7K×200–600 token与4–9M总量不符的资源说明。无需实验即可识别这些定义/推论错误，不能用自主review零finding当正确性证明。
 
-本阶段24调用全SETTLED，已结算上界 **1.426032 CNY**（developer 0.464074，科学初审0.961958）。前后字段与费用原件为 `work/NATURAL_DEVELOP_RESULT.md/.json`，最终独立审计为 `work/NATURAL_DEVELOP_SCIENCE_AUDIT.md`，Windows已同步完整阶段报告。后续 run 已在第二轮显式开发反馈后接受五项决定性发现并进入定向修订；这属于 development_assisted，尚无最终完成结果。其以后结果与费用单列，不回填成 develop 自主检出了这些错误。
+本阶段24调用全SETTLED，已结算上界 **1.426032 CNY**（developer 0.464074，科学初审0.961958）。前后字段与费用原件为 `work/NATURAL_DEVELOP_RESULT.md/.json`，最终独立审计为 `work/NATURAL_DEVELOP_SCIENCE_AUDIT.md`，Windows已同步完整阶段报告。后续 run 与最终独立纠正的已完成结果和费用见下；均属于 development_assisted，不回填成 develop 自主检出了这些错误。
+
+## 开发辅助 run 与最终两项定向纠正
+
+`functional-20260908-natural.run` 已 COMPLETED / PROMISING，将原卡v3修订为v4；2026-09-08 17:48:56 UTC复核ACCEPTED，五项prior findings均resolved、无新增finding。实际修订改用固定位置阈值精度—召回扫描、允许实际风险低于α、分开共同题配对与新增覆盖、分列资源成本，删除oracle残差直接证明信号精度缺陷的裁决。这些是真实改善，discover→develop→run也已跑完全流程，没有执行训练或研究实验。
+
+但独立核对仍发现两项错误：P4、controls[1]、measurements[4]在Δ=s*−t*定义后又减t*（s*=8、t*=5应得3，却得−2）；O3将配对增益不显著解释为没有实用滞后，并把残差归于可靠性边际（点估计5、CI[-1,11]仍不能排除有意义收益）。ARC复核确有读原文和计算旧例，却复述错误双减并resolved。故 **流程完成、模型推荐与独立科学未通过并存**。本阶段24条SETTLED，上界3.049044 CNY；原件为 `work/NATURAL_RUN_RESULT.md/.json`、`work/NATURAL_RUN_SCIENCE_AUDIT.md`。
+
+随后显式携带这两个CodeX反例的新运行 `functional-20260908-natural-final-correction.science` 已COMPLETED/PROMISING，独立卡 `card_151cd7b908e840ba91ff86310087b9f9` v1→v2，保存于18:05:35 UTC。三处公式统一为Δ=s*−t*；O3报告点估计与CI、保持未决，仅满足预注册等效界才否定实用增益，残差分量不可分离且不作归因；decision_changed同步修订。先前阈值扫描、低风险合格、共同题与覆盖分开等正确项保持，resources/claims本轮未改。最终保存卡的 **两项已知辅助目标定向验收通过**，4条SETTLED、上界2.149556 CNY。
+
+两项通过不等于整卡已被穷尽检查、未见研究质量提高或真实实验成功；原五张无辅助discover失败、辅助develop/run复核漏检和费用记录均保留，不倒算成ARC自主发现。前后原句、最终卡及独立审计为 `work/NATURAL_FINAL_CORRECTION_RESULT.md/.json`、`work/NATURAL_FINAL_CORRECTION_AUDIT.md`，所有已完成阶段完整报告已同步Windows。
 
 ## draw3 论文接入与连续空读事故
 
@@ -118,17 +130,17 @@ draw2 conception 的已完成工具 trace 在 11:45 UTC 实际对 `src_earlystop
 
 后续 `ca6b222` 将 evaluator 候选覆盖错误接入已有纠正机会；`913b989` 允许 CONCEIVE 引用本次候选新声明的 claim，并由真实 draw3 缓存恢复验证；`72e09e5` 将请求 claim/issue/draw 绑定错误接入同一次 JSON 诊断；`eb9e0bf` 把 complete 响应的请求沿当前候选/科学循环交接，复核保留初审和修订请求。请求交接**不等于补证完成**，接收角色须结合已有核验判断，旧冻结输入不回写。绑定/纠正落地回归为 114 项；交接相关回归 70 项通过，随后交接文件新增 support 分支后 7 项通过。这些是本地模拟与流程检查，真实补证是否解决问题仍需看后续任务原件，不能换算为科学通过率。
 
-最新完成的完整软件验证为 **0afa47c：695 passed，0 failed/error/skipped**，于 2026-09-08 16:35:18 UTC 完成。sdist→wheel、仓库外隔离安装、38 份提示词/18 个注册任务/3 份配置资源、4 个 CLI 帮助与依赖检查均通过，原始 JSON 为 `work/software-validation-20260908T163216677905Z/SOFTWARE_VALIDATION.json`。Windows 的唯一 wheel/sdist 和同组验收 JSON 已更新。
+最新完成的完整软件验证为 **31fc58c：694 passed，0 failed/error/skipped**，于2026-09-08 17:58:20 UTC完成。sdist→wheel、仓库外隔离安装、38份提示词/18个注册任务/3份配置资源、4个CLI帮助与依赖检查均通过，原始JSON为 `work/software-validation-20260908T175518443480Z/SOFTWARE_VALIDATION.json`。Windows唯一wheel/sdist和同组JSON已更新。
 
-该快照包括 f9aad60 报告计数/历史版本分类修复、5c12dcf 一次性独立输出诊断汇总和 0afa47c 显式 retry reason 传递，及此前 c44e775/6668234 的来源日志/论文工具接入修复。旧失败不覆盖，正式工具参数/JSON 纠错额度不刷新；这些变更均晚于无辅助五卡，不能回填成其运行时能力。
+此前0afa47c的695项已完整通过；195240b后续快照为694 passed / 1 failed，失败是要求investigator逐字复述搜索trace的旧文案断言，与已交由runtime重建的职责不符。31fc58c删除这条过期断言并重新执行全部剩余694项，未跳过检查；原195失败JSON/XML/日志保留。`work/empty-actual-searches-check.json`另记录两种正常/中断恢复路径：empty actual_searches由真实trace重建，各2次模拟请求、0次JSON修复，付费调用0；这是离线恢复证据，不是模型质量实测。
 
-4dad9d4 全量快照真实为 **684 passed / 8 failed**，旧失败保留；f70b937/637、eb9e0bf/673、83bac05/685、6668234/692 均为历史快照。695 只认证 0afa47c，后续源码变动仍按影响补验和打包。软件通过与科学验收未通过并存。
+当前包包含f9aad60报告计数、5c12dcf独立输出诊断汇总、0afa47c显式retry reason，以及c44e775/6668234来源日志/论文接入修复和195240b机械trace职责调整。旧失败不覆盖，任务纠错额度不刷新；晚于自然候选运行的修改不能回填成其当时能力。4dad9d4的684 passed / 8 failed，以及f70b937/637、eb9e0bf/673、83bac05/685、6668234/692、0afa47c/695均保留各自历史范围。软件通过与科学验收未通过并存。
 
 ## 开发失败与费用
 
 v1 保留为历史开发记录：数字正确例仍把已报告效应写成“尚未测得”；交互组正控未区分人工软件校验与未知系统响应；修订字段结构问题也曾阻断流程。这些真实失败促成 fixture、结构诊断与修订接口的修复，不能删除，也不能把合理的额外查错统计成正确版本误杀。原件见 [v1 fixture](../tests/fixtures/scientific_error_pairs_v1.json)，当前对照见 [v2 fixture](../tests/fixtures/scientific_error_pairs.json)。
 
-以下按已完成的各独立子账本费用上界汇总，单位 CNY，不使用父账本历史累计。**当前合计64.525617元，尚不包含在途run与未执行A–E**；部分调用是有界用量估算，不冒称供应商精确账单。
+以下按已完成的各独立子账本费用上界汇总，单位 CNY，不使用父账本历史累计。**当前已完成合计73.165122元，尚不包含在途A–E**；部分调用是有界用量估算，不冒称供应商精确账单。
 
 | 验证 | 费用 |
 | --- | ---: |
@@ -140,18 +152,23 @@ v1 保留为历史开发记录：数字正确例仍把已报告效应写成“�
 | 新主题无辅助 discover（五个候选；包含其原协议失败与恢复） | 31.624446 |
 | 旧卡显式定向 followup（含原失败1.650115） | 6.615908 |
 | draw1 开发辅助 develop | 1.426032 |
-| 已完成运行合计 | **64.525617** |
+| draw1 开发辅助 run | 3.049044 |
+| 自然卡最终两项辅助纠正 | 2.149556 |
+| 旧卡最终四项辅助纠正 | 3.440905 |
+| 已完成运行合计 | **73.165122** |
 
-逐例成本见 `scientific-controls-v2.md/.json`、`scientific-pairs-v2-results.json`、`value-calibration-v3-results.json`，新增阶段见 `OLD_TARGETED_RESULT.json`、`NATURAL_DEVELOP_RESULT.json` 及各run的 `COST_REPORT.md`。draw3空读关联费用和旧卡首任务失败都已在各自阶段总额中，不另叠加。这些私有运行产物不随源码公开。
+逐例成本见 `scientific-controls-v2.md/.json`、`scientific-pairs-v2-results.json`、`value-calibration-v3-results.json`，新增阶段见 `OLD_TARGETED_RESULT.json`、`NATURAL_DEVELOP_RESULT.json`、`NATURAL_RUN_RESULT.json`、`NATURAL_FINAL_CORRECTION_RESULT.json`、`OLD_FINAL_CORRECTION_RESULT.json` 及各run的 `COST_REPORT.md`。draw3空读关联费用和旧卡首任务失败都已在各自阶段总额中，不另叠加。这些私有运行产物不随源码公开。
 
 ## 当前交付状态与未完成项
 
-| 项目 | 已确认状态 | 尚需完成 |
+| 项目 | 已确认状态 | 尚需完成或结论边界 |
 | --- | --- | --- |
-| 旧卡两轮 | 首轮NEEDS_EVIDENCE；定向followup完成PROMISING但独立仍失败，真实改进与残余错误均已导出 | 不把其当可无保留执行协议；后续若修复需另留任务与前后证据 |
-| 自然 discover / develop | 五卡discover结束，三推荐为独立误放；辅助develop完成v3/PROMISING，仍漏四项关键错误 | 已完成结果冻结，不以之后辅助成功改写 |
-| 自然 run | 显式反馈后的初审已接受五项发现，定向修订在途 | 最终卡、审查/修订、独立验收、阶段成本与风险 |
-| A–E 消融 | 实现、冻结材料和导出器就绪；真实比较尚未执行 | 各条件候选/修改、独立费用、双序匿名评价及人工研究价值判断 |
-| 软件与报告交付 | 0afa47c/695完整检查、打包与隔离安装通过；自然计数已修、所有已完成阶段报告已导出 | run/A–E结束后统一更新入口、总费用和实际软件/报告快照 |
+| 旧卡各轮 | 首轮NEEDS_EVIDENCE；targeted推荐仍误放；最终独立纠正保存四项实改并通过定向验收 | 不升级为整卡穷尽科学通过，原失败及各轮费用保留 |
+| 自然discover/develop/run | 五卡discover结束、三推荐均有独立硬错误；辅助develop/run完成仍漏检 | 全流程完成不代表科学通过；原结果不回写 |
+| 自然最终纠正 | 新独立卡v2，两项显式反馈目标已保存并定向通过 | 不是无辅助检出或未见质量提高 |
+| A–E r1消融 | 同材料、条件、导出器就绪，真实生成正在进行 | 完成各条件候选/修改、独立费用、双序匿名评价及人工研究价值判断 |
+| 软件与报告交付 | 31fc58c/694完整检查、打包隔离安装通过；全部已完成阶段报告已导出 | A–E结束后统一入口与费用，不提前宣称比较优势 |
 
-当前不能宣布本轮科学功能验收通过：八个已知语义对照成功，但五张无辅助自然候选均未通过独立验收，三张存在核心错误仍被推荐。后续判断仍需回答：新卡是否提供了值得继续思考的认识，必要修订是否改善了这个认识。自动纠错与自动比较可以提供证据，不能自行宣布 ARC 已优于直接 Pro。
+A–E实验 `functional-20260908-ablation-r1` 首次CLI遗漏 `--env-file`，A/B/C在客户端初始化时报Missing credentials，均0调用/0成本；D/E因A无候选暂停，judge未启动。原始诊断另存 `work/ABLATION_R1_AUTH_STARTUP_FAILURE.md/.json`，不被后续进度覆盖。主线程已在同一ID补充 `--env-file .env` 恢复，日志 `work/ablation-r1-resumed.log`；这是启动配置错误及恢复，不是模型科学比较结果。当前尚无完整A–E结论，其费用与上表已完成73.165122元分开汇总。
+
+当前不能宣布ARC自主科学质量验收通过：八个已知语义对照成功，且最后六项已知辅助目标得以修复，但五张无辅助自然候选均未通过独立验收，三张核心错误被推荐。仍需判断新卡是否提供值得继续思考的认识、修订是否改善研究价值；自动纠错和自动比较不能自行宣布ARC优于直接Pro。
