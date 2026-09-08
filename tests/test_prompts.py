@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import hashlib
 import re
 import shutil
 from pathlib import Path
@@ -17,25 +16,18 @@ DATA={'task_id':'task-1','subject':{'run_id':'run-1','card_id':'card-1','card_ve
 SCHEMA={'type':'object','properties':{'schema_version':{'const':'arc.v1'},'result':{'type':'object'},'note':{'anyOf':[{'type':'string'},{'type':'null'}]}}}
 
 
-def test_spec_assets_are_exact():
+def test_original_spec_remains_in_explicit_historical_fixture():
     spec=(ROOT/'EXECUTION_SPEC.md').read_text(encoding='utf-8')
     blocks=re.findall(r'(?ms)^## A\d+\. `(prompts/[^`]+)`\n\n````markdown\n(.*?)^````\s*$',spec)
     assert len(blocks)==27
+    historical=ROOT/'tests/fixtures/prompts_pre_redesign'
     for path,body in blocks:
-        actual=(ROOT/path).read_text(encoding='utf-8')
-        additions={'prompts/tasks/repair_structure.md':'\n## Complete structural diagnostics\n',
-                   'prompts/roles/moderator.md':'\n## Runtime claim version assignment and issue targets\n',
-                   'prompts/roles/developer.md':'\n## IMPORT: preserve an explicitly supplied user question or proposal\n',
-                   'prompts/roles/investigator.md':'\n## Mechanical search trace mapping\n',
-                   'prompts/common/output_protocol.md':'\n## Evidence request ownership\n',
-                   'prompts/tools/read_record.md':'\n## Cached source coverage\n',
-                   'prompts/tools/request_capability.md':'\n## Improvements to an existing capability\n',
-                   'prompts/reports/capabilities.md':'\n## 改进需求的处理边界\n'}
-        if path in additions:
-            assert actual.startswith(body)
-            assert actual[len(body):].startswith(additions[path])
-        else:
-            assert actual==body
+        assert (historical/Path(path).relative_to('prompts')).read_text(encoding='utf-8').startswith(body)
+    old=PromptLoader(historical).render('discovery.COMPOSE',DATA,schema=SCHEMA)
+    current=PromptLoader(ASSETS).render('discovery.CONCEIVE',DATA,schema=SCHEMA)
+    assert old.messages[0]['content']!=current.messages[0]['content']
+    assert 'common/scientific_goal.md' not in old.dependencies
+    assert not any('fixtures' in name for name in current.dependencies)
 
 
 def test_registered_roles_render_traceable_task_and_minimal_prefix():
@@ -49,7 +41,9 @@ def test_registered_roles_render_traceable_task_and_minimal_prefix():
         assert '{{ task_id }}' not in rendered.messages[1]['content']
         assert set(rendered.source_hashes)==set(rendered.dependencies)
         assert 'common/research_policy.md' in rendered.dependencies
-        assert f"roles/{entry['role']}.md" in rendered.dependencies
+        role_path='roles/discovery_staged.md' if prompt_id in {'discovery.FRAME','discovery.NEXT_DRAW','discovery.COMPOSE'} else f"roles/{entry['role']}.md"
+        assert role_path in rendered.dependencies
+        assert 'common/scientific_goal.md' in rendered.dependencies
     assert 'common/selection_examples.md' not in loader.render('skeptic.INVOKE',DATA,schema=SCHEMA).dependencies
     assert 'common/resource_policy.md' in loader.render('discovery.COMPOSE',DATA,schema=SCHEMA).dependencies
 
@@ -126,10 +120,9 @@ def test_investigator_targets_existing_claim_version_without_guessing():
 
 
 @pytest.mark.parametrize('prompt_id',['investigator.INVOKE','investigator.SCOPE_AUDIT'])
-def test_calibrated_investigator_preserves_v2_prefix_and_renders_evidence_boundaries(prompt_id):
+def test_calibrated_investigator_renders_evidence_boundaries(prompt_id):
     text=(ASSETS/'roles/investigator.md').read_text(encoding='utf-8')
-    prefix,addition=text.split('\n## Exact excerpts, source access and claim scope\n',1)
-    assert hashlib.sha256(prefix.encode('utf-8')).hexdigest()=='7b412a9eb3aea6f245fa5fd9e8971689fb2835e74cf27b0d29292641e5b6811f'
+    addition=text.split('\n## Exact excerpts, source access and claim scope\n',1)[1]
     rendered=PromptLoader(ASSETS).render(prompt_id,DATA,schema=SCHEMA)
     system=rendered.messages[0]['content']
     assert addition.strip() in system
@@ -141,7 +134,7 @@ def test_calibrated_investigator_preserves_v2_prefix_and_renders_evidence_bounda
     assert 'does not establish that the full paper or the literature lacks it' in system
     assert 'Keep an unknown source version unknown' in system
     assert '`A ... B`' in system and '`We observed a change [8].`' in system
-    assert rendered.source_hashes['roles/investigator.md']==hashlib.sha256(text.encode()).hexdigest()
+    assert rendered.sources['roles/investigator.md']==text
 
 
 def test_unregistered_or_missing_resources_fail_before_invocation(tmp_path):
@@ -237,3 +230,36 @@ def test_ast_checks_dict_tool_descriptions_and_raw_messages(tmp_path):
     assert len(failures)==2
     assert any('inline_tool_description' in failure for failure in failures)
     assert any('inline_message' in failure for failure in failures)
+
+
+@pytest.mark.parametrize('prompt_id',['discovery.CONCEIVE','discovery.REVISE','scientific_reviewer.INVOKE'])
+def test_short_scientific_roles_render_only_their_responsibility(prompt_id):
+    data={**DATA,'payload':{'original_user_problem':{'topic':'固定用户范围','essential_conditions':['资源限制']},'card':{'title':'当前候选'},'review':{'findings':[{'location':'minimal_test','acceptance_condition':'比较包含必要条件'}]}}}
+    rendered=PromptLoader(ASSETS).render(prompt_id,data,schema=SCHEMA,tool_profile=['read_record'])
+    assert '固定用户范围' in rendered.messages[1]['content']
+    assert '资源限制' in rendered.messages[1]['content']
+    assert 'roles/discovery_staged.md' not in rendered.dependencies
+    assert 'roles/selector.md' not in rendered.dependencies
+    assert 'roles/novelty_examiner.md' not in rendered.dependencies
+    assert 'verification_status=verified' in rendered.messages[0]['content']
+    assert 'not that the excerpt entails a claim' in rendered.messages[0]['content']
+    if prompt_id=='discovery.REVISE':
+        assert 'tasks/revise_science.md' in rendered.dependencies
+        assert 'patch' in rendered.messages[1]['content']
+        assert '比较包含必要条件' in rendered.messages[1]['content']
+
+
+def test_scientific_review_does_concrete_checks_without_regression_answers():
+    system=PromptLoader(ASSETS).render('scientific_reviewer.INVOKE',DATA,schema=SCHEMA).messages[0]['content']
+    assert '分母' in system and '极端情况' in system and '最小反例' in system
+    assert '错误文本与受影响推论是否真的消失' in system
+    assert '合格但普通' in system and '简洁方法解除瓶颈' in system
+    for answer in ('PNDR','40.44','RayTraced','T-LESS','HB Scene10'):
+        assert answer not in system
+
+
+def test_moderator_scientific_priority_does_not_teach_avoiding_edits():
+    system=PromptLoader(ASSETS).render('moderator.INVOKE',DATA,schema=SCHEMA).messages[0]['content']
+    assert '不要为节省状态更新或证据重绑而保留错误文本' in system
+    assert 'A second revision requiring the same kind of removal pauses' not in system
+    assert '检索没有读到全文，也不能关闭全文是否覆盖贡献的问题' in system

@@ -1,4 +1,12 @@
-# Evidence and provenance
+# Evidence and scientific support
+
+`verification_status=verified` establishes source/excerpt provenance, not that the excerpt entails a claim. Independently inspect the method, population, setting, quantity, denominator and applicable conditions before judging support. A quoted sentence can exist exactly as written while its interpretation in the card is wrong.
+
+Separate retrieved candidates, decision-relevant working evidence and formal citations. Irrelevant search hits stay in the search log; they are not evidence simply because a tool returned them. Carry the few passages that affect the current decision, including decisive counterevidence. Open further source text on demand.
+
+Facts need sources. Connecting supported facts into a new hypothesis is legitimate inference and does not require an author to have already stated that hypothesis. Explain its premises and testable uncertainty. Inspect critical support for motivation, nearest-work difference and the minimal test first; do not demand exhaustive review of every background sentence.
+
+Ordinary wording corrections do not create a new scientific result. Recheck affected support relationships when a claim's meaning, applicability or causal force changes. Source originals and historical records remain available; neither provenance nor prior approval automatically establishes support for a materially changed claim.
 
 Only cite source_id and evidence_id values supplied by the runtime or registered by an actual tool result. A plausible title, URL, DOI, arXiv identifier, or section number generated from memory is not a verified reference. Register and inspect a source before relying on it.
 
