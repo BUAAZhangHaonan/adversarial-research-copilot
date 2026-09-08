@@ -224,6 +224,28 @@ def test_compare(ctx: typer.Context, source_run: str = typer.Option(...),
     from .evaluation import run_comparison
     asyncio.run(run_comparison(ctx.obj, source_run, seed=seed, include_swapped_order=swap_order))
 
+
+@app.command(name='test-ablation')
+def test_ablation(ctx: typer.Context, source_run: str = typer.Option(...),
+                  experiment_id: str = typer.Option(...), parent_budget: str = typer.Option(...),
+                  budget_cny: str = typer.Option(...), seed: int = typer.Option(...),
+                  legacy_prompt_root: Path = typer.Option(Path('tests/fixtures/prompts_pre_redesign'),
+                      exists=True, file_okay=False, resolve_path=True)):
+    """开发用：在显式父账本内串行运行或恢复冻结材料的 A–E 消融。"""
+    from decimal import InvalidOperation
+    from .functional_evaluation import run_ablation
+    try:
+        budget = Decimal(budget_cny)
+    except InvalidOperation as exc:
+        raise typer.BadParameter('budget must be a positive finite CNY amount', param_hint='--budget-cny') from exc
+    if not budget.is_finite() or budget <= 0:
+        raise typer.BadParameter('budget must be a positive finite CNY amount', param_hint='--budget-cny')
+    if not (legacy_prompt_root / 'manifest.json').is_file():
+        raise typer.BadParameter('historical prompt directory must contain manifest.json',
+                                 param_hint='--legacy-prompt-root')
+    asyncio.run(run_ablation(ctx.obj, source_run, experiment_id=experiment_id,
+        parent_id=parent_budget, budget_cny=budget_cny, seed=seed, legacy_prompt_root=legacy_prompt_root))
+
 @app.command(name='retry-comparison-task')
 def retry_comparison_task(ctx: typer.Context, source_run: str,
                           system: str = typer.Option(...), task_key: str = typer.Option(...),
