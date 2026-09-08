@@ -1,0 +1,190 @@
+{
+  "purpose": "已见正确卡的定向研究价值回归：结果未知且检验合理不能独自证明重要洞察；不检验未见迁移。",
+  "synthetic": true,
+  "cases": [
+    {
+      "case_id": "interaction_correct",
+      "pair_id": "interaction",
+      "model_visible": {
+        "original_task": {
+          "topic": "两个二值干预是否存在非加性交互？",
+          "boundaries": [
+            "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "两个二值干预是否存在非加性交互？",
+          "problem_anchor": {
+            "question": "两个二值干预是否存在非加性交互？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+            "evidence_ids": [
+              "ev_interaction"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_interaction"
+            ],
+            "established_claim": "材料定义四个可独立设置的干预条件，并说明随机顺序和完全复位；没有提供任何条件响应。",
+            "remaining_claim": "四条件响应及其加性尺度交互值尚未测量。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "在相同单元测量四个条件，估计交互对比。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "必选条件为(A,B)=(0,0)、(1,0)、(0,1)、(1,1)，每个单元均测量。",
+            "controls": [
+              "相同总体、测量仪器和复位程序",
+              "随机条件顺序",
+              "固定A/B各自的干预强度"
+            ],
+            "measurements": [
+              "I=Y_11-Y_10-Y_01+Y_00；给出重复单元不确定性"
+            ],
+            "positive_controls": [
+              "只校验统计软件：人工构造四格输入(Y_00,Y_10,Y_01,Y_11)=(1,2,3,7)，直接送入交互计算函数，应得I=3；再把人工Y_11改为4，应得I=0。",
+              "上述输入由测试者任意指定，独立于目标系统，不是目标系统的已知响应或实测证据，也不能替代目标系统四条件的实际测量。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "I偏离0支持该尺度和总体中的非加性交互；不能据此独自确定潜在机制。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "原始记录精度；不涉及量化模型",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_interaction",
+              "version": 1,
+              "text": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+              "conditions": [
+                "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_interaction"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_interaction",
+            "title": "合成研究材料 interaction",
+            "content": "合成实验定义：A与B均可独立设为0或1。Y_ab是同一目标总体在A=a且B=b下的平均连续响应。各单元可重复测量四种条件，条件顺序随机，测量间完全复位，无携带效应。候选要估计加性尺度上的交互，未有任何条件的已知响应常数。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_interaction",
+            "source_id": "src_interaction",
+            "claim_id": "claim_interaction",
+            "claim_version": 1,
+            "claim": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+            "conditions": [
+              "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+            ],
+            "excerpt": "合成实验定义：A与B均可独立设为0或1。Y_ab是同一目标总体在A=a且B=b下的平均连续响应。各单元可重复测量四种条件，条件顺序随机，测量间完全复位，无携带效应。候选要估计加性尺度上的交互，未有任何条件的已知响应常数。",
+            "locator": "chars:0:110",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": false,
+        "target_locations": [],
+        "reason": "本例目标错误不存在。可判断研究价值普通，不应捏造该硬错误。",
+        "repair_acceptance": "不需要针对该错误修订。",
+        "not_a_quality_label": true,
+        "expected_value": "routine"
+      }
+    }
+  ],
+  "fixture_version": 2,
+  "revision_note": "v1保留为历史开发材料。v2明确归因对只检验本地复现，不把表1已报告的效应称为尚未测得；分解对明确阶段条件判定。正确对照只表示没有指定硬错误，不表示研究价值已获认可。",
+  "development_scope": "Value-judgment regression on the unchanged previously overvalued correct card; not an unseen quality benchmark.",
+  "unseen_test": false
+}
