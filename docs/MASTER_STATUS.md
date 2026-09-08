@@ -20,7 +20,7 @@
 
 r2原B.selection应用暂停与显式retry费用保留；retry重评资源前提，没有修原科学卡。E最终v2的新增finding未修，COMPLETED不能写PROMISING。计划内两轮运行和审计已结束，未证明自主科学可靠性；详见[两轮结果](FUNCTIONAL_ABLATION_RESULTS.md)与[最终费用口径](COST_REPORT.md)。
 
-清理明细保留于私有`work/CLEANUP_PLAN.md`及`cleanup-completed-*.json`：已结束软件副本与过期包按明确路径清理，当前55a134c dist、所有外层验证日志、付费原件及必要helpers保留；主线程最后清理尚待实际记录。5个Windows历史阻断路径未重试删除；下方早期列出的3处仅是当时快照，不代表当前总数。没有新增文件哈希校验。
+清理明细保留于私有`work/CLEANUP_PLAN.md`及`cleanup-completed-*.json`：已结束软件副本与过期包按明确路径清理，当前55a134c dist、所有外层验证日志、付费原件及必要helpers保留；最后一批166项及三个pytest目录已清理，旧工作树登记已解除，仅剩canonical master；原数据前后不变，详见[最终收尾](FINAL_CLOSEOUT.md)。5个Windows历史阻断路径未重试删除；下方早期列出的3处仅是当时快照，不代表当前总数。没有新增文件哈希校验。
 
 ## 功能重构前的历史快照（原结果保留）
 
