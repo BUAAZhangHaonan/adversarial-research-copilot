@@ -93,17 +93,26 @@ async def test_saved_repaired_metadata_recovers_without_additional_sdk_request(t
 async def test_mechanical_logs_do_not_repair_scientific_findings(tmp_path, field, value, error):
     raw = research_answer()
     raw['result']['findings'][0][field] = value
-    runtime, store, ledger, requests = fixture_runtime(tmp_path, [tool_response(), sse(json.dumps(raw))])
-    with pytest.raises(RuntimePaused, match=error):
+    responses = [tool_response(), sse(json.dumps(raw))]
+    # Only reference addressing receives the existing JSON correction; an
+    # invented scientific excerpt remains a provenance rejection.
+    if field == 'source_id':
+        responses.append(sse(json.dumps(raw)))
+    runtime, store, ledger, requests = fixture_runtime(tmp_path, responses)
+    stop_error = 'INVALID_OUTPUT_AFTER_REPAIR' if field == 'source_id' else error
+    with pytest.raises(RuntimePaused, match=stop_error):
         await invoke_research(runtime)
     task = store.get_task('task_fixture')
     assert task.accepted_result is None
     state = json.loads(store.read_artifact(task.response_artifact_path))
     assert json.loads(state['response']['message']['content']) == raw
-    assert state['repair_count'] == 0
-    with pytest.raises(RuntimePaused, match=error):
+    assert state['repair_count'] == (1 if field == 'source_id' else 0)
+    if field == 'source_id':
+        assert error in state['final_validation_errors'][0]
+        assert 'findings' in state['final_validation_errors'][0]
+    with pytest.raises(RuntimePaused, match=stop_error):
         await invoke_research(runtime)
-    assert len(requests) == 2
+    assert len(requests) == (3 if field == 'source_id' else 2)
     await runtime.close()
 
 
