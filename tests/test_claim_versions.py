@@ -147,7 +147,7 @@ def test_new_issue_with_wrong_version_is_not_repaired(tmp_path):
     derived, _, references = derive_claim_versions(original, result, new_issue_contract=True)
     assert derived.updated_issues[0].claim_version == 9 and not references
     card = store.save_card(derived.proposed_card_revision, card_id=original.card_id, parent_version=1)
-    run = store.create_run('run', card_id=card.card_id, card_version=card.version)
+    run = store.create_run('run', card_id=card.card_id, card_version=card.version, state={'research_flow':'legacy_debate_v1'})
     with pytest.raises(StateError, match='issue_refers_to_unknown_claim_version'):
         store.apply_issues(run.run_id, derived.updated_issues, derived.issue_transitions)
 
@@ -185,7 +185,7 @@ def workflow_case(tmp_path, *, mode='develop', keep_evidence=False):
         text='Distance and distractor count covary.', conditions=['synthetic controlled recall task'],
         kind='empirical', evidence_ids=[evidence.evidence_id] if keep_evidence else [])]
     card = store.save_card(draft)
-    run = store.create_run(mode, card_id=card.card_id, card_version=card.version)
+    run = store.create_run(mode, card_id=card.card_id, card_version=card.version, state={'research_flow':'legacy_debate_v1'})
     runtime = ConditionsRuntime(store, mode='developer' if mode == 'develop' else 'moderator',
                                 keep_evidence=keep_evidence)
     return store, card, run, runtime, evidence

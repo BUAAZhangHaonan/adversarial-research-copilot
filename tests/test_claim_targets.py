@@ -187,6 +187,7 @@ async def test_runtime_missing_revision_claims_repairs_once_before_workflow_save
     original=card_payload();original['claims']=[claim('draft_c1',1),claim('draft_c2',1)]
     card=store.save_card(original)
     store.update_run(SUBJECT['run_id'],card_id=card.card_id,card_version=card.version)
+    store.update_run(SUBJECT['run_id'],state={**store.get_run(SUBJECT['run_id']).state,'research_flow':'legacy_debate_v1'})
     subject={**SUBJECT,'card_id':card.card_id,'card_version':card.version}
     omitted=deepcopy(original);del omitted['claims']
     raw=answer();raw['task_id']=SUBJECT['run_id']+'.development';raw['subject']=subject

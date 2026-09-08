@@ -52,7 +52,7 @@ def setup_case(tmp_path, *, paused=True):
     ledger.mark_started('old-call')
     ledger.settle('old-call', '1', '1', 'usage_calculated')
     run = store.create_run('run', card_id=card.card_id, card_version=card.version,
-        budget_account_id='stage', run_id='research-run')
+        budget_account_id='stage', run_id='research-run', state={'research_flow':'legacy_debate_v1'})
     if paused:
         inputs = {'payload': {'card': card.model_dump(mode='json'), 'frozen_context': 'Original science'},
                   'subject': {'campaign_id': None, 'run_id': run.run_id,

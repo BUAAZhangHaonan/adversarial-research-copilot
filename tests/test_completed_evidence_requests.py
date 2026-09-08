@@ -106,7 +106,7 @@ async def test_after_evidence_alias_retains_only_final_requests(tmp_path):
 async def test_reassessment_retrieves_final_requests_not_superseded_ruling(tmp_path, monkeypatch):
     store, _, _ = research_store(tmp_path)
     card = store.save_card(research_draft())
-    run = store.create_run('run', card_id=card.card_id, card_version=card.version)
+    run = store.create_run('run', card_id=card.card_id, card_version=card.version, state={'research_flow':'legacy_debate_v1'})
     runtime = RequestRuntime(store)
     engine = CaptureEngine(store, runtime, Settings(max_rounds=1), reassess=True)
     monkeypatch.setattr(store, 'get_issues', lambda _: [retrieval_issue()])
