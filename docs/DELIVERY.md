@@ -1,3 +1,5 @@
+> 历史记录：本文描述功能重构前的交付状态。当前实现与验证以 [FUNCTIONAL_REDESIGN](FUNCTIONAL_REDESIGN.md) 为准；旧三组对照不是新流程的有效性证明。
+
 # ARC 当前交付说明
 
 ARC聚焦研究idea抽卡、方案展开与可行性压力测试；实验和论文由人完成。正式源码在g203，唯一master。

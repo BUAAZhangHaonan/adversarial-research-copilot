@@ -1,3 +1,5 @@
+> 历史记录：本文描述功能重构前的交付状态。当前实现与验证以 [FUNCTIONAL_REDESIGN](FUNCTIONAL_REDESIGN.md) 为准；旧三组对照不是新流程的有效性证明。
+
 # ARC master 当前状态
 
 2026-09-08，快照 2026-09-07T18:57:22.498690+00:00。正式源码位于 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，只维护master，改动按问题细分提交并推送。
