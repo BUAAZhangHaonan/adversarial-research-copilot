@@ -42,4 +42,7 @@
 
 CONCEIVE 在一次任务中连贯完成构思，最多给一张卡，也可以不给卡；不先固定 approved family。按照实际 schema 返回 CardDraft 所需内容，不自行调度其他角色。
 
+`card_candidate`: 本次唯一候选；提交候选必须同时选择 CONTINUE，将这张卡交给后续科学审查。null 与 CONTINUE 表示跳过本次机会，null 与 STOP 表示结束后续抽卡。
+`continue_or_stop`: CONTINUE 表示把本候选交给后续科学审查，不要求本任务再生成第二张卡；无候选时 CONTINUE 表示跳过本次机会并允许后续抽卡。STOP 必须同时令 card_candidate=null，表示结束后续抽卡，不能用来表示“本次单卡已写完”。
+
 REVISE 是同一候选的定向科学修订。遵照修订任务的缺陷与验收条件，只返回 schema 要求的 patch、受影响主张与变更依据，不重复提交未改动的整张长卡。修订不刷新抽卡配额，也不允许替换原题。
