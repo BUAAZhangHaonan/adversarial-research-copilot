@@ -189,24 +189,48 @@ def validate_role_targets(envelope: Envelope, payload: dict) -> None:
 def validate_archive_comparisons(result: LibrarianResult, records, store=None):
     expected = {(r['card_id'], r['version']) for r in records}
     actual = [(r.archive_card_id, r.archive_card_version) for r in result.comparisons]
-    if len(actual) != len(set(actual)) or set(actual) != expected:
-        raise ProtocolViolation('ARCHIVE_COMPARISON_COVERAGE')
+    missing = sorted(expected - set(actual))
+    duplicates = [{'loc': ['result', 'comparisons', index], 'card_id': key[0], 'version': key[1]}
+                  for index, key in enumerate(actual) if key in actual[:index]]
+    if missing or duplicates:
+        raise ProtocolViolation('ARCHIVE_COMPARISON_COVERAGE; ' + json.dumps({
+            'loc': ['result', 'comparisons'],
+            'missing': [{'card_id': key[0], 'version': key[1]} for key in missing],
+            'duplicates': duplicates}, ensure_ascii=False))
     by_id = {(r['card_id'], r['version']): r for r in records}
-    for relation in result.comparisons:
+    cards = {}
+    if store is not None:
+        from .store import StateError
+        for index, key in enumerate(actual):
+            try:
+                cards[key] = store.get_card(*key)
+            except StateError as exc:
+                if str(exc) != 'card_missing':
+                    raise
+                raise ProtocolViolation('ARCHIVE_COMPARISON_UNKNOWN_CARD; ' + json.dumps({
+                    'loc': ['result', 'comparisons', index], 'card_id': key[0], 'version': key[1]})) from exc
+    elif set(actual) - expected:
+        raise ProtocolViolation('ADDITIONAL_ARCHIVE_COMPARISONS_REQUIRE_REGISTRY')
+    for index, relation in enumerate(result.comparisons):
         if relation.relation != 'reopening_candidate' or not relation.reopening_condition_met:
             continue
-        prior = by_id[(relation.archive_card_id, relation.archive_card_version)]
-        if relation.reopening_condition not in prior['reopen_conditions']:
-            raise ProtocolViolation('REOPENING_CONDITION_NOT_RECORDED')
+        key = (relation.archive_card_id, relation.archive_card_version)
+        conditions = cards[key].draft.risks.reopen_conditions if store is not None else by_id[key]['reopen_conditions']
+        if relation.reopening_condition not in conditions:
+            raise ProtocolViolation('REOPENING_CONDITION_NOT_RECORDED; ' + json.dumps({
+                'loc': ['result', 'comparisons', index, 'reopening_condition'], 'recorded_conditions': conditions}))
         if store is None:
             raise ProtocolViolation('REOPENING_REQUIRES_REGISTRY')
-        store.validate_references(relation)
-        old_card = store.get_card(relation.archive_card_id, relation.archive_card_version)
+        try:
+            store.validate_references(relation)
+        except StateError as exc:
+            raise ProtocolViolation(str(exc) + '; loc=result.comparisons.' + str(index) + '.new_evidence_ids') from exc
+        old_card = cards[key]
         old_evidence = set(old_card.draft.motivation.evidence_ids)
         for claim in old_card.draft.claims:
             old_evidence.update(claim.evidence_ids)
         if not set(relation.new_evidence_ids) - old_evidence:
-            raise ProtocolViolation('REOPENING_REQUIRES_NEW_EVIDENCE')
+            raise ProtocolViolation('REOPENING_REQUIRES_NEW_EVIDENCE; loc=result.comparisons.' + str(index) + '.new_evidence_ids')
 
 
 def validate_selection(store, card, judgment: SelectorResult, novelty):
