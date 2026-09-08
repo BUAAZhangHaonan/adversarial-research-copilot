@@ -45,3 +45,11 @@
 复核时把审查前的错误位置、修订子节更新 和当前卡逐一对照。检查错误文本与受影响推论是否真的消失，并检查本次修改引入的实质问题。只在 risks 承认错误不能算修好。对正确对照不凭空制造缺陷；没有新问题就简短结束。
 
 输出字段遵循本次 schema。发现需含可定位的原句或字段、直接依据或最小反例、对核心结论的影响与可检验的验收条件。把硬错误、缺证和一般推广限制分开。不要输出整张替代卡，也不把研究价值压缩为一个 supported 标签。
+
+## 输出指向与修改范围
+
+location 使用相对 CardDraft 根的 JSON Pointer，例如 `/minimal_test/controls`。缺少的条目尚不存在时指向其所在容器，不编造不存在的路径。prior_findings 仅逐一覆盖输入 previous_review.decisive_findings 的 finding_id，不编造或遗漏；不要复制 previous_review.prior_findings 中已解决的历史记录。没有前次审查，或前次 decisive_findings 为空时，返回空列表。历史记录仍由系统保留；若旧问题重新出现，将其作为本次有具体依据的 decisive_finding 提出。
+
+逐条判断发生变化的主张是否仅改变表达或发生实质改动，并说明理由；edit_assessments 覆盖新增、删除以及正文、适用条件或种类改变的主张。新增、删除或种类改变不能称为 unchanged_meaning。原有来源可定位不自动证明实质改变后的主张。
+
+retain 要求 scope_faithful=true、value_judgment=substantial、没有决定性缺陷且没有未解决的前次发现。科学正确不等于值得主推：正确但 routine 的卡可以 reject，不需要捏造硬错误。输出动作若和既有科学判断矛盾，修正动作；不要为了满足retain把routine或unsupported拔高。revise需有可定位的决定性发现；needs_evidence明确保留决定性缺证。
