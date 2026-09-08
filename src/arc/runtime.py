@@ -584,10 +584,12 @@ class Runtime:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
                 from .scientific import validate_scientific_output_contract
                 validate_scientific_output_contract(self.store, payload, envelope.result)
-                from .schemas import LibrarianResult
-                from .validation import validate_archive_comparisons
+                from .schemas import LibrarianResult, EvaluatorResult
+                from .validation import validate_archive_comparisons, validate_evaluator_coverage
                 if isinstance(envelope.result, LibrarianResult):
                     validate_archive_comparisons(envelope.result, payload.get('records_to_compare', []), self.store)
+                if isinstance(envelope.result, EvaluatorResult):
+                    validate_evaluator_coverage(envelope.result, payload.get('candidates', []))
             except (ValueError, ValidationError) as exc:
                 errors = (output_validation_errors(message.get('content') or '', envelope_type, exc)
                           if isinstance(exc, ValidationError) else [str(exc)])

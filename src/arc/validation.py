@@ -233,6 +233,19 @@ def validate_archive_comparisons(result: LibrarianResult, records, store=None):
             raise ProtocolViolation('REOPENING_REQUIRES_NEW_EVIDENCE; loc=result.comparisons.' + str(index) + '.new_evidence_ids')
 
 
+def validate_evaluator_coverage(result, candidates):
+    """Require one addressed finding per presented candidate, not a ranking."""
+    expected = {item['candidate_id'] for item in candidates}
+    supplied = [item.candidate_id for item in result.per_candidate_findings]
+    duplicates = sorted({identifier for index, identifier in enumerate(supplied)
+                         if identifier in supplied[:index]})
+    if duplicates or set(supplied) != expected:
+        raise ProtocolViolation('EVALUATOR_CANDIDATE_COVERAGE; ' + json.dumps({
+            'loc': ['result', 'per_candidate_findings'], 'expected': sorted(expected),
+            'supplied': supplied, 'missing': sorted(expected - set(supplied)),
+            'duplicate': duplicates, 'unknown': sorted(set(supplied) - expected)}, ensure_ascii=False))
+
+
 def validate_selection(store, card, judgment: SelectorResult, novelty):
     store.validate_references(judgment.model_dump(mode='json'))
     store.validate_references(novelty.model_dump(mode='json'))
