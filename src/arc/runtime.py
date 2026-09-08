@@ -309,6 +309,37 @@ class Runtime:
         except (ValueError, KeyError, TypeError, FileNotFoundError) as exc:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
+    def _validate_evidence_request_targets(self, envelope, payload):
+        """Pure claim/issue/draw addressing; no source checks or registry writes."""
+        from .schemas import ModeratorResult, ComposeResult, ConceptionResult
+        from .store import StateError
+        for field in ('claim_id', 'issue_id', 'draw_id'):
+            visible = reference_ids(payload, {field, field + 's'})
+            if field == 'claim_id' and isinstance(envelope.result, (ComposeResult, ConceptionResult)):
+                candidate = envelope.result.card_candidate
+                if candidate is not None:
+                    visible.update(claim.claim_id for claim in candidate.claims)
+            if field == 'issue_id' and isinstance(envelope.result, ModeratorResult):
+                # A completed moderator may create an issue and request evidence
+                # for it in the same ruling. Store gates still validate the issue
+                # transitions and claim version before executing the retrieval.
+                current_claims = reference_ids(payload, {'claim_id', 'claim_ids'})
+                declared = {issue.issue_id: issue for issue in envelope.result.updated_issues
+                            if issue.claim_id in current_claims}
+                for index, request in enumerate(envelope.evidence_requests):
+                    issue = declared.get(request.issue_id)
+                    if issue is not None and request.claim_id not in (None, issue.claim_id):
+                        raise StateError('evidence_request_issue_claim_mismatch; ' + json.dumps({
+                            'loc': ['evidence_requests', index, 'claim_id'],
+                            'expected': [issue.claim_id], 'supplied': request.claim_id}))
+                visible.update(declared)
+            for index, request in enumerate(envelope.evidence_requests):
+                target = getattr(request, field)
+                if target and target not in visible:
+                    raise StateError(f'evidence_request_{field}_not_supplied_to_task; ' + json.dumps({
+                        'loc': ['evidence_requests', index, field],
+                        'expected': sorted(visible), 'supplied': target}))
+
     def _validate_semantics(self, envelope, payload, state):
         from .schemas import InvestigatorResult, ModeratorResult, ComposeResult, ConceptionResult
         from .store import StateError
@@ -326,27 +357,7 @@ class Runtime:
         keys = EVIDENCE_REF_KEYS | SOURCE_REF_KEYS
         if reference_ids(envelope, keys) - reference_ids([payload, state['tool_trace']], keys):
             raise StateError('reference_not_supplied_to_task')
-        for field in ('claim_id', 'issue_id', 'draw_id'):
-            visible = reference_ids(payload, {field, field + 's'})
-            if field == 'claim_id' and isinstance(envelope.result, (ComposeResult, ConceptionResult)):
-                candidate = envelope.result.card_candidate
-                if candidate is not None:
-                    visible.update(claim.claim_id for claim in candidate.claims)
-            if field == 'issue_id' and isinstance(envelope.result, ModeratorResult):
-                # A completed moderator may create an issue and request evidence
-                # for it in the same ruling. Store gates still validate the issue
-                # transitions and claim version before executing the retrieval.
-                current_claims = reference_ids(payload, {'claim_id', 'claim_ids'})
-                declared = {issue.issue_id: issue for issue in envelope.result.updated_issues
-                            if issue.claim_id in current_claims}
-                for request in envelope.evidence_requests:
-                    issue = declared.get(request.issue_id)
-                    if issue is not None and request.claim_id not in (None, issue.claim_id):
-                        raise StateError('evidence_request_issue_claim_mismatch')
-                visible.update(declared)
-            if any(getattr(request, field) and getattr(request, field) not in visible
-                   for request in envelope.evidence_requests):
-                raise StateError(f'evidence_request_{field}_not_supplied_to_task')
+        self._validate_evidence_request_targets(envelope, payload)
         findings = (getattr(envelope.result, 'findings', []) + getattr(envelope.result, 'contrary_findings', [])
                     if envelope.result is not None else [])
         self.store.validate_finding_sources(findings)
@@ -582,6 +593,13 @@ class Runtime:
                 raise RuntimePaused('PAUSED_PROTOCOL', 'STOP_WITH_TOOL_CALLS')
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
+                from .store import StateError
+                try:
+                    self._validate_evidence_request_targets(envelope, payload)
+                except StateError as exc:
+                    # Only addressing errors enter JSON correction; provenance
+                    # and authorization remain in post-parse semantic checks.
+                    raise ValueError(str(exc)) from exc
                 from .scientific import validate_scientific_output_contract
                 validate_scientific_output_contract(self.store, payload, envelope.result)
                 from .schemas import LibrarianResult, EvaluatorResult
