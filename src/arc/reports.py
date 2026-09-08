@@ -238,6 +238,10 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             for e in evidence if e['evidence_id'] in card_evidence_ids]
         target.write_text(loader.render_report('card',context),encoding='utf-8')
         paths[f"card:{card['card_id']}:{card['version']}"] = target
+        # Keep every saved version's detail, but summarize each candidate once
+        # using only its latest version's recorded judgment.
+        if card['version'] != latest_versions[card['card_id']]:
+            continue
         if category == 'MAIN_REPORT':
             main.append({'title':context['title'],'decision_paragraph':context['decision_paragraph'],
                          'insight_paragraph':context['insight_paragraph'],
@@ -295,7 +299,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             f"{'已由后续任务接替' if task['task_id'] in superseded else '所属阶段已完成'}，不计入当前未完成任务。"
             for task in historical)
     overview = {'report_title': f"ARC {_heading(run['mode'])} 研究总览",
-                'executive_summary':f"本次已保存 {len(cards)} 张研究卡，其中 {len(main)} 张进入主报告，{len(leads)} 张为待补证线索。以下是当前候选的认识与风险；保留判断不代表假设已被实验验证。",
+                'executive_summary':f"本次已保存 {len(latest_versions)} 张候选研究卡（共 {len(cards)} 个保存版本），其中 {len(main)} 张进入主报告，{len(leads)} 张为待补证线索。以下是当前候选的认识与风险；保留判断不代表假设已被实验验证。",
                 'main_cards':main,'leads':leads,'rejected':rejected,
                 'scope_changes':[{'summary':_text(change.get('proposed_problem_anchor')),'original_evidence_audit':_text({'original_sources_revisited':change.get('original_sources_revisited'),'missed_evidence_analysis':change.get('missed_evidence_analysis'),'trigger_evidence_ids':change.get('trigger_evidence_ids')})} for change in changes],
                 'scope_paragraph':_text({'run_id':run_id,'campaign_id':run.get('campaign_id'),'card_id':run.get('card_id'),'card_version':run.get('card_version')}),

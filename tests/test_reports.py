@@ -430,3 +430,27 @@ def test_later_stage_uses_scientific_final_only_for_reviewed_current_version(tmp
         assert '0 张进入主报告' in overview
         assert '两种解释改变下一步干预选择' not in detail
         assert '当前卡与未完成判断' in overview
+
+
+def test_discover_counts_distinct_candidates_and_latest_judgments_keeps_versions(tmp_path):
+    from tests.test_selection import research_store, research_draft, selection_result
+    store, _, _ = research_store(tmp_path)
+    run = store.create_run('discover', run_id='versioned_discovery')
+    first = store.save_card(research_draft(), run_id=run.run_id)
+    store.record_selection(run.run_id, first.card_id, first.version, selection_result('MAIN_REPORT'))
+    revised = store.save_card(first.draft, card_id=first.card_id,
+                             parent_version=first.version, run_id=run.run_id)
+    store.record_selection(run.run_id, revised.card_id, revised.version, selection_result('LEAD_ONLY'))
+    other = store.save_card(research_draft(), run_id=run.run_id)
+    store.record_selection(run.run_id, other.card_id, other.version, selection_result('MAIN_REPORT'))
+    store.update_run(run.run_id, status='COMPLETED')
+    before = store.list_cards(run_id=run.run_id)
+    paths = render_run(store, run.run_id, tmp_path / 'versioned-report')
+    overview = paths['overview'].read_text(encoding='utf-8')
+    assert '2 张候选研究卡（共 3 个保存版本）' in overview
+    assert '1 张进入主报告，1 张为待补证线索' in overview
+    assert f'cards/{first.card_id}/v1.md' not in overview
+    assert f'cards/{revised.card_id}/v2.md' in overview
+    assert f'cards/{other.card_id}/v1.md' in overview
+    assert all(paths[f'card:{card.card_id}:{card.version}'].is_file() for card in before)
+    assert store.list_cards(run_id=run.run_id) == before
