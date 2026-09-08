@@ -55,6 +55,10 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 
 行为指导写在科学目标 Markdown：接收角色对照已有证据和前序核验判断是否需要补读，不增加自动必经调查阶段，不重复购买已有充分核验。新接线不回写历史任务的冻结输入。真实 draw3.science.review 已冻结输入含 `er1_es_cot_full_text` 完整问题及 claim/source/draw 对应，来源为原 draw3.conception，原始 boundaries 正确；这证明运行时交接接通，是否完成补证与科学问题是否解决仍待核对。
 
+真实 draw3 随后暴露了另一条接入链缺陷：两份 read_paper 原件成功返回，但因 title 为空未登记，旧来源缓存耗尽后发生跨轮空读。修复原文登记并给出明确缓存耗尽错误后，同一任务仍持续空读；CodeX 在两次已保存且无活跃预算调用的安全点停止任务，再用原 raw 零 API 登记两份独立表示，显式建立 `review.protocol_retry1`。这属于开发运维恢复，不是 ARC 已完成科学自纠；原 trace、费用、卡片及五次 draw 上限均不重置。`2074cce` 仅压缩重试工作视图中的重复空读，不把失败当证据，也不向任务注入科学答案；20 项相关测试通过，真实 retry 审查尚未完成。完整事故证据与费用归因边界见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)。
+
 最近完成的整套软件验证是 **83bac05：685 passed，0 failed/error/skipped**，包含 LEAD_ONLY 总览洞察前置、空标题论文原文登记、来源页末尾显式读取失败等最新变化。另完成从 sdist 构建 wheel、仓库外目录的隔离安装、38 份提示词文件/18 个注册任务/3 份配置资源检查、4 个 CLI 帮助入口和依赖检查。真实记录位于私有 `work/software-validation-20260908T140839525973Z/SOFTWARE_VALIDATION.json`，Windows 交付目录的唯一当前 wheel/sdist 与此快照对应。f70b937 的 637 项、eb9e0bf 的 673 项记录保留为历史；685 只认证 83bac05 的源码与资源快照，不是研究质量实验，也不预先认证后续代码。A–E、自然后续和旧卡定向纠正的最终结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)中的待完成项。
+
+`2074cce` 晚于该软件快照，目前仅记录 20 项相关检查；现有包不包含这项改动。后续稳定后再统一完整验收和打包，不沿用旧全量成绩。
 
 旧 MASTER_STATUS、L4 和自然运行报告是历史记录，最终交付时更新入口，不覆盖历史结果。费用沿用既有父/子账本；本文不固定正在变化的余额或最终总额。
