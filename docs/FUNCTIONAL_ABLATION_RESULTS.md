@@ -1,12 +1,12 @@
-# 功能消融：r1已完成，r2在途
+# 功能消融：两轮完成，局部纠错有效但科学可靠性未通过
 
-`functional-20260908-ablation-r1` 于2026-09-08 19:45:23 UTC完成A–E和双序匿名评价。**新审查确实检出旧审遗漏，并推动局部实改；最终E仍未通过独立科学核对。** 本轮不能证明ARC已优于直接Pro，也不能从单次A/B/C输出判定构思步数或模型分工的普遍优劣。r2于19:46 UTC启动，尚无完成结果。
+`functional-20260908-ablation-r1` 于2026-09-08 19:45:23 UTC完成A–E和双序匿名评价。**新审查确实检出旧审遗漏，并推动局部实改；最终E仍未通过独立科学核对。** 本轮不能证明ARC已优于直接Pro，也不能从单次A/B/C输出判定构思步数或模型分工的普遍优劣。r2于19:46 UTC启动、21:10:34 UTC完成；完整结果见下。两轮均未证明可可靠清除硬错误。
 
 ## 比较对象与输入
 
 两轮使用同一“长链推理提前停止”原题、四项用户边界、四篇原文与14条登记证据；无在线检索工具。A是当前Pro连贯CONCEIVE，B是当前Pro的FRAME/NEXT_DRAW/COMPOSE，C同样分步但构思由Flash承担；ABC使用相同旧Pro novelty/selector审核。D对A的同一候选作新科学审查、不修订；E复用A候选与D初审，执行一次必要修订并复核。所有实际语义请求为max。
 
-19:47 UTC只读直接比较确认：两轮manifest材料与条件定义相等，current提示词38文件、legacy提示词35文件分别逐字相等，未使用哈希。current与legacy本来是两套不同设计，不要求彼此相等。r1实际任务加载文本均对应自己的冻结phase。r2完成后仍需核对其所有实际任务与完整结果，不能以静态输入一致代替执行完成。
+19:47 UTC只读直接比较确认：两轮manifest材料与条件定义相等，current提示词38文件、legacy提示词35文件分别逐字相等，未使用哈希。current与legacy本来是两套不同设计，不要求彼此相等。r1实际任务加载文本均对应自己的冻结phase。最终已核对两轮所有实际任务加载文本，均对应自己的冻结phase；两轮A/D正文和E复用D初审均直接相等。不能以输入一致代替科学正确。
 
 r1的A/D正文直接相等；E复用review与D保存cycle review直接相等，D/E初审review_target、原题、mandate、sources、evidence均相等，E没有额外初审模型调用。seed 20260908与r2的20260909只用于匿名呈现顺序，**不是模型采样seed或确定性复现承诺**。自动评价看见相同的A/D卡，不能由卡片偏好推断两套审核本身哪个更好。
 
@@ -56,8 +56,52 @@ D/E模式的run.assessment为null，表中如实使用ScientificReview的action/
 
 交换序原文写 `candidate_3/4`，指D/A；现离线导出只替换完整`candidate_N`，会显示`D [candidate_3]/4`。其中裸“4”仍是匿名candidate_4=A，不是名为“system4”的新条件。完整原文和映射保留，不为了补一个排名再调用模型或改变在途比较输入。
 
-## 原件与未完成项
+## r1原件与后续完成记录
 
-私有 `work/functional-20260908-ablation-r1-ablation.md/.json` 为完整候选、审查、E变化和双序结果；`work/ABLATION_METHOD_COST_AUDIT.md/.json` 为只读方法/费用补充，r2在途部分明确pending。Windows交付已同步这些文件及 `ABLATION_R1_A_INDEPENDENT_AUDIT.md`、`ABLATION_R1_B_INDEPENDENT_AUDIT.md`、`ABLATION_R1_C_INDEPENDENT_AUDIT.md`、`ABLATION_R1_DE_INDEPENDENT_AUDIT.md`、`ABLATION_R1_COUNTEREXAMPLES.json`。未公开全部论文正文、reasoning或数据库。
+私有 `work/functional-20260908-ablation-r1-ablation.md/.json` 为完整候选、审查、E变化和双序结果；`work/ABLATION_METHOD_COST_AUDIT.md/.json` 为只读方法/费用补充，最终两轮均完整记录。Windows交付已同步这些文件及 `ABLATION_R1_A_INDEPENDENT_AUDIT.md`、`ABLATION_R1_B_INDEPENDENT_AUDIT.md`、`ABLATION_R1_C_INDEPENDENT_AUDIT.md`、`ABLATION_R1_DE_INDEPENDENT_AUDIT.md`、`ABLATION_R1_COUNTEREXAMPLES.json`。未公开全部论文正文、reasoning或数据库。
 
-r2仍待全部条件、双序评价与独立核对完成，再比较重复中的稳定性；目前不报跨轮胜率或质量提高。r1新增10.081649元与此前已完成73.165122元合计83.246771元，**不包含在途r2**，不是父账户总花费或剩余余额。
+## r2最终科学结果与恢复
+
+`functional-20260908-ablation-r2` 于2026-09-08 21:10:34 UTC全部COMPLETED，CLI真实报告completed、退出0。没有把E的未解决问题伪装成PROMISING。
+
+| 条件 | 最终ARC判断 | 实际改善与独立结论 |
+| --- | --- | --- |
+| A：Pro连贯＋旧审 | MAIN_REPORT/PROMISING，卡v1未改 | 旧审自主注意过晚cue和并集反推限制，却未修正文；漏更早可救cue，核心覆盖关系仍错 |
+| B：Pro分步＋旧审 | 显式retry后MAIN_REPORT/PROMISING，卡v1未改 | 原selection前提矛盾导致应用暂停；retry仅将resource_path从unknown重评为supported，保留未测估算，没有修复“未来不可分→不可救”的科学错误 |
+| C：Flash分步＋旧审 | MAIN_REPORT/PROMISING | 分解本身正确，较r1有改善；R_all=F恒等导致第三分支不可能、事件错配与标签偏差方向问题仍在 |
+| D：A同稿＋新审 | revise/substantial | 自主用早期cue反例检出遗漏，要求全轨迹可救机会；并非CodeX反馈引导 |
+| E：复用D＋修订复核 | v2保存；最终revise/substantial，新增finding未修；assessment/selection均null | 全轨迹rescue指标实改。复核自主发现“仅双低才有结构上限”的新错误并保留未解决；并集上下界、退出点/标签与分类残留仍使独立验收失败 |
+
+E没有再次修订复核的新发现；当前cycle完成并不保证科学争点关闭。独立复核还发现新审建议有验收/修法冲突，因此不继续把“发现数量”换算为正确性分数。两轮共同证据是新审能产生比旧审更多的具体反例并推动实改，但会漏错、继承错误或提出不可靠修法；不是零作用，也不是已达可靠科研助手。
+
+r2 B.frame实际发生两次Pro请求；C.family两次Flash请求；D.review两次Pro请求。B.selection原响应虽ACCEPTED，但应用阶段因MAIN_REPORT与resource_path前提矛盾触发MAIN_REPORT_PREREQUISITE_UNESTABLISHED。原暂停、输出、费用保留；21:00:11 UTC显式准备B.selection.protocol_retry1，使用原冻结legacy提示词串行恢复，之后运行双序judge。不是无成本重跑或丢弃失败样本。
+
+11d95ae把selector前置矛盾纳入已有JSON诊断；909f235支持准确恢复该类已接受但应用失败的任务；05cf26e对未完成ablation返回非零退出码。上述修改发生于r2恢复窗口，**两轮提示词与材料虽相同，执行期协议代码并非完全同一版本**，应保留这一设计限制。它们不改变科学门槛，也没有给B提供科学答案。后续软件55a134c/707的证据单列，不回填成早期运行能力。
+
+## 两轮实际成本与调用时长
+
+| r2条件 | 实际调用 | 已结算上界CNY | 完成请求时长之和（秒） |
+| --- | --- | ---: | ---: |
+| A | Pro×3 | 1.931496 | 1063.863028 |
+| B | Pro×7，含frame纠错、原selection及显式retry | 3.991761 | 1378.258000 |
+| C | Flash×4＋Pro×2 | 1.822430 | 798.391352 |
+| D | Pro×2 | 1.235257 | 456.024136 |
+| E增量 | Pro×2 | 1.474597 | 640.481338 |
+| 双序judge | Pro×2 | 1.364073 | 502.043165 |
+| **r2合计** | **22，全部SETTLED** | **11.819614** | **4839.061019** |
+
+r2费用区间11.819592–11.819614元。B.frame的1.000528元含两次调用；原selection0.705626与retry0.532075均计入B。r2首请求19:46:03.160286到末响应21:10:31.058912的窗口5067.898626秒，包含开发恢复与阶段间间隙，不等于4839.061019秒实际请求时长之和；不使用created→updated当模型耗时。
+
+r2 **E完整链3.487617–3.487622 CNY**＝A.conception 0.777768＋D初审1.235257＋E增量1.474597（列上界）。两轮E均没有付费重买D初审；不加入A旧审、B/C或judge。两轮共40调用、全部SETTLED，费用 **21.901226–21.901263 CNY**；所有请求max，r1为15Pro＋3Flash，r2为18Pro＋4Flash。没有把协议纠错、应用失败与恢复费用漏掉或加两次。
+
+此前已完成73.165122元加两轮21.901263元，本轮功能重构新增上界为 **95.066385 CNY**。父账户历史总额/授权余额与此不同，见[最终费用](COST_REPORT.md)；账本余额不是在线钱包查询。
+
+## r2双序匿名评价与总体判断
+
+正序呈现B,C,D,E,A，偏好E>B≈C>D=A；交换序呈现A,E,D,C,B，首选C。两者首选都处在position4，但理由和生成随机性也改变，**不能据两次输出将差异归因于位置**。两个评价都漏掉关键科学错误；交换序对E并集/接口限制更具体，却同时保留上下界混称。E自身最终review仍要求revise，不能因外部judge偏好而升级为科学通过。
+
+r1是正序无偏好、交换序偏E；r2是正序偏E、交换序偏C。没有跨轮一致赢家，也不把有限样本偏好换算为模型或流程胜率。A=D在两轮均精确复用，评价也识别同稿；比较审核增益要看D发现与E实改，不能看同稿在匿名排名中的位置。原完整偏好文本、匿名映射及所有失败保留。
+
+完整r2导出为私有`work/functional-20260908-ablation-r2-ablation.md/.json`；最终两轮方法核对为`work/ABLATION_METHOD_COST_AUDIT.md/.json`。r2独立A/B/C、DE与JUDGE审计均已同步Windows；其中记录各阶段自主发现、实改、漏检及开发审计自我限制。材料及两套prompt的直接文本核对通过，只证明实验输入保持，不证明科研结论。
+
+两轮计划内调用和审计已结束，没有待运行r3。当前结论是：功能接线、已知纠错与局部科学修订有真实证据；自主自然抽卡及修订后的整卡科学可靠性仍未通过，不宣称ARC优于直接Pro或已提升人类认可的研究价值。后续若改进，应围绕这些真实漏检及推论错误另做明确开发任务，不靠继续增加形式约束或补一次排名掩盖结果。
