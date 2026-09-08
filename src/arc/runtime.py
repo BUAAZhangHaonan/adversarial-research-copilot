@@ -163,6 +163,10 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             result.update(content=content[offset:offset+limit], content_offset=offset,
                           cached_content_chars=len(content), more_cached_content=more_cached,
                           requires_source_fetch=result.get('content_complete') is False and not more_cached)
+            if offset >= len(content):
+                result.update(is_error=True,
+                    error='SOURCE_CACHE_EXHAUSTED' if result.get('content_complete') is False else 'SOURCE_END_REACHED',
+                    cached_range_start=0, cached_range_end=len(content), next_cached_offset=None)
         elif 'source_type' in result and 'access_status' in result:
             # Search metadata can be opened as metadata, but it is never a body.
             # Old records may have defaulted content_complete to true without text.
