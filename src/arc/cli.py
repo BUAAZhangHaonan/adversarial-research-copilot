@@ -73,7 +73,7 @@ def services(settings):
 
 def new_run(settings, mode, *, topic=None, card_id=None, version=None,
             budget='20', parent=None, run_id=None, campaign_id=None, input_text=None,
-            parent_card_id=None, parent_card_version=None):
+            parent_card_id=None, parent_card_version=None, boundaries=None):
     store, ledger = services(settings)
     run_id = run_id or f'run_{uuid4().hex}'
     amount = Decimal(str(budget))
@@ -91,7 +91,7 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
                 campaign_id = campaigns[0]
     ledger.create_account(run_id, str(amount), parent_id=parent)
     if mode == 'discover':
-        campaign = store.create_campaign(topic, max_draws=settings.draws,
+        campaign = store.create_campaign(topic, boundaries=boundaries, max_draws=settings.draws,
             budget_account_id=run_id, campaign_id=campaign_id,
             parent_card_id=parent_card_id, parent_card_version=parent_card_version)
         campaign_id = campaign.campaign_id
