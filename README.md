@@ -94,4 +94,4 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/validation tes
 开发命令的串联不改变正式命令默认停止。自动评价只是初步检查，不代替研究者认可。
 实际完成范围、成本与阻塞见 `docs/E2E_REPORT.md`、`docs/COST_REPORT.md` 和 `docs/IMPLEMENTATION_AUDIT.md`。
 
-[任务要求](EXECUTION_SPEC.md) · [提示词清单](docs/PROMPT_INVENTORY.md) · [迁移说明](docs/MIGRATION.md)
+[本轮功能要求](docs/FUNCTIONAL_REDESIGN_REQUEST.md) · [原任务要求](EXECUTION_SPEC.md) · [提示词清单](docs/PROMPT_INVENTORY.md) · [迁移说明](docs/MIGRATION.md)
