@@ -332,7 +332,8 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
         search_lines.append(f"- [{label}]({links[0]['url']})" if links else '- ' + label)
     paths['search_sources'].write_text('\n'.join(search_lines) + '\n', encoding='utf-8')
     paths['cost']=output_dir/'COST_REPORT.md'
-    cost_entries='\n\n'.join(_text({key:call.get(key) for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper']}) for call in calls)
+    cost_entries='\n\n'.join(_text({key:(call.get('state', call.get('status')) if key == 'status' else call.get(key))
+        for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper']}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost',{'run_id':run_id,'summary':cost_text,'entries':cost_entries}),encoding='utf-8')
     if capabilities:
         paths['capabilities']=output_dir/'MCP_REQUIREMENTS.md'

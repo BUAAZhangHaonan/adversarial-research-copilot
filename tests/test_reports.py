@@ -46,6 +46,22 @@ def test_unrecommended_candidate_shows_current_decisive_defect_without_task_logs
     assert '尚未确认远端结果' not in section
 
 
+def test_cost_report_uses_real_ledger_state_for_each_call(tmp_path, monkeypatch):
+    from arc.budget import BudgetLedger
+    ledger = BudgetLedger(tmp_path / 'real-budget.sqlite')
+    ledger.create_account('account', '20')
+    ledger.reserve('account', 'settled-call', '1')
+    with ledger._connect() as db:
+        db.execute("UPDATE budget_calls SET state='SETTLED', reserved_micro=0, lower_micro=100000, upper_micro=100000, cost_status='estimated_usage' WHERE call_id='settled-call'")
+    calls = ledger.list_calls('account')
+    assert calls[0]['state'] == 'SETTLED' and 'status' not in calls[0]
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    monkeypatch.setattr(FakeLedger, 'list_calls', lambda self, account: calls)
+    paths = render_run(FakeStore(tmp_path), 'run-1', tmp_path / 'settled-report', PromptLoader(ASSETS))
+    report = paths['cost'].read_text(encoding='utf-8')
+    assert '状态：SETTLED' in report and '状态：未记录' not in report
+
+
 def card(selection='MAIN_REPORT',card_id='card-1'):
     return {'card_id':card_id,'version':2,'selection':selection,'assessment':'PROMISING' if selection=='MAIN_REPORT' else 'NEEDS_EVIDENCE' if selection=='LEAD_ONLY' else 'REJECTED',
             'selection_result':{'why_worth_investigating':'已登记判断的原句，不能改变。','decisive_risks':['最致命风险：测量无法分离两个因素'],'next_action':'HANDOFF_EXPERIMENT','reopening_condition':'拿到分离测量后重新判断','evidence_ids':['e-1']},
