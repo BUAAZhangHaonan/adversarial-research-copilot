@@ -456,7 +456,7 @@ class WorkflowEngine:
         # scientific support before this draft is saved. Method conditions in a
         # model's first card are not frozen user requirements.
         card, review = await review_and_revise(self, run_id, 'development.science',
-            original=original, proposed=revision.proposed_revision)
+            original=original, proposed=revision.proposed_revision, evidence_from='development')
         self.checkpoint(run_id, change_summary=revision.change_summary)
         self.finish_scientific_stage(run_id, card, review)
 

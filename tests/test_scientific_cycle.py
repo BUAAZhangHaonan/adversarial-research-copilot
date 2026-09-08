@@ -98,6 +98,7 @@ class CheckpointEngine:
         self.invocations.append(key)
         result = self.outputs[key]
         response = {'result_status': 'complete', 'result': result.model_dump(mode='json'),
+                    'evidence_requests': deepcopy(getattr(self, 'requests', {}).get(key, [])),
                     'subject': inputs[key]['subject']}
         response_path = f'synthetic/{run_id}.{key}.json'
         self.store.save_artifact(response_path, json.dumps(response))

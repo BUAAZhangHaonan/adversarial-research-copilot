@@ -160,7 +160,36 @@ def _registered_support_findings(engine, run_id, key, result, card):
     return registered
 
 
-async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_profile=None, original=None, proposed=None):
+def _evidence_handoff(engine, run_id, *source_keys):
+    """Pass explicitly selected predecessors' questions, without inferring resolution."""
+    state = engine.store.get_run(run_id).state
+    handoff, seen = [], set()
+    for source_key in dict.fromkeys(k for k in source_keys if k is not None):
+        requests = state.get(source_key + '_evidence_requests', [])
+        if not requests:
+            continue
+        traces = engine.trace_tasks(run_id, source_key)
+        source_task_id = None
+        for task_id in reversed(traces):
+            task = engine.store.get_task(task_id)
+            accepted = task.accepted_result if task else None
+            if (task and task.status == 'ACCEPTED' and accepted
+                    and accepted.get('result') == state.get(source_key)
+                    and accepted.get('evidence_requests') == requests):
+                source_task_id = task_id
+                break
+        for request in requests:
+            identity = (source_task_id or source_key, request['request_local_id'])
+            if identity in seen:
+                continue
+            seen.add(identity)
+            handoff.append({'source_task_key': source_key, 'source_task_id': source_task_id,
+                'trace_task_ids': traces, 'request': request})
+    return {'evidence_request_handoff': handoff} if handoff else {}
+
+
+async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_profile=None,
+                            original=None, proposed=None, evidence_from=None):
     """Initial review -> optional targeted change -> independent recheck; never refresh a draw."""
     state = engine.store.get_run(run_id).state
     saved_input = state.get('task_inputs', {}).get(key + '.review', {})
@@ -188,6 +217,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
         return card, ScientificReview.model_validate(completed['review'])
     review = await engine.call(run_id, key + '.review', 'scientific_reviewer', payload={
         **engine.context(run_id), 'original_card': original.model_dump(mode='json') if proposed else None,
+        **_evidence_handoff(engine, run_id, evidence_from),
         'proposed_revision': proposed.model_dump(mode='json') if proposed else None,
         'review_target': target.model_dump(mode='json'), 'previous_review': None,
     }, tool_profile=tool_profile)
@@ -198,6 +228,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
     if review.action == 'revise' and allow_revision:
         revision = await engine.call(run_id, key + '.revision', 'discovery', 'REVISE', payload={
             **engine.context(run_id), 'original_card': original.model_dump(mode='json'),
+            **_evidence_handoff(engine, run_id, evidence_from, key + '.review'),
             'review_target': target.model_dump(mode='json'),
             'scientific_review': review.model_dump(mode='json'),
         }, tool_profile=tool_profile)
@@ -208,6 +239,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
             recheck_key = key + '.recheck'
             recheck = await engine.call(run_id, recheck_key, 'scientific_reviewer', payload={
                 **engine.context(run_id), 'original_card': original.model_dump(mode='json'),
+                **_evidence_handoff(engine, run_id, evidence_from, key + '.review', key + '.revision'),
                 'proposed_revision': proposed.model_dump(mode='json'),
                 'review_target': proposed.model_dump(mode='json'),
                 'previous_review': review.model_dump(mode='json'),
@@ -235,6 +267,8 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
             engine.checkpoint(run_id, **{key + '.support_removals': removed})
             evidence_key = key + '.support_recheck'
             result = await engine.investigate(run_id, evidence_key, [], fresh=False, extra={
+                **_evidence_handoff(engine, run_id, evidence_from, key + '.review',
+                    key + '.revision', accepted_key),
                 'verification_target': 'superseded_claim_evidence_reselection',
                 'claim_evidence_recheck': {'removed_references': removed},
                 'target_source_ids': sorted({item['source_id'] for item in removed}),
@@ -255,6 +289,8 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
             original_versions = {claim.claim_id: claim.version for claim in original.draft.claims}
             support_review = await engine.call(run_id, support_key, 'scientific_reviewer', payload={
                 **engine.context(run_id), 'original_card': card.model_dump(mode='json'),
+                **_evidence_handoff(engine, run_id, evidence_from, key + '.review',
+                    key + '.revision', accepted_key, evidence_key),
                 'proposed_revision': supported.model_dump(mode='json'),
                 'review_target': supported.model_dump(mode='json'),
                 'previous_review': review.model_dump(mode='json'),
@@ -328,7 +364,8 @@ async def discover(engine, run_id):
         if duplicate:
             current.update(finished=True, reason='historical_contribution_requires_new_evidence')
         else:
-            card, review = await review_and_revise(engine, run_id, f'draw{number}.science')
+            card, review = await review_and_revise(engine, run_id, f'draw{number}.science',
+                evidence_from=f'draw{number}.conception')
             current.update(finished=True, card_version=card.version, selection={
                 'selection': review.selection, 'assessment': review.assessment}, scientific_review=review.model_dump(mode='json'))
             engine.store.record_selection(run_id, card.card_id, card.version, review)
