@@ -31,6 +31,12 @@ def claim_fingerprint(claim):
     claim=Claim.model_validate(claim)
     return hashlib.sha256(_dump(claim.model_dump(exclude={"evidence_ids"})).encode("utf-8")).hexdigest()
 
+def _selection_judgment(value):
+    value=value.model_dump(mode="json") if isinstance(value,BaseModel) else value
+    if "action" in value:
+        from .schemas import ScientificReview
+        return ScientificReview.model_validate(value)
+    return SelectorResult.model_validate(value)
 
 def _tokens(text):
     """Latin terms and overlapping CJK bigrams; retrieval only, never judgment."""
@@ -288,7 +294,7 @@ class Store:
             card=ResearchCard.model_validate_json(row["data"])
             judgment=db.execute("SELECT data FROM selections WHERE card_id=? AND version=?",(card_id,card.version)).fetchone()
         if judgment:
-            accepted=SelectorResult.model_validate_json(judgment[0])
+            accepted=_selection_judgment(json.loads(judgment[0]))
             card.selection_result=accepted
             card.selection=accepted.selection
             card.assessment=accepted.assessment
@@ -337,12 +343,12 @@ class Store:
         return context
 
     def record_selection(self,run_id,card_id,version,judgment,state_patch=None):
-        result=SelectorResult.model_validate(judgment)
+        result=_selection_judgment(judgment)
         self.validate_references(result)
         self.get_card(card_id,version)
         with self._transaction() as db:
             old=db.execute("SELECT data FROM selections WHERE card_id=? AND version=?",(card_id,version)).fetchone()
-            if old and SelectorResult.model_validate_json(old[0])!=result:
+            if old and _selection_judgment(json.loads(old[0]))!=result:
                 raise StateError("selection_already_accepted")
             db.execute("INSERT OR IGNORE INTO selections VALUES (?,?,?,?)",(card_id,version,run_id,_dump(result)))
             if run_id: db.execute("INSERT OR IGNORE INTO run_cards VALUES (?,?,?)",(run_id,card_id,version))
