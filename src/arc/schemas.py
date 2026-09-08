@@ -686,7 +686,7 @@ class ConceptionResult(StrictModel):
 
 class ScientificFinding(StrictModel):
     finding_id: str = Field(min_length=1)
-    location: str = Field(min_length=1, description='JSON Pointer relative to CardDraft; for a missing item point to its containing field, e.g. /minimal_test/controls.')
+    location: str = Field(min_length=1)
     quoted_text: str
     reason: str = Field(min_length=1)
     consequence: str = Field(min_length=1)
@@ -736,7 +736,13 @@ class ScientificReview(StrictModel):
             raise ValueError('duplicate_edit_assessment')
         if self.action == 'retain' and (not self.scope_faithful or self.value_judgment != 'substantial'
                 or self.decisive_findings or any(x.status == 'unresolved' for x in self.prior_findings)):
-            raise ValueError('retention_requires_scope_value_and_no_decisive_error')
+            unresolved = [x.finding_id for x in self.prior_findings if x.status == 'unresolved']
+            raise ValueError('retention_requires_scope_value_and_no_decisive_error: '
+                f'actual scope_faithful={self.scope_faithful}, value_judgment={self.value_judgment}, '
+                f'decisive_findings={len(self.decisive_findings)}, unresolved_prior_findings={unresolved}; '
+                'required for retain: scope_faithful=true, value_judgment=substantial, '
+                'decisive_findings=[], unresolved_prior_findings=[]; '
+                'routine value is consistent with reject; correctness is separate from research value.')
         if self.action == 'revise' and not self.decisive_findings:
             raise ValueError('revision_requires_located_scientific_defect')
         return self
