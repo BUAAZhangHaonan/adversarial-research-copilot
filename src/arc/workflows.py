@@ -119,8 +119,10 @@ class WorkflowEngine:
             if (original['subject'].get('card_id'), original['subject'].get('card_version')) != (
                     run.card_id, run.card_version):
                 raise WorkflowPause('PAUSED_PROTOCOL', 'task_retry_subject_changed')
+            from .retrying import retry_working_view
             result = await self.call(run_id, audit['replacement_key'], role, task,
-                payload={**original['payload'], 'protocol_retry': audit['protocol_retry']},
+                payload={**original['payload'], 'protocol_retry': retry_working_view(
+                    audit['protocol_retry'], audit_path=retry['audit_path'])},
                 on_admitted=on_admitted, tool_profile=audit['tool_profile'], request_depth=request_depth)
             traces = list(dict.fromkeys([r['source_task_id'] for r in retries] +
                                         self.trace_tasks(run_id, audit['replacement_key'])))

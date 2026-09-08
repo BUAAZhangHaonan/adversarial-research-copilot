@@ -1,11 +1,45 @@
 """Explicit user-triggered task revisions; never automatic model retry loops."""
 from __future__ import annotations
+import copy
 import json
 import re
 from pydantic import ValidationError
 from .schemas import Envelope, RESULT_SCHEMAS, utc_now
 from .store import StateError
 from .validation import output_validation_errors
+
+
+def retry_working_view(protocol_retry, *, audit_path=None):
+    """Condense repetitive empty cache reads for a new task, preserving its audit."""
+    view = copy.deepcopy(protocol_retry)
+    retained, boundaries = [], {}
+    for item in view.get('previous_successful_tools', []):
+        result = item.get('result') or {}
+        arguments = item.get('arguments') or {}
+        source_id = result.get('source_id') or arguments.get('record_id')
+        empty_boundary = (item.get('name') == 'read_record' and source_id
+            and result.get('content') == ''
+            and result.get('content_origin') != 'metadata'
+            and result.get('access_status') != 'metadata_only'
+            and (result.get('requires_source_fetch') is True
+                 or result.get('error') in {'SOURCE_CACHE_EXHAUSTED', 'SOURCE_END_REACHED'}))
+        if not empty_boundary:
+            retained.append(item)
+            continue
+        summary = boundaries.setdefault(source_id, {'source_id': source_id,
+            'omitted_empty_reads': 0})
+        summary['omitted_empty_reads'] += 1
+        summary.update({key: result[key] for key in (
+            'url', 'cached_content_chars', 'content_total_chars', 'content_complete',
+            'requires_source_fetch', 'cached_range_start', 'cached_range_end') if key in result})
+        summary['error'] = result.get('error') or 'SOURCE_CACHE_EXHAUSTED'
+        summary['next_cached_offset'] = None
+    view['previous_successful_tools'] = retained
+    if boundaries:
+        view['previous_source_read_boundaries'] = list(boundaries.values())
+        if audit_path is not None:
+            view['previous_successful_tools_audit_path'] = audit_path
+    return view
 
 
 def prepare_task_retry(store, ledger, run_id, task_key, reason):
