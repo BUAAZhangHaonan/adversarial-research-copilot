@@ -92,6 +92,6 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/validation tes
 开发验证复用同一个私有 `.arc-validation/arc.sqlite` 和已有父账户，追加预算必须有用户授权，不能改目录重置花费。本轮沿用用户已追加的账户余额授权；正式阶段默认仍为 20 元。
 新验证先检查四组正误对照的发现、修订与复核，再做同材料构思/模型/审查消融和新主题迁移，最后验证同卡三入口。原先三个主题均已成为开发回归，不能再称作未见留出集。
 开发命令的串联不改变正式命令默认停止。自动评价只是初步检查，不代替研究者认可。
-实际完成范围、成本与阻塞见 `docs/E2E_REPORT.md`、`docs/COST_REPORT.md` 和 `docs/IMPLEMENTATION_AUDIT.md`。
+当前实际完成范围与费用见[本轮功能验收](docs/FUNCTIONAL_VALIDATION_RESULTS.md)，实现映射见[功能重构](docs/FUNCTIONAL_REDESIGN.md)，软件包见[交付入口](docs/DELIVERY.md)。新主题discover→辅助develop→run已完成，原五张无辅助候选均未通过独立科学验收；后续已知目标定向修复不等于未见质量提高。A–E r1在途、r2未启动，暂不能宣称ARC优于直接Pro。旧 `E2E_REPORT.md`、`COST_REPORT.md`、`IMPLEMENTATION_AUDIT.md` 保留重构前历史范围。
 
 [本轮功能要求](docs/FUNCTIONAL_REDESIGN_REQUEST.md) · [原任务要求](EXECUTION_SPEC.md) · [提示词清单](docs/PROMPT_INVENTORY.md) · [迁移说明](docs/MIGRATION.md)
