@@ -14,7 +14,7 @@ def apply_scientific_revision(original, revision: ScientificRevision):
     if not revision.section_updates and not revision.claim_updates and not revision.remove_claim_ids:
         raise ProtocolViolation('SCIENTIFIC_REVISION_HAS_NO_CHANGE')
     for update in revision.section_updates:
-        candidate[update.field] = update.value
+        candidate[update.field] = update.model_dump(mode='json')['value']
     claims = {item['claim_id']: item for item in candidate['claims']}
     for claim_id in revision.remove_claim_ids:
         if claim_id not in claims:

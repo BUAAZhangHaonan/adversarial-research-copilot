@@ -1,7 +1,7 @@
 """Typed research contracts; model judgments do not control accounting."""
 from __future__ import annotations
 from datetime import UTC, datetime
-from typing import Generic, Literal, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
@@ -755,10 +755,59 @@ class ScientificReview(StrictModel):
     def assessment(self):
         return 'PROMISING' if self.action == 'retain' else 'REJECTED' if self.action == 'reject' else 'NEEDS_EVIDENCE'
 
-class SectionUpdate(StrictModel):
-    field: Literal['title', 'problem_anchor', 'contribution', 'motivation', 'closest_work_delta',
-                   'hypotheses', 'method', 'minimal_test', 'resources', 'risks']
-    value: JsonValue
+class TitleSectionUpdate(StrictModel):
+    field: Literal['title']
+    value: str = Field(min_length=1)
+
+class ProblemAnchorSectionUpdate(StrictModel):
+    field: Literal['problem_anchor']
+    value: ProblemAnchor
+
+class ContributionSectionUpdate(StrictModel):
+    field: Literal['contribution']
+    value: Contribution
+
+class MotivationSectionUpdate(StrictModel):
+    field: Literal['motivation']
+    value: Motivation
+
+class ClosestWorkSectionUpdate(StrictModel):
+    field: Literal['closest_work_delta']
+    value: ClosestWorkDelta
+
+class HypothesesSectionUpdate(StrictModel):
+    field: Literal['hypotheses']
+    value: Hypotheses
+
+class MethodSectionUpdate(StrictModel):
+    field: Literal['method']
+    value: MethodPlan
+
+class MinimalTestSectionUpdate(StrictModel):
+    field: Literal['minimal_test']
+    value: MinimalTest
+
+class ResourceSectionUpdate(StrictModel):
+    field: Literal['resources']
+    value: ResourceEstimate
+
+class RiskSectionUpdate(StrictModel):
+    field: Literal['risks']
+    value: CardRisks
+
+SectionUpdate = Annotated[
+    TitleSectionUpdate |
+    ProblemAnchorSectionUpdate |
+    ContributionSectionUpdate |
+    MotivationSectionUpdate |
+    ClosestWorkSectionUpdate |
+    HypothesesSectionUpdate |
+    MethodSectionUpdate |
+    MinimalTestSectionUpdate |
+    ResourceSectionUpdate |
+    RiskSectionUpdate,
+    Field(discriminator='field'),
+]
 
 class ScientificRevision(StrictModel):
     section_updates: list[SectionUpdate]
