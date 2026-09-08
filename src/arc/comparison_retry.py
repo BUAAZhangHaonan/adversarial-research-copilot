@@ -69,33 +69,89 @@ def frozen_reference_diagnostics(raw, material):
 
 
 def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, reason):
+    return _prepare_comparison_retry(store, ledger, source_run_id, system, task_key, reason)
+
+
+def prepare_ablation_selection_retry(store, ledger, experiment_id, condition, reason):
+    """Explicitly correct an ablation selector application failure; never redraw."""
+    return _prepare_comparison_retry(store, ledger, experiment_id, condition, 'selection', reason,
+                                     ablation=True)
+
+
+def _prepare_comparison_retry(store, ledger, source_run_id, system, task_key, reason, *, ablation=False):
     """Record one user request; only execution creates the new physical task."""
     options = comparison_retry_options(task_key)
     spec = ('evaluator', 'INVOKE') if options else COMPARISON_TASKS.get(task_key)
-    if system not in ('ARC', 'direct-Pro', 'evaluator') or spec is None or not reason.strip():
+    if system not in (('A', 'B', 'C') if ablation else ('ARC', 'direct-Pro', 'evaluator')) or spec is None or not reason.strip():
         raise StateError('COMPARISON_RETRY_INVALID_SYSTEM_TASK_OR_REASON')
     if ((system == 'evaluator') != (spec[0] == 'evaluator')
             or (system == 'direct-Pro' and task_key in ('frame', 'family'))):
         raise StateError('COMPARISON_RETRY_TASK_NOT_IN_SYSTEM')
-    run_id = source_run_id + '.comparison.' + system
+    run_id = source_run_id + ('.' if ablation else '.comparison.') + system
     run = store.get_run(run_id)
     if run.mode != 'evaluation' or run.status not in ('PAUSED_PROTOCOL', 'PAUSED_EXTERNAL'):
         raise StateError('COMPARISON_RETRY_REQUIRES_FAILED_OR_BLOCKED_RUN')
     if any(c['state'] not in ('SETTLED', 'NOT_SENT') for c in ledger.list_calls(run.budget_account_id)):
         raise StateError('COMPARISON_RETRY_HAS_UNSETTLED_CALLS')
-    frozen_path = f'evaluations/{source_run_id}/evidence.json'
-    material = json.loads(store.read_artifact(frozen_path)).get('material', {})
+    frozen_path = (f'functional-evaluations/{source_run_id}/manifest.json' if ablation else
+                   f'evaluations/{source_run_id}/evidence.json')
+    frozen = json.loads(store.read_artifact(frozen_path))
+    material = frozen.get('material', {})
+    if ablation and (run.status != 'PAUSED_PROTOCOL'
+            or run.state.get('functional_experiment') != source_run_id
+            or run.state.get('condition') != system or run.state.get('material_path') != frozen_path
+            or frozen.get('experiment_id') != source_run_id
+            or ledger.summary(run.budget_account_id)['parent_id'] != frozen.get('parent_id')
+            or 'functional_result' in run.state):
+        raise StateError('ABLATION_SELECTION_RETRY_BINDING_MISMATCH')
     retries = dict(run.state.get('comparison_task_retries', {}))
     history = list(retries.get(task_key, []))
     previous_key = history[-1]['replacement_key'] if history else task_key
     source = store.get_task(f'{run_id}.{previous_key}')
-    if (source is None or source.status not in ('PAUSED_PROTOCOL', 'PAUSED_EXTERNAL')
-            or source.accepted_result is not None or not source.response_artifact_path
-            or not source.rendered_prompt_path):
-        raise StateError('COMPARISON_RETRY_REQUIRES_UNACCEPTED_FAILED_TASK')
     envelopes = dict(run.state.get('comparison_envelopes', {}))
     cached = envelopes.get(task_key)
-    if cached is not None and cached.get('result_status') == 'complete':
+    application_failure = None
+    if ablation:
+        from .schemas import NoveltyResult, SelectorResult
+        from .validation import validate_selection, ProtocolViolation
+        original_input = run.state.get('task_inputs', {}).get('selection', {})
+        payload = original_input.get('payload', {})
+        current_subject = {'campaign_id': run.campaign_id, 'run_id': run_id,
+            'card_id': run.card_id, 'card_version': run.card_version}
+        card = store.get_card(run.card_id, run.card_version)
+        if (original_input.get('subject') != current_subject
+                or payload.get('card') != card.model_dump(mode='json')
+                or payload.get('novelty') != envelopes.get('novelty', {}).get('result')):
+            raise StateError('ABLATION_SELECTION_RETRY_INPUT_CHANGED')
+        if source is not None and source.status == 'ACCEPTED':
+            if (source.run_id != run_id or not cached or cached.get('task_id') != source.task_id
+                    or source.accepted_result != cached
+                    or cached.get('result_status') != 'complete' or cached.get('subject') != current_subject):
+                raise StateError('ABLATION_SELECTION_RETRY_ACCEPTED_CACHE_MISMATCH')
+            try:
+                validate_selection(store, card, SelectorResult.model_validate(cached['result']),
+                                   NoveltyResult.model_validate(payload['novelty']))
+            except ProtocolViolation as exc:
+                diagnostics = json.loads(str(exc))
+                if run.stop_reason != str(exc) and run.stop_reason not in {d['type'] for d in diagnostics}:
+                    raise StateError('ABLATION_SELECTION_RETRY_FAILURE_CHANGED') from exc
+                application_failure = {'type': 'ablation_selection_application_failure',
+                                       'validation_errors': diagnostics}
+            else:
+                raise StateError('ABLATION_SELECTION_RETRY_FAILURE_NOT_REPRODUCED')
+        elif history and cached is None:
+            previous_audit = json.loads(store.read_artifact(history[-1]['audit_path']))
+            application_failure = previous_audit.get('application_failure')
+            if not application_failure or application_failure.get('type') != 'ablation_selection_application_failure':
+                raise StateError('ABLATION_SELECTION_RETRY_REQUIRES_APPLICATION_HISTORY')
+        else:
+            raise StateError('ABLATION_SELECTION_RETRY_REQUIRES_ACCEPTED_APPLICATION_FAILURE')
+    accepted_application = ablation and source is not None and source.status == 'ACCEPTED'
+    if (source is None or (not accepted_application and
+            (source.status not in ('PAUSED_PROTOCOL', 'PAUSED_EXTERNAL') or source.accepted_result is not None))
+            or not source.response_artifact_path or not source.rendered_prompt_path):
+        raise StateError('COMPARISON_RETRY_REQUIRES_UNACCEPTED_FAILED_TASK')
+    if cached is not None and cached.get('result_status') == 'complete' and not accepted_application:
         raise StateError('COMPARISON_RETRY_CANNOT_REPLACE_COMPLETED_RESULT')
     role, task = spec
     snapshot = json.loads(store.read_artifact(source.rendered_prompt_path))
@@ -117,7 +173,10 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
             blocked = False
         if not blocked:
             raise StateError('COMPARISON_RETRY_EXTERNAL_RESULT_NOT_BLOCKED')
-    errors = saved.get('final_validation_errors', [])
+    if accepted_application and json.loads(raw) != source.accepted_result:
+        raise StateError('ABLATION_SELECTION_RETRY_RAW_MISMATCH')
+    errors = (application_failure['validation_errors'] if accepted_application else
+              saved.get('final_validation_errors', []))
     if not errors:
         schema = RESULT_SCHEMAS[f'{role}.{task}' if role == 'discovery' else role]
         try:
@@ -127,7 +186,8 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
     reference_errors, reference_catalog = frozen_reference_diagnostics(raw, material)
     errors = [*errors, *reference_errors]
     replacement_key = f'{task_key}.protocol_retry{len(history) + 1}'
-    path = f'evaluations/{source_run_id}/task-retries/{system}.{replacement_key}.json'
+    path = (f'functional-evaluations/{source_run_id}/task-retries/{system}.{replacement_key}.json' if ablation else
+            f'evaluations/{source_run_id}/task-retries/{system}.{replacement_key}.json')
     audit = {'source_run_id': source_run_id, 'run_id': run_id, 'system': system,
         'task_key': task_key, 'replacement_key': replacement_key,
         'source_task_id': source.task_id, 'source_response_artifact_path': source.response_artifact_path,
@@ -137,8 +197,13 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
         'superseded_cached_envelope': cached,
         'protocol_retry': {'previous_task_id': source.task_id,
             'previous_error': source.error or run.stop_reason,
+            'request_reason': reason.strip(),
             'validation_errors': errors, 'unaccepted_response': raw,
             'previous_successful_tools': []}}
+    if application_failure is not None:
+        audit['application_failure'] = application_failure
+        audit['protocol_retry']['application_failure'] = application_failure
+        audit['protocol_retry']['previous_response_was_accepted'] = accepted_application
     if reference_catalog is not None:
         audit['protocol_retry']['frozen_reference_catalog'] = reference_catalog
     audit = json.loads(json.dumps(audit, ensure_ascii=False, default=str))
