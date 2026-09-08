@@ -354,3 +354,31 @@ def test_scientific_review_exposes_the_defect_and_required_action_for_a_lead(tmp
         assert '两种相反干预可以产生相同汇总召回' in text
         assert '分别记录每个干预条件的召回' in text
         assert '测量规则尚未区分竞争解释' in text
+
+
+@pytest.mark.parametrize('mode', ['develop', 'run'])
+@pytest.mark.parametrize('review_version', [1, 2])
+def test_later_stage_uses_scientific_final_only_for_reviewed_current_version(tmp_path, monkeypatch, mode, review_version):
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    store = FakeStore(tmp_path)
+    store.cards = [card()]
+    store.run.update(mode=mode, card_id='card-1', card_version=2,
+        assessment='PROMISING', state={
+            'final_scientific_review': {'action': 'retain', 'value_reason': '两种解释改变下一步干预选择。',
+                'remaining_uncertainty': ['尚未执行科研实验。'], 'decisive_findings': []},
+            'final_scientific_card_version': review_version, 'next_action': 'HANDOFF_EXPERIMENT',
+            'final_ruling': {'concise_ruling': '旧流程恢复日志不代表当前判断。'},
+        })
+    paths = render_run(store, 'run-1', tmp_path / f'science-{mode}-{review_version}')
+    overview = paths['overview'].read_text(encoding='utf-8')
+    detail = paths['card:card-1:2'].read_text(encoding='utf-8')
+    assert '旧流程恢复日志' not in detail
+    if review_version == 2:
+        assert '1 张进入主报告' in overview
+        assert '两种解释改变下一步干预选择' in detail
+        assert '尚未执行科研实验' in detail
+        assert 'HANDOFF_EXPERIMENT' in detail
+    else:
+        assert '0 张进入主报告' in overview
+        assert '两种解释改变下一步干预选择' not in detail
+        assert '当前卡与未完成判断' in overview

@@ -141,9 +141,7 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
         'insight_paragraph': _text(draft.get('contribution', {}).get('knowledge_increment')),
         'motivation_paragraph': _text(draft.get('motivation', {}).get('observation_or_deficit')),
         'knowledge_gain_paragraph': _text({'decision_changed': draft.get('contribution', {}).get('decision_changed')}),
-        'review_paragraph': _text(judgment.get('value_reason') or judgment.get('why_worth_investigating')) +
-            ('\n\n' + _text({'decisive_findings': judgment['decisive_findings']})
-             if judgment.get('decisive_findings') else ''),
+        'review_paragraph': _text(judgment.get('value_reason') or judgment.get('why_worth_investigating')),
         'bindings_paragraph': bindings_text,
         'nearest_work_paragraph': _text(draft.get('closest_work_delta')),
         'hypothesis_paragraph': _text(hypothesis.get('main_or_competing_explanations')),
@@ -156,7 +154,7 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
             ('\n\n' + _text({'decisive_findings': judgment['decisive_findings']})
              if judgment.get('decisive_findings') else '') + '\n\n' + '\n'.join(f"- {issue['issue_id']}（{issue['status']}）：{_text(issue.get('content', issue.get('dispute')))}" for issue in unresolved),
         'version_paragraph': f"研究卡 {card['card_id']}，版本 {card['version']}；原问题：{anchor['question']}。\n\n"+_text({'conditions':anchor.get('conditions'),'anti_scope':anchor.get('anti_scope')}),
-        'next_step_paragraph': _text({'next_action':judgment.get('action') or judgment.get('next_action'), 'external_test_requirements':judgment.get('external_test_requirements'), 'reopening_condition':judgment.get('reopening_condition'), 'reopen_conditions':risks.get('reopen_conditions')}),
+        'next_step_paragraph': _text({'next_action':judgment.get('next_action') or judgment.get('action'), 'external_test_requirements':judgment.get('external_test_requirements'), 'reopening_condition':judgment.get('reopening_condition'), 'reopen_conditions':risks.get('reopen_conditions')}),
         'sources':sources,
     }
 
@@ -177,7 +175,12 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     tasks = [_obj(item) for item in store.list_tasks(run_id)]
     capabilities = [_obj(item) for item in store.list_capability_requests(run_id)]
     state = run.get('state', {})
-    references = [cards, issues, changes, state.get('final_ruling')]
+    scientific_final = state.get('final_scientific_review')
+    scientific_final_current = (scientific_final is not None and
+        state.get('final_scientific_card_version') == run.get('card_version'))
+    references = [cards, issues, changes,
+                  scientific_final if scientific_final_current else
+                  state.get('final_ruling') if scientific_final is None else None]
     trace_references = [references, {'evidence_ids': state.get('evidence_ids', [])},
                         [{'evidence_ids': task.get('evidence_ids', [])} for task in tasks]]
     # Resolve inherited IDs without copying their records into the current run.
@@ -201,15 +204,21 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
         card = dict(card)
         if focused_stage:
             card['selection'] = None
-            card['assessment'] = run.get('assessment')
-            ruling = run.get('state', {}).get('final_ruling') or {}
-            card['selection_result'] = {
-                'why_worth_investigating': ruling.get('concise_ruling'),
-                'next_action': ruling.get('next_action'),
-                'external_test_requirements': ruling.get('external_test_requirements'),
-                'evidence_ids': ruling.get('decisive_evidence_ids', []),
-                'reopening_condition': None,
-            }
+            if scientific_final is not None:
+                # A reviewed earlier version is not approval of the current card.
+                card['assessment'] = run.get('assessment') if scientific_final_current else None
+                card['selection_result'] = ({**scientific_final,
+                    'next_action': state.get('next_action')} if scientific_final_current else {})
+            else:
+                card['assessment'] = run.get('assessment')
+                ruling = state.get('final_ruling') or {}
+                card['selection_result'] = {
+                    'why_worth_investigating': ruling.get('concise_ruling'),
+                    'next_action': ruling.get('next_action'),
+                    'external_test_requirements': ruling.get('external_test_requirements'),
+                    'evidence_ids': ruling.get('decisive_evidence_ids', []),
+                    'reopening_condition': None,
+                }
         category = card.get('selection') if not focused_stage else {
             'PROMISING': 'MAIN_REPORT', 'NEEDS_EVIDENCE': 'LEAD_ONLY', 'REJECTED': 'NOT_RETAINED',
         }.get(card.get('assessment'))
