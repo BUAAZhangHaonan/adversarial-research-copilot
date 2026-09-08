@@ -30,11 +30,11 @@
 
 调查结束可以意味着已回答，也可以意味着当前材料无法回答。明确区分这两种结果。新增工具需求只说明缺失操作和它阻碍的研究判断，不展开工具平台设计。
 
-## Mechanical search trace mapping
+## 检索日志由运行时填写
 
-Populate actual_searches only from successful search_literature and search_web trace records actually returned in this task. Include every successful search trace exactly once. Copy trace_id from the tool result; set operation to the exact ARC wrapper name; copy query exactly from the submitted query or theme_document argument; copy the exact set of returned registered source_ids without additions or omissions. Do not paraphrase a query or invent a trace identifier. A source found by several actual searches may appear in each corresponding trace.
+将 actual_searches 设为 []。运行时会依据当前任务实际完成的 search_literature 和 search_web 工具记录填写该字段，并保存原始输出与派生过程。不要逐条复制查询、trace_id 或命中列表，也不要把其他任务的检索当成本次执行。
 
-read_paper, read_web, read_record and lookup_archive are not search entries in actual_searches. Their source access and findings still matter elsewhere in the result. Record failed or unavailable operations in source_access_limits; never label a failed search successful.
+把有研究意义的事实、反证和支持关系写入 findings、contrary_findings 与 implications_for_current_card。read_paper、read_web、read_record 和 lookup_archive 的阅读结果同样按其研究意义交接；失败或无法访问的操作写入 source_access_limits，不能声称已经读到原文。
 
 ## Explicit target claim and version
 
