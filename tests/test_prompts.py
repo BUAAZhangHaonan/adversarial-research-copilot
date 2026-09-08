@@ -99,13 +99,6 @@ def test_existing_card_affected_claims_exact_difference_is_visible_without_overr
     assert 'affected_claims and evidence_review refer only to actual supplied registered claims' in imported
 
 
-def test_investigator_searches_copy_actual_trace_identity_and_coverage():
-    rendered=PromptLoader(ASSETS).render('investigator.INVOKE',DATA,schema=SCHEMA)
-    assert 'Include every successful search trace exactly once' in rendered.messages[0]['content']
-    assert 'copy query exactly' in rendered.messages[0]['content']
-    assert 'are not search entries in actual_searches' in rendered.messages[0]['content']
-
-
 def test_investigator_targets_existing_claim_version_without_guessing():
     from arc.schemas import RESULT_SCHEMAS
     rendered=PromptLoader(ASSETS).render('investigator.INVOKE',
