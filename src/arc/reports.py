@@ -245,7 +245,16 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
                          'knowledge_gain_paragraph':context['knowledge_gain_paragraph'],
                          'main_risk_paragraph':context['risks_paragraph'],'relative_path':relative})
         elif category == 'LEAD_ONLY':
-            leads.append({'title':context['title'],'missing_prerequisite_paragraph':context['unresolved_paragraph'],
+            judgment = card.get('selection_result') or {}
+            current_risks = [item.get('consequence') or item.get('reason')
+                for item in judgment.get('decisive_findings', [])]
+            if not current_risks:
+                current_risks = (judgment.get('decisive_risks') or card['draft'].get('risks', {}).get('decisive_risks') or [])[:1]
+            leads.append({'title':context['title'], 'decision_paragraph':context['decision_paragraph'],
+                          'insight_paragraph':context['insight_paragraph'],
+                          'knowledge_gain_paragraph':context['knowledge_gain_paragraph'],
+                          'main_risk_paragraph':_text(current_risks),
+                          'missing_prerequisite_paragraph':context['unresolved_paragraph'],
                           'reopening_action_paragraph':context['next_step_paragraph']+f'\n\n[查看研究卡详情]({relative})'})
         elif category == 'NOT_RETAINED':
             if card['version'] == latest_versions[card['card_id']]:

@@ -28,6 +28,16 @@
 {% for lead in leads %}
 ### {{ lead.title }}
 
+{{ lead.decision_paragraph }}
+
+核心认识：{{ lead.insight_paragraph }}
+
+{{ lead.knowledge_gain_paragraph }}
+
+主要未决风险：{{ lead.main_risk_paragraph }}
+
+#### 缺失前提与下一步
+
 {{ lead.missing_prerequisite_paragraph }}
 
 {{ lead.reopening_action_paragraph }}
