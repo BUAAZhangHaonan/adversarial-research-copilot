@@ -1,0 +1,1445 @@
+{
+  "purpose": "查错、定向修订和正确版本误判的开发回归；不证明新idea价值或未见主题迁移。",
+  "synthetic": true,
+  "cases": [
+    {
+      "case_id": "scope_correct",
+      "pair_id": "scope",
+      "model_visible": {
+        "original_task": {
+          "topic": "两个传感器读数相互冲突时，置信度加权能否比固定选择更准确？",
+          "boundaries": [
+            "测试总体必须包含读数冲突，主要结论限于冲突单元"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "两个传感器读数相互冲突时，置信度加权能否比固定选择更准确？",
+          "problem_anchor": {
+            "question": "两个传感器读数相互冲突时，置信度加权能否比固定选择更准确？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "测试总体必须包含读数冲突，主要结论限于冲突单元"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "两个传感器在一部分单元读数相互冲突，需要判断哪种选择更准确。",
+            "evidence_ids": [
+              "ev_scope"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_scope"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "在冲突单元上比较置信度加权与固定选择。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "对同一批冲突单元分别运行两种策略。",
+            "controls": [
+              "相同测试单元和真实标签",
+              "置信度在独立数据上校准并在测试前冻结"
+            ],
+            "measurements": [
+              "冲突单元准确率差：加权策略减固定选择策略"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "正差值支持在该冲突分布采用加权；零或负差值不支持该变更。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_scope",
+              "version": 1,
+              "text": "两个传感器在一部分单元读数相互冲突，需要判断哪种选择更准确。",
+              "conditions": [
+                "测试总体必须包含读数冲突，主要结论限于冲突单元"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_scope"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_scope",
+            "title": "合成研究材料 scope",
+            "content": "合成传感器系统：每个测试单元有两个二值读数、一个真实标签和分别独立校准的置信度。至少一个读数为真。冲突单元中两读数不同；一致单元中两读数相同。用户关注冲突单元。所有策略读取相同信息；固定选择策略始终使用传感器一，加权策略使用置信度更高的读数。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_scope",
+            "source_id": "src_scope",
+            "claim_id": "claim_scope",
+            "claim_version": 1,
+            "claim": "两个传感器在一部分单元读数相互冲突，需要判断哪种选择更准确。",
+            "conditions": [
+              "测试总体必须包含读数冲突，主要结论限于冲突单元"
+            ],
+            "excerpt": "合成传感器系统：每个测试单元有两个二值读数、一个真实标签和分别独立校准的置信度。至少一个读数为真。冲突单元中两读数不同；一致单元中两读数相同。用户关注冲突单元。所有策略读取相同信息；固定选择策略始终使用传感器一，加权策略使用置信度更高的读数。",
+            "locator": "chars:0:121",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": false,
+        "target_locations": [],
+        "reason": "本例目标错误不存在。可判断研究价值普通，不应捏造该硬错误。",
+        "repair_acceptance": "不需要针对该错误修订。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "scope_faulty",
+      "pair_id": "scope",
+      "model_visible": {
+        "original_task": {
+          "topic": "两个传感器读数相互冲突时，置信度加权能否比固定选择更准确？",
+          "boundaries": [
+            "测试总体必须包含读数冲突，主要结论限于冲突单元"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "两个传感器读数相互冲突时，置信度加权能否比固定选择更准确？",
+          "problem_anchor": {
+            "question": "两个传感器读数相互冲突时，置信度加权能否比固定选择更准确？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "测试总体必须包含读数冲突，主要结论限于冲突单元"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "两个传感器在一部分单元读数相互冲突，需要判断哪种选择更准确。",
+            "evidence_ids": [
+              "ev_scope"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_scope"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "只在两读数一致的单元上比较置信度加权与固定选择，以简化构造。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "剔除所有冲突单元，对剩余一致单元分别运行两种策略。",
+            "controls": [
+              "相同测试单元和真实标签",
+              "置信度在独立数据上校准并在测试前冻结"
+            ],
+            "measurements": [
+              "一致单元上的两种策略准确率差"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "正差值支持在该冲突分布采用加权；零或负差值不支持该变更。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_scope",
+              "version": 1,
+              "text": "两个传感器在一部分单元读数相互冲突，需要判断哪种选择更准确。",
+              "conditions": [
+                "测试总体必须包含读数冲突，主要结论限于冲突单元"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_scope"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_scope",
+            "title": "合成研究材料 scope",
+            "content": "合成传感器系统：每个测试单元有两个二值读数、一个真实标签和分别独立校准的置信度。至少一个读数为真。冲突单元中两读数不同；一致单元中两读数相同。用户关注冲突单元。所有策略读取相同信息；固定选择策略始终使用传感器一，加权策略使用置信度更高的读数。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_scope",
+            "source_id": "src_scope",
+            "claim_id": "claim_scope",
+            "claim_version": 1,
+            "claim": "两个传感器在一部分单元读数相互冲突，需要判断哪种选择更准确。",
+            "conditions": [
+              "测试总体必须包含读数冲突，主要结论限于冲突单元"
+            ],
+            "excerpt": "合成传感器系统：每个测试单元有两个二值读数、一个真实标签和分别独立校准的置信度。至少一个读数为真。冲突单元中两读数不同；一致单元中两读数相同。用户关注冲突单元。所有策略读取相同信息；固定选择策略始终使用传感器一，加权策略使用置信度更高的读数。",
+            "locator": "chars:0:121",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": true,
+        "target_locations": [
+          "method.simplest_path",
+          "minimal_test.intervention"
+        ],
+        "reason": "实验排除用户要求的冲突条件，一致单元结果不能回答冲突单元选择问题。",
+        "repair_acceptance": "恢复冲突单元上的比较与解释，不替换原题；材料、预算和校准条件保持一致。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "attribution_correct",
+      "pair_id": "attribution",
+      "model_visible": {
+        "original_task": {
+          "topic": "压缩表示能否提高同一任务的低预算准确率？",
+          "boundaries": [
+            "比较对象和准确率必须对应同一给定设置"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "压缩表示能否提高同一任务的低预算准确率？",
+          "problem_anchor": {
+            "question": "压缩表示能否提高同一任务的低预算准确率？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "比较对象和准确率必须对应同一给定设置"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "在表1的相同设置中，压缩表示准确率为71%，未压缩基线为62%。",
+            "evidence_ids": [
+              "ev_attribution"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_attribution"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "在固定测试集上复现两种表示，并记录低预算条件下的准确率。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "仅替换表示方式，保持训练样本和推理次数相同。",
+            "controls": [
+              "相同数据、训练样本数与一次推理",
+              "实现先复现给定表格设置"
+            ],
+            "measurements": [
+              "每种表示的准确率及差值"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "只有在同等预算下得到正差值，才支持在本设置采用压缩表示。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_attribution",
+              "version": 1,
+              "text": "在表1的相同设置中，压缩表示准确率为71%，未压缩基线为62%。",
+              "conditions": [
+                "比较对象和准确率必须对应同一给定设置"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_attribution"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_attribution",
+            "title": "合成研究材料 attribution",
+            "content": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_attribution",
+            "source_id": "src_attribution",
+            "claim_id": "claim_attribution",
+            "claim_version": 1,
+            "claim": "在表1的相同设置中，压缩表示准确率为71%，未压缩基线为62%。",
+            "conditions": [
+              "比较对象和准确率必须对应同一给定设置"
+            ],
+            "excerpt": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
+            "locator": "chars:0:86",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": false,
+        "target_locations": [],
+        "reason": "本例目标错误不存在。可判断研究价值普通，不应捏造该硬错误。",
+        "repair_acceptance": "不需要针对该错误修订。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "attribution_faulty",
+      "pair_id": "attribution",
+      "model_visible": {
+        "original_task": {
+          "topic": "压缩表示能否提高同一任务的低预算准确率？",
+          "boundaries": [
+            "比较对象和准确率必须对应同一给定设置"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "压缩表示能否提高同一任务的低预算准确率？",
+          "problem_anchor": {
+            "question": "压缩表示能否提高同一任务的低预算准确率？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "比较对象和准确率必须对应同一给定设置"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "在表1的相同设置中，未压缩基线准确率为71%，压缩表示为62%。",
+            "evidence_ids": [
+              "ev_attribution"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_attribution"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "在固定测试集上复现两种表示，并记录低预算条件下的准确率。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "仅替换表示方式，保持训练样本和推理次数相同。",
+            "controls": [
+              "相同数据、训练样本数与一次推理",
+              "实现先复现给定表格设置"
+            ],
+            "measurements": [
+              "每种表示的准确率及差值"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "只有在同等预算下得到正差值，才支持在本设置采用压缩表示。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_attribution",
+              "version": 1,
+              "text": "在表1的相同设置中，未压缩基线准确率为71%，压缩表示为62%。",
+              "conditions": [
+                "比较对象和准确率必须对应同一给定设置"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_attribution"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_attribution",
+            "title": "合成研究材料 attribution",
+            "content": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_attribution",
+            "source_id": "src_attribution",
+            "claim_id": "claim_attribution",
+            "claim_version": 1,
+            "claim": "在表1的相同设置中，压缩表示准确率为71%，未压缩基线为62%。",
+            "conditions": [
+              "比较对象和准确率必须对应同一给定设置"
+            ],
+            "excerpt": "合成报告表1。设置：相同测试集、相同训练样本量、一次推理，准确率单位为百分比。方法 | 准确率：未压缩基线 | 62；压缩表示 | 71。表中未报告其他系统或多次推理结果。",
+            "locator": "chars:0:86",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": true,
+        "target_locations": [
+          "motivation.observation_or_deficit",
+          "claims[0].text"
+        ],
+        "reason": "方法与数值的归属对调；表格中的原文可定位不代表候选转述正确。",
+        "repair_acceptance": "把两处数值归属恢复为压缩71%、未压缩62%，并删除或修正任何依赖错误归属的推论。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "interaction_correct",
+      "pair_id": "interaction",
+      "model_visible": {
+        "original_task": {
+          "topic": "两个二值干预是否存在非加性交互？",
+          "boundaries": [
+            "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "两个二值干预是否存在非加性交互？",
+          "problem_anchor": {
+            "question": "两个二值干预是否存在非加性交互？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+            "evidence_ids": [
+              "ev_interaction"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_interaction"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "在相同单元测量四个条件，估计交互对比。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "必选条件为(A,B)=(0,0)、(1,0)、(0,1)、(1,1)，每个单元均测量。",
+            "controls": [
+              "相同总体、测量仪器和复位程序",
+              "随机条件顺序",
+              "固定A/B各自的干预强度"
+            ],
+            "measurements": [
+              "I=Y_11-Y_10-Y_01+Y_00；给出重复单元不确定性"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "I偏离0支持该尺度和总体中的非加性交互；不能据此独自确定潜在机制。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_interaction",
+              "version": 1,
+              "text": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+              "conditions": [
+                "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_interaction"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_interaction",
+            "title": "合成研究材料 interaction",
+            "content": "合成实验定义：A与B均可独立设为0或1。Y_ab是同一目标总体在A=a且B=b下的平均连续响应。各单元可重复测量四种条件，条件顺序随机，测量间完全复位，无携带效应。候选要估计加性尺度上的交互，未有任何条件的已知响应常数。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_interaction",
+            "source_id": "src_interaction",
+            "claim_id": "claim_interaction",
+            "claim_version": 1,
+            "claim": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+            "conditions": [
+              "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+            ],
+            "excerpt": "合成实验定义：A与B均可独立设为0或1。Y_ab是同一目标总体在A=a且B=b下的平均连续响应。各单元可重复测量四种条件，条件顺序随机，测量间完全复位，无携带效应。候选要估计加性尺度上的交互，未有任何条件的已知响应常数。",
+            "locator": "chars:0:110",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": false,
+        "target_locations": [],
+        "reason": "本例目标错误不存在。可判断研究价值普通，不应捏造该硬错误。",
+        "repair_acceptance": "不需要针对该错误修订。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "interaction_faulty",
+      "pair_id": "interaction",
+      "model_visible": {
+        "original_task": {
+          "topic": "两个二值干预是否存在非加性交互？",
+          "boundaries": [
+            "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "两个二值干预是否存在非加性交互？",
+          "problem_anchor": {
+            "question": "两个二值干预是否存在非加性交互？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+            "evidence_ids": [
+              "ev_interaction"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_interaction"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "拟检验效应在本例条件下存在。",
+              "拟检验效应在本例条件下不存在。"
+            ],
+            "distinct_predictions": [
+              "核心差值偏离零效应。",
+              "核心差值与零效应相容。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "测量三个活跃处理条件，未处理条件列为可选以节省工作。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "必选条件为(A,B)=(1,0)、(0,1)、(1,1)；(0,0)只在有额外时间时选测。",
+            "controls": [
+              "相同总体、测量仪器和复位程序",
+              "随机条件顺序",
+              "固定A/B各自的干预强度"
+            ],
+            "measurements": [
+              "I=Y_11-Y_10-Y_01+Y_00；给出重复单元不确定性"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "I偏离0支持该尺度和总体中的非加性交互；不能据此独自确定潜在机制。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_interaction",
+              "version": 1,
+              "text": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+              "conditions": [
+                "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_interaction"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_interaction",
+            "title": "合成研究材料 interaction",
+            "content": "合成实验定义：A与B均可独立设为0或1。Y_ab是同一目标总体在A=a且B=b下的平均连续响应。各单元可重复测量四种条件，条件顺序随机，测量间完全复位，无携带效应。候选要估计加性尺度上的交互，未有任何条件的已知响应常数。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_interaction",
+            "source_id": "src_interaction",
+            "claim_id": "claim_interaction",
+            "claim_version": 1,
+            "claim": "A与B可独立操作；已有材料没有提供交互值或任何响应常数。",
+            "conditions": [
+              "目标是完整估计加性尺度交互I，而非只比较联合处理和一个单处理"
+            ],
+            "excerpt": "合成实验定义：A与B均可独立设为0或1。Y_ab是同一目标总体在A=a且B=b下的平均连续响应。各单元可重复测量四种条件，条件顺序随机，测量间完全复位，无携带效应。候选要估计加性尺度上的交互，未有任何条件的已知响应常数。",
+            "locator": "chars:0:110",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": true,
+        "target_locations": [
+          "method.simplest_path",
+          "minimal_test.intervention"
+        ],
+        "reason": "交互定义需要Y_00，材料没有给出其已知值，但实验把该条件列为可选。",
+        "repair_acceptance": "使Y_00具有必选、同总体可比的测量来源，或明确收窄目标并停止宣称估计原交互；不能假设Y_00=0。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "partition_correct",
+      "pair_id": "partition",
+      "model_visible": {
+        "original_task": {
+          "topic": "怎样把固定真实实例总体中的识别流水线结果分解为可解释的发生率？",
+          "boundaries": [
+            "以全体真实实例为分母",
+            "分类按流水线顺序互斥，不统计额外无匹配预测"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "怎样把固定真实实例总体中的识别流水线结果分解为可解释的发生率？",
+          "problem_anchor": {
+            "question": "怎样把固定真实实例总体中的识别流水线结果分解为可解释的发生率？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "以全体真实实例为分母",
+              "分类按流水线顺序互斥，不统计额外无匹配预测"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
+            "evidence_ids": [
+              "ev_partition"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_partition"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "失败负担可能集中在一个阶段。",
+              "失败负担可能分散在各阶段。"
+            ],
+            "distinct_predictions": [
+              "一个失败发生率明显高于其他失败发生率。",
+              "各失败发生率相近。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "按流水线先后顺序对每个真实实例赋予且仅赋予一种结果。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "固定模型和匹配规则，在同一批N个真实实例上记录各阶段结果。",
+            "controls": [
+              "同一真实实例分母N",
+              "固定一对一匹配规则",
+              "固定ID判断与位姿阈值"
+            ],
+            "measurements": [
+              "漏检/N、已检出但ID错/N、ID正确但位姿超阈/N、完全正确/N；四项之和为1"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "各发生率描述全体真实实例上的阶段负担，可据此选择下一步排查位置；不推出干预因果收益。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_partition",
+              "version": 1,
+              "text": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
+              "conditions": [
+                "以全体真实实例为分母",
+                "分类按流水线顺序互斥，不统计额外无匹配预测"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_partition"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_partition",
+            "title": "合成研究材料 partition",
+            "content": "合成流水线定义：分母N为固定真实实例数，N>0。每个实例按预先固定的一对一匹配规则处理；未匹配为漏检。已匹配实例有一个预测ID；ID不同为ID错误。ID正确实例有位姿误差，以固定阈值判断合格。此统计不包含无对应真实实例的多余预测，不据此评价预测精确率。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_partition",
+            "source_id": "src_partition",
+            "claim_id": "claim_partition",
+            "claim_version": 1,
+            "claim": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
+            "conditions": [
+              "以全体真实实例为分母",
+              "分类按流水线顺序互斥，不统计额外无匹配预测"
+            ],
+            "excerpt": "合成流水线定义：分母N为固定真实实例数，N>0。每个实例按预先固定的一对一匹配规则处理；未匹配为漏检。已匹配实例有一个预测ID；ID不同为ID错误。ID正确实例有位姿误差，以固定阈值判断合格。此统计不包含无对应真实实例的多余预测，不据此评价预测精确率。",
+            "locator": "chars:0:126",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": false,
+        "target_locations": [],
+        "reason": "本例目标错误不存在。可判断研究价值普通，不应捏造该硬错误。",
+        "repair_acceptance": "不需要针对该错误修订。",
+        "not_a_quality_label": true
+      }
+    },
+    {
+      "case_id": "partition_faulty",
+      "pair_id": "partition",
+      "model_visible": {
+        "original_task": {
+          "topic": "怎样把固定真实实例总体中的识别流水线结果分解为可解释的发生率？",
+          "boundaries": [
+            "以全体真实实例为分母",
+            "分类按流水线顺序互斥，不统计额外无匹配预测"
+          ],
+          "proposal_details_are_user_constraints": false
+        },
+        "card": {
+          "title": "怎样把固定真实实例总体中的识别流水线结果分解为可解释的发生率？",
+          "problem_anchor": {
+            "question": "怎样把固定真实实例总体中的识别流水线结果分解为可解释的发生率？",
+            "research_object": "本例给定的合成研究系统",
+            "conditions": [
+              "以全体真实实例为分母",
+              "分类按流水线顺序互斥，不统计额外无匹配预测"
+            ],
+            "anti_scope": [
+              "不声称已运行新实验",
+              "不外推到未提供的真实系统"
+            ]
+          },
+          "contribution": {
+            "primary_type": "new_boundary",
+            "secondary_types": [],
+            "knowledge_increment": "明确本例所问判断在给定系统与条件内是否成立。",
+            "decision_changed": "决定是否在本例条件下采用该方案；不主张已建立领域新颖性。"
+          },
+          "motivation": {
+            "observation_or_deficit": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
+            "evidence_ids": [
+              "ev_partition"
+            ],
+            "unresolved_assumptions": [
+              "这是合成材料中的局部检验，研究价值和外部新颖性另行评价。"
+            ]
+          },
+          "closest_work_delta": {
+            "source_ids": [
+              "src_partition"
+            ],
+            "established_claim": "给定材料说明系统和已知事实。",
+            "remaining_claim": "候选中的拟检验量尚未测得。",
+            "search_limits": [
+              "只有本例合成材料，不作全球文献新颖性判断。"
+            ]
+          },
+          "hypotheses": {
+            "main_or_competing_explanations": [
+              "失败负担可能集中在一个阶段。",
+              "失败负担可能分散在各阶段。"
+            ],
+            "distinct_predictions": [
+              "一个失败发生率明显高于其他失败发生率。",
+              "各失败发生率相近。"
+            ],
+            "favored_only_if_justified": null
+          },
+          "method": {
+            "simplest_path": "按流水线先后顺序对每个真实实例赋予且仅赋予一种结果。",
+            "necessary_components": [],
+            "stitching_assessment": "使用必要的测量与对照，不以模块组合声称创新。"
+          },
+          "minimal_test": {
+            "intervention": "固定模型和匹配规则，在同一批N个真实实例上记录各阶段结果。",
+            "controls": [
+              "同一真实实例分母N",
+              "固定一对一匹配规则",
+              "固定ID判断与位姿阈值"
+            ],
+            "measurements": [
+              "漏检/N、已检出但ID错/N、ID正确但位姿超阈/N；这三项在全体真实实例上之和恒为1"
+            ],
+            "positive_controls": [
+              "先用已知答案的小样本确认测量实现符合材料中的定义。"
+            ],
+            "outcome_interpretations": [
+              {
+                "outcome": "得到预先定义的核心测量量",
+                "interpretation": "各发生率描述全体真实实例上的阶段负担，可据此选择下一步排查位置；不推出干预因果收益。",
+                "validity_limit": "仅限原问题条件，不能推成普遍结论。"
+              }
+            ],
+            "confounds_not_yet_ruled_out": [
+              "对真实系统的迁移尚未检验；不影响本例定义检查。"
+            ]
+          },
+          "resources": {
+            "gpu_type": "RTX 3090",
+            "gpu_memory_gb_assumption": 24.0,
+            "gpu_count": 1,
+            "training_gpu_hours_range": null,
+            "inference_gpu_hours_range": {
+              "lower": 0,
+              "upper": 1,
+              "unit": "GPU-hours"
+            },
+            "wall_hours_range": {
+              "lower": 2.0,
+              "upper": 8.0,
+              "unit": "hours"
+            },
+            "workload_assumptions": {
+              "model_size": "固定合成系统，无模型训练",
+              "precision": "4-bit",
+              "sequence_length": null,
+              "data_amount": "100个固定测试单元",
+              "steps": null,
+              "parallelism": "single GPU",
+              "non_gpu_steps": "task construction"
+            },
+            "estimate_basis": "合成系统的微型测量；无已执行科研实验或吞吐数据。",
+            "uncertainty": "Broad estimate; no research experiment executed."
+          },
+          "risks": {
+            "decisive_risks": [
+              "测量或结论若不符合给定定义，就应修改后再使用。"
+            ],
+            "missing_prerequisites": [],
+            "reopen_conditions": [
+              "出现违反固定假设的材料时重新审查。"
+            ]
+          },
+          "claims": [
+            {
+              "claim_id": "claim_partition",
+              "version": 1,
+              "text": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
+              "conditions": [
+                "以全体真实实例为分母",
+                "分类按流水线顺序互斥，不统计额外无匹配预测"
+              ],
+              "kind": "empirical",
+              "evidence_ids": [
+                "ev_partition"
+              ]
+            }
+          ]
+        },
+        "sources": [
+          {
+            "source_id": "src_partition",
+            "title": "合成研究材料 partition",
+            "content": "合成流水线定义：分母N为固定真实实例数，N>0。每个实例按预先固定的一对一匹配规则处理；未匹配为漏检。已匹配实例有一个预测ID；ID不同为ID错误。ID正确实例有位姿误差，以固定阈值判断合格。此统计不包含无对应真实实例的多余预测，不据此评价预测精确率。",
+            "source_type": "user_material",
+            "content_origin": "original",
+            "access_status": "retrieved"
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "ev_partition",
+            "source_id": "src_partition",
+            "claim_id": "claim_partition",
+            "claim_version": 1,
+            "claim": "每个真实实例都经过匹配、ID和位姿判定，需要区分失败阶段与成功结果。",
+            "conditions": [
+              "以全体真实实例为分母",
+              "分类按流水线顺序互斥，不统计额外无匹配预测"
+            ],
+            "excerpt": "合成流水线定义：分母N为固定真实实例数，N>0。每个实例按预先固定的一对一匹配规则处理；未匹配为漏检。已匹配实例有一个预测ID；ID不同为ID错误。ID正确实例有位姿误差，以固定阈值判断合格。此统计不包含无对应真实实例的多余预测，不据此评价预测精确率。",
+            "locator": "chars:0:126",
+            "relation": "motivates",
+            "origin": "original",
+            "locator_status": "verified",
+            "verification_status": "verified",
+            "support_explanation": "原始合成材料可定位；是否支持候选中的具体解释仍由科学审查判断。"
+          }
+        ]
+      },
+      "expected": {
+        "has_target_hard_error": true,
+        "target_locations": [
+          "minimal_test.measurements"
+        ],
+        "reason": "以全部真实实例为分母却遗漏完全正确实例；三种错误发生率不恒加和为1。",
+        "repair_acceptance": "全实例分解加入完全正确类，或明确改用全部错误实例分母并改变所宣称的统计量。",
+        "not_a_quality_label": true
+      }
+    }
+  ]
+}
