@@ -245,7 +245,7 @@ def test_short_scientific_roles_render_only_their_responsibility(prompt_id):
     assert 'not that the excerpt entails a claim' in rendered.messages[0]['content']
     if prompt_id=='discovery.REVISE':
         assert 'tasks/revise_science.md' in rendered.dependencies
-        assert 'patch' in rendered.messages[1]['content']
+        assert 'section_updates' in rendered.messages[1]['content']
         assert '比较包含必要条件' in rendered.messages[1]['content']
 
 
