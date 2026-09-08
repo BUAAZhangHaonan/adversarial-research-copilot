@@ -215,8 +215,19 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                 return {'is_error': True, 'error': 'MCP_OPERATION_FAILED', 'data': body}
             source_ids, registered = [], []
             if name == 'read_paper':
-                paper = body.get('paper') or {}
-                items = [{**paper, 'content': body.get('markdown'), 'origin': cap.origin}]
+                paper = dict(body.get('paper') or {})
+                text = body.get('markdown')
+                identity = paper.get('versioned_id') or paper.get('arxiv_id')
+                if not (paper.get('title') or '').strip():
+                    if (isinstance(text, str) and text.strip() and isinstance(identity, str)
+                            and re.fullmatch(r'(?:\d{4}\.\d{4,5}|[a-zA-Z][a-zA-Z.\-]*/\d{7})v[1-9]\d*', identity)):
+                        paper['title'] = 'arXiv ' + identity
+                    else:
+                        return {'is_error': True, 'error': 'MCP_SOURCE_METADATA_INCOMPLETE',
+                                'missing': ['title_or_versioned_arxiv_identity_with_body'],
+                                'raw_artifact_path': raw_path}
+                items = [{**paper, 'content': text, 'origin': cap.origin,
+                          'representation_id': f'{cap.service}:{cap.method}:markdown'}]
             elif name == 'read_web':
                 items = [{**body, **web_text_representation(body, arguments), 'origin': cap.origin}]
             else:
@@ -228,7 +239,12 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                 arxiv_id = item.get('versioned_id') or item.get('arxiv_id')
                 url = item.get('url') or item.get('canonical_url')
                 if not url and arxiv_id: url = 'https://arxiv.org/abs/' + arxiv_id
-                if not url or not item.get('title'): continue
+                if not url or not item.get('title'):
+                    if name == 'read_paper':
+                        return {'is_error': True, 'error': 'MCP_SOURCE_METADATA_INCOMPLETE',
+                                'missing': ['source_identity' if not url else 'title'],
+                                'raw_artifact_path': raw_path}
+                    continue
                 origin = item['origin']
                 text = item.get('content')
                 source = store.register_source(SourceRecord(title=item['title'], url=url, arxiv_id=arxiv_id,
