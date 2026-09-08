@@ -198,6 +198,9 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
         try:
             store.update_run(run.run_id, status='RUNNING', stop_reason=None)
             result = run.state.get('functional_result')
+            if result and result.get('not_run_reason'):
+                # Missing prerequisites are checked again after an upstream recovery.
+                result = None
             if result is None:
                 if condition in 'ABC':
                     if condition == 'A':
@@ -221,6 +224,7 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                     judgment = None
                     if draft is not None:
                         card = store.save_card(draft, creation_key=run.run_id + '.candidate', run_id=run.run_id)
+                        store.update_run(run.run_id, card_id=card.card_id, card_version=card.version)
                         # The original task is present in all three legacy review arms.
                         context = {**engine.context(run.run_id), 'card': as_data(card)}
                         novelty = await engine.call(run.run_id, 'novelty', 'novelty_examiner',
@@ -240,6 +244,7 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                                   'not_run_reason': 'D_has_no_complete_initial_review'}
                     else:
                         card = store.save_card(a['draft'], creation_key=run.run_id + '.candidate', run_id=run.run_id)
+                        store.update_run(run.run_id, card_id=card.card_id, card_version=card.version)
                         if condition == 'E':
                             d = store.get_run(f'{experiment_id}.D')
                             initial = d.state['scientific_cycles']['science']['review']
@@ -252,8 +257,13 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                         result = {'draft': as_data(card.draft), 'judgment': as_data(scientific_review),
                             'candidate_origin': f'{experiment_id}.A', 'card_version': card.version,
                             'initial_review_origin': f'{experiment_id}.D.science.review'}
-                engine.checkpoint(run.run_id, functional_result=result)
-            store.update_run(run.run_id, status='COMPLETED', stop_reason='frozen_ablation_condition_complete')
+                if not result.get('not_run_reason'):
+                    engine.checkpoint(run.run_id, functional_result=result)
+            dependency = 'D' if result.get('not_run_reason') == 'D_has_no_complete_initial_review' else 'A'
+            waiting = bool(result.get('not_run_reason') and
+                           report['conditions'].get(dependency, {}).get('status') != 'COMPLETED')
+            store.update_run(run.run_id, status='PAUSED_EXTERNAL' if waiting else 'COMPLETED',
+                stop_reason=result['not_run_reason'] if waiting else 'frozen_ablation_condition_complete')
         except Exception as exc:
             _record_failure(store, run.run_id, exc)
             current = store.get_run(run.run_id)

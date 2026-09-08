@@ -175,3 +175,37 @@ async def test_unsettled_paid_request_stops_before_starting_another_condition(tm
     assert len(calls) == 1
     with pytest.raises(ValueError, match='PARENT_HAS_PENDING_CALLS'):
         await run_ablation(settings, source.run_id, **arguments)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('failed_key,waiting', [('.A.conception', 'DE'), ('.D.science.review', 'E')])
+async def test_upstream_recovery_revisits_dependent_arms_without_regenerating_candidates(
+        tmp_path, monkeypatch, failed_key, waiting):
+    settings, store, _, source, calls, arguments = environment(tmp_path, monkeypatch, fail_key=failed_key)
+    first = await run_ablation(settings, source.run_id, **arguments)
+    for condition in waiting:
+        assert first['conditions'][condition]['status'] == 'PAUSED_EXTERNAL'
+        assert not store.get_run('ablation-test.' + condition).state.get('functional_result')
+    completed_generation = [c for c in calls if c['task'] in {'CONCEIVE', 'COMPOSE'} and failed_key not in c['task_id']]
+    async def recovered(run, phase, config):
+        return LocalRuntime(store, calls, run, phase, config)
+    second = await run_ablation(settings, source.run_id, **{**arguments, 'runtime_factory': recovered})
+    assert second['status'] == 'completed'
+    for accepted in completed_generation:
+        assert len([c for c in calls if c['task_id'] == accepted['task_id']]) == 1
+    assert second['conditions']['D']['draft'] == second['conditions']['A']['draft']
+    assert second['conditions']['E']['judgment']['action'] == 'retain'
+
+
+@pytest.mark.asyncio
+async def test_failed_old_review_preserves_a_candidate_for_d_and_e(tmp_path, monkeypatch):
+    settings, store, _, source, calls, arguments = environment(tmp_path, monkeypatch, fail_key='.A.novelty')
+    first = await run_ablation(settings, source.run_id, **arguments)
+    assert first['conditions']['A']['status'] == 'PAUSED_PROTOCOL'
+    assert first['conditions']['D']['draft'] == first['conditions']['A']['draft']
+    assert first['conditions']['E']['judgment']['action'] == 'retain'
+    async def recovered(run, phase, config):
+        return LocalRuntime(store, calls, run, phase, config)
+    second = await run_ablation(settings, source.run_id, **{**arguments, 'runtime_factory': recovered})
+    assert second['status'] == 'completed'
+    assert len([c for c in calls if c['task'] == 'CONCEIVE']) == 1
