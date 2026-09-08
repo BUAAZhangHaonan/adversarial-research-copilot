@@ -90,6 +90,7 @@ def test_prepare_preserves_failure_science_budget_and_frozen_input(tmp_path):
     assert audit['original_input'] == old_inputs[KEY]
     assert audit['tool_profile'] == ['read_record']
     repair = audit['protocol_retry']
+    assert repair['request_reason'] == REASON
     assert repair['unaccepted_response'] == RAW
     assert repair['previous_task_id'] == before['task']['task_id']
     assert repair['validation_errors']
@@ -325,6 +326,8 @@ async def test_second_task_version_requires_new_explicit_request_and_keeps_failu
     assert 'new_unfrozen_input' not in runtime.calls[0]['payload']
     assert runtime.calls[0]['payload']['frozen_context'] == 'Original science'
     assert runtime.calls[0]['payload']['protocol_retry']['previous_task_id'] == failed_revision.task_id
+    assert runtime.calls[0]['payload']['protocol_retry']['request_reason'] == REASON + ' Reviewed the new failure.'
+    assert store.get_run(run.run_id).state['task_inputs'][second['replacement_key']]['payload']['protocol_retry']['request_reason'] == REASON + ' Reviewed the new failure.'
     assert engine.trace_tasks(run.run_id, KEY) == [f'{run.run_id}.{KEY}', failed_revision.task_id,
         f"{run.run_id}.{second['replacement_key']}"]
     assert store.get_task(f'{run.run_id}.{KEY}').model_dump(mode='json') == old_failure

@@ -171,7 +171,8 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
              'tool_profile': [t['function']['name'] for t in saved.get('original_tools', [])],
              'application_failure': application_failure,
              'superseded_cached_result': run.state.get(task_key),
-             'protocol_retry': {'previous_task_id': source.task_id, 'previous_error': source.error or run.stop_reason,
+             'protocol_retry': {'request_reason': reason.strip(),
+                 'previous_task_id': source.task_id, 'previous_error': source.error or run.stop_reason,
                  'validation_errors': errors, 'unaccepted_response': raw,
                  'previous_successful_tools': successful_tools}}
     audit = json.loads(json.dumps(audit, ensure_ascii=False, default=str))
