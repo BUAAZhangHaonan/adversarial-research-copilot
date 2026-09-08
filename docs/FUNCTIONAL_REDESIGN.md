@@ -55,6 +55,6 @@ discover 结束后显式选卡才进入 develop；随后再显式进入 run 的�
 
 行为指导写在科学目标 Markdown：接收角色对照已有证据和前序核验判断是否需要补读，不增加自动必经调查阶段，不重复购买已有充分核验。新接线不回写历史任务的冻结输入。真实 draw3.science.review 已冻结输入含 `er1_es_cot_full_text` 完整问题及 claim/source/draw 对应，来源为原 draw3.conception，原始 boundaries 正确；这证明运行时交接接通，是否完成补证与科学问题是否解决仍待核对。
 
-最近完成的整套软件验证是 **f70b937：637 passed**，并完成从 sdist 构建 wheel、隔离安装及依赖检查。之后的提交不能借用这一结果宣称已经全量验收；最终软件验证与包仍待统一收尾。软件记录位于私有 `work/software-closeout-final/SOFTWARE_VALIDATION.json`。A–E、自然后续和旧卡定向纠正的最终结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)中的待完成项。
+最近完成的整套软件验证是 **eb9e0bf：673 passed，0 failed/error/skipped**，并完成从 sdist 构建 wheel、仓库外目录的隔离安装、38 份提示词文件/18 个注册任务/3 份配置资源检查、4 个 CLI 帮助入口和依赖检查。真实记录位于私有 `work/software-validation-20260908T132602459094Z/SOFTWARE_VALIDATION.json`。f70b937 的 637 项记录仍保留为历史基线；673 只覆盖 eb9e0bf 的源码与资源快照，不认证其后代码改动，也不是研究质量实验。A–E、自然后续和旧卡定向纠正的最终结果见[验收结果](FUNCTIONAL_VALIDATION_RESULTS.md)中的待完成项。
 
 旧 MASTER_STATUS、L4 和自然运行报告是历史记录，最终交付时更新入口，不覆盖历史结果。费用沿用既有父/子账本；本文不固定正在变化的余额或最终总额。
