@@ -73,7 +73,7 @@ def test_report_preserves_state_judgments_versions_and_costs(tmp_path,monkeypatc
     report=paths['overview'].read_text(encoding='utf-8')
     detail=paths['card:card-1:2'].read_text(encoding='utf-8')
     assert '1 张进入主报告，1 张为待补证线索' in report
-    assert '已登记判断的原句，不能改变。' in report
+    assert '已登记判断的原句，不能改变。' in detail
     assert 'next_request_not_admitted' in report
     assert 'arc resume run-1' in report
     assert '未完成 1 项' in report
@@ -224,8 +224,9 @@ def test_cross_run_report_resolves_only_referenced_inherited_evidence(tmp_path, 
     overview = paths['overview'].read_text(encoding='utf-8')
     detail = paths[f'card:{card_record.card_id}:1'].read_text(encoding='utf-8')
     for name, contents in [('overview', overview), ('detail', detail)]:
-        if name == 'detail' and reference_location == 'run':
-            continue  # A run-only source is not attributed to a card that never cited it.
+        if reference_location == 'run':
+            assert source.content_path not in contents
+            continue  # Registered working evidence alone is not a formal citation.
         links = [unquote(value) for value in re.findall(r'\]\(([^)]+)\)', contents)]
         report_dir = paths['overview' if name == 'overview' else f'card:{card_record.card_id}:1'].parent
         assert any((report_dir / link).resolve() == (store.artifact_root / source.content_path).resolve()
@@ -291,6 +292,7 @@ def test_later_stage_reports_final_assessment_instead_of_old_selection(tmp_path,
     assert '已登记判断的原句' not in detail
     assert '人类需执行明确的区分实验。' in detail
     assert store.cards==original
+    assert detail.index('区分两个解释') < detail.index('当前阶段发现新的致命混淆。')
     if assessment is None:
         assert '当前卡与未完成判断' in report
 
@@ -308,3 +310,25 @@ def test_developed_card_without_selection_is_shown_from_current_assessment(tmp_p
     assert 'cards/card-1/v2.md' in report
     assert 'cards/card-1/v1.md' not in report
     assert '当前阶段科研判断：值得继续调查' in paths['card:card-1:2'].read_text(encoding='utf-8')
+
+
+def test_search_hits_remain_audit_only_and_insight_precedes_operational_ruling(tmp_path, monkeypatch):
+    monkeypatch.setattr('arc.budget.BudgetLedger', FakeLedger)
+    store = FakeStore(tmp_path)
+    store.cards = [card()]
+    store.run.update(mode='develop', card_id='card-1', card_version=2,
+                     assessment='PROMISING', status='COMPLETED', state={
+        'source_ids': ['s-1', 's-private'],
+        'final_ruling': {'concise_ruling': '版本纠错成功，旧证据移除后任务恢复。',
+                        'next_action': 'HANDOFF_EXPERIMENT'}})
+    paths = render_run(store, 'run-1', tmp_path / 'curated-report')
+    overview = paths['overview'].read_text(encoding='utf-8')
+    detail = paths['card:card-1:2'].read_text(encoding='utf-8')
+    appendix = paths['search_sources'].read_text(encoding='utf-8')
+    assert '不相关秘密' not in overview and '不相关秘密' not in detail
+    assert '不相关秘密' in appendix and '不表示相关、已读或支持当前结论' in appendix
+    assert '版本纠错成功' not in overview
+    assert detail.index('区分两个解释') < detail.index('版本纠错成功')
+    assert overview.index('区分两个解释') < overview.index('当前执行状态') if '当前执行状态' in overview else True
+    assert '出处可定位只确认摘录存在' in detail
+    assert 'SEARCH_SOURCES.md' in overview and 'SEARCH_SOURCES.md' in detail

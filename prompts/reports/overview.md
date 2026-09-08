@@ -9,6 +9,10 @@
 
 {{ card.decision_paragraph }}
 
+{{ card.insight_paragraph }}
+
+{{ card.motivation_paragraph }}
+
 {{ card.knowledge_gain_paragraph }}
 
 {{ card.main_risk_paragraph }}
@@ -54,8 +58,12 @@
 
 {{ next_step_paragraph }}
 
-## 来源
+## 正式来源
+
+以下来源服务于卡片、争点或当前结论；搜索命中不自动成为引用。
 
 {% for source in sources %}
 - [{{ source.id }}：{{ source.title }}]({{ source.url }})
 {% endfor %}
+
+[完整调用与证据记录](PROMPT_TRACE_INDEX.md) · [检索命中审计](SEARCH_SOURCES.md)

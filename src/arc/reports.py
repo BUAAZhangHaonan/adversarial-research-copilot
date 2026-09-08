@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit
 
 from arc.prompting import PromptLoader
+from arc.research_context import EVIDENCE_KEYS, SOURCE_KEYS, reference_ids as _reference_ids
 
 
 LABELS = {
@@ -58,7 +59,7 @@ def _text(value: Any) -> str:
     if isinstance(value, bool):
         return '是' if value else '否'
     if isinstance(value, list):
-        return '；'.join(_text(item) for item in value)
+        return '\n\n'.join('- ' + _text(item) for item in value)
     if isinstance(value, dict):
         return '\n\n'.join(f'{LABELS.get(key, key)}：{_text(item)}' for key, item in value.items())
     return str(value)
@@ -93,25 +94,6 @@ def _artifact_path(value: Any, output_dir: Path, store: Any) -> str | None:
     if not path.is_file():
         return None
     return quote(Path(os.path.relpath(path.resolve(), output_dir.resolve())).as_posix(), safe='/.-_')
-
-
-def _reference_ids(value: Any, keys: set[str]) -> set[str]:
-    if isinstance(value, list):
-        return set().union(*(_reference_ids(item, keys) for item in value))
-    if not isinstance(value, dict):
-        return set()
-    found = set()
-    for key, item in value.items():
-        if key in keys:
-            found.update(ref for ref in (item if isinstance(item, list) else [item]) if isinstance(ref, str))
-        elif isinstance(item, (dict, list)):
-            found.update(_reference_ids(item, keys))
-    return found
-
-
-EVIDENCE_KEYS = {'evidence_id', 'evidence_ids', 'anchor_evidence_ids', 'trigger_evidence_ids',
-                 'decisive_evidence_ids', 'basis_evidence_ids', 'new_evidence_ids'}
-SOURCE_KEYS = {'source_id', 'source_ids', 'target_source_ids', 'original_sources_revisited'}
 
 
 def _source_links(source_ids: set[str], sources: list[dict], base_dir: Path, store: Any) -> list[dict]:
@@ -152,10 +134,12 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
         for b in claim_bindings)
     return {
         'title': _heading(draft.get('title') or anchor['question']),
-        'decision_paragraph': decision+'\n\n'+_text(judgment.get('why_worth_investigating')),
-        'motivation_paragraph': _text(draft.get('motivation')) +
-            ('\n\n主张与引用关系：\n\n' + bindings_text if bindings_text else ''),
-        'knowledge_gain_paragraph': _text(draft.get('contribution')),
+        'decision_paragraph': decision,
+        'insight_paragraph': _text(draft.get('contribution', {}).get('knowledge_increment')),
+        'motivation_paragraph': _text(draft.get('motivation', {}).get('observation_or_deficit')),
+        'knowledge_gain_paragraph': _text({'decision_changed': draft.get('contribution', {}).get('decision_changed')}),
+        'review_paragraph': _text(judgment.get('value_reason') or judgment.get('why_worth_investigating')),
+        'bindings_paragraph': bindings_text,
         'nearest_work_paragraph': _text(draft.get('closest_work_delta')),
         'hypothesis_paragraph': _text(hypothesis.get('main_or_competing_explanations')),
         'alternative_paragraph': _text({'distinct_predictions': hypothesis.get('distinct_predictions'), 'favored_only_if_justified':hypothesis.get('favored_only_if_justified')}),
@@ -163,9 +147,9 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
         'result_interpretation_paragraph': _text({key:test.get(key) for key in ['outcome_interpretations','confounds_not_yet_ruled_out']}),
         'resource_paragraph': _text(draft.get('resources')),
         'risks_paragraph': _text(judgment.get('decisive_risks',risks.get('decisive_risks'))),
-        'unresolved_paragraph': _text({'missing_prerequisites':risks.get('missing_prerequisites'), 'unresolved_assumptions':draft.get('motivation',{}).get('unresolved_assumptions')}) + '\n\n' + '\n'.join(f"- {issue['issue_id']}（{issue['status']}）：{_text(issue.get('content', issue.get('dispute')))}" for issue in unresolved),
+        'unresolved_paragraph': _text({'missing_prerequisites':risks.get('missing_prerequisites'), 'unresolved_assumptions':draft.get('motivation',{}).get('unresolved_assumptions'), 'remaining_uncertainty':judgment.get('remaining_uncertainty')}) + '\n\n' + '\n'.join(f"- {issue['issue_id']}（{issue['status']}）：{_text(issue.get('content', issue.get('dispute')))}" for issue in unresolved),
         'version_paragraph': f"研究卡 {card['card_id']}，版本 {card['version']}；原问题：{anchor['question']}。\n\n"+_text({'conditions':anchor.get('conditions'),'anti_scope':anchor.get('anti_scope')}),
-        'next_step_paragraph': _text({'next_action':judgment.get('next_action'), 'external_test_requirements':judgment.get('external_test_requirements'), 'reopening_condition':judgment.get('reopening_condition'), 'reopen_conditions':risks.get('reopen_conditions')}),
+        'next_step_paragraph': _text({'next_action':judgment.get('action') or judgment.get('next_action'), 'external_test_requirements':judgment.get('external_test_requirements'), 'reopening_condition':judgment.get('reopening_condition'), 'reopen_conditions':risks.get('reopen_conditions')}),
         'sources':sources,
     }
 
@@ -186,21 +170,24 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     tasks = [_obj(item) for item in store.list_tasks(run_id)]
     capabilities = [_obj(item) for item in store.list_capability_requests(run_id)]
     state = run.get('state', {})
-    references = [cards, issues, changes, {key: state.get(key) for key in
-        ('evidence_ids', 'source_ids', 'final_ruling')},
-        [{'evidence_ids': task.get('evidence_ids', [])} for task in tasks]]
+    references = [cards, issues, changes, state.get('final_ruling')]
+    trace_references = [references, {'evidence_ids': state.get('evidence_ids', [])},
+                        [{'evidence_ids': task.get('evidence_ids', [])} for task in tasks]]
     # Resolve inherited IDs without copying their records into the current run.
     # Frozen archive windows and rejected candidate payloads are not report evidence.
     evidence = [_obj(item) for item in store.list_evidence(
-        ids=sorted(_reference_ids(references, EVIDENCE_KEYS)))]
+        ids=sorted(_reference_ids(trace_references, EVIDENCE_KEYS)))]
     source_ids = _reference_ids(references, SOURCE_KEYS) | {e['source_id'] for e in evidence}
+    formal_evidence_ids = _reference_ids(references, EVIDENCE_KEYS)
+    formal_source_ids = _reference_ids(references, SOURCE_KEYS) | {
+        e['source_id'] for e in evidence if e['evidence_id'] in formal_evidence_ids}
     sources = [_obj(item) for item in store.list_sources(ids=sorted(source_ids))]
     ledger = BudgetLedger(store.db_path)
     budget = ledger.summary(run['budget_account_id']) if run.get('budget_account_id') else None
     calls = ledger.list_calls(run['budget_account_id']) if run.get('budget_account_id') else []
     paths: dict[str, Path] = {}
     main, leads, rejected, pending_cards = [], [], [], []
-    all_sources = {source['id']: source for source in _source_links(source_ids, sources, output_dir, store)}
+    all_sources = {source['id']: source for source in _source_links(formal_source_ids, sources, output_dir, store)}
     for card in cards:
         # A later stage owns its assessment. Never display a prior discovery
         # selection as approval of a revised proposal or a rejected review.
@@ -225,10 +212,19 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
         related_sources = _sources_for(card,evidence,sources,target.parent,store,issues)
         context = _card_context(card, related_sources, issues, focused_stage=focused_stage,
                                 claim_bindings=store.claim_evidence_bindings(card['draft']))
+        card_evidence_ids = _reference_ids([card, [i for i in issues if i.get('card_id') in {None, card['card_id']}]], EVIDENCE_KEYS)
+        context['evidence_notes'] = [
+            {'id': _heading(e['evidence_id']), 'source_id': _heading(e['source_id']),
+             'excerpt': _text(e.get('excerpt')), 'locator': _text(e.get('locator')),
+             'conditions': _text(e.get('conditions')), 'relation': e.get('relation'),
+             'support_explanation': _text(e.get('support_explanation'))}
+            for e in evidence if e['evidence_id'] in card_evidence_ids]
         target.write_text(loader.render_report('card',context),encoding='utf-8')
         paths[f"card:{card['card_id']}:{card['version']}"] = target
         if category == 'MAIN_REPORT':
             main.append({'title':context['title'],'decision_paragraph':context['decision_paragraph'],
+                         'insight_paragraph':context['insight_paragraph'],
+                         'motivation_paragraph':context['motivation_paragraph'],
                          'knowledge_gain_paragraph':context['knowledge_gain_paragraph'],
                          'main_risk_paragraph':context['risks_paragraph'],'relative_path':relative})
         elif category == 'LEAD_ONLY':
@@ -262,7 +258,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             f"{'已由后续任务接替' if task['task_id'] in superseded else '所属阶段已完成'}，不计入当前未完成任务。"
             for task in historical)
     overview = {'report_title': f"ARC {_heading(run['mode'])} 研究总览",
-                'executive_summary':f"当前执行状态：{status}。已保存 {len(cards)} 张研究卡，其中 {len(main)} 张进入主报告，{len(leads)} 张为待补证线索。科研判断：{ASSESSMENTS.get(run.get('assessment'), run.get('assessment') or '尚未形成')}。",
+                'executive_summary':f"本次已保存 {len(cards)} 张研究卡，其中 {len(main)} 张进入主报告，{len(leads)} 张为待补证线索。以下是当前候选的认识与风险；保留判断不代表假设已被实验验证。",
                 'main_cards':main,'leads':leads,
                 'scope_changes':[{'summary':_text(change.get('proposed_problem_anchor')),'original_evidence_audit':_text({'original_sources_revisited':change.get('original_sources_revisited'),'missed_evidence_analysis':change.get('missed_evidence_analysis'),'trigger_evidence_ids':change.get('trigger_evidence_ids')})} for change in changes],
                 'scope_paragraph':_text({'run_id':run_id,'campaign_id':run.get('campaign_id'),'card_id':run.get('card_id'),'card_version':run.get('card_version')}),
@@ -295,6 +291,18 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
                                  'recorded_run_id':e.get('run_id')})} for e in evidence]}
     paths['trace']=output_dir/'PROMPT_TRACE_INDEX.md'
     paths['trace'].write_text(loader.render_report('trace',trace),encoding='utf-8')
+    # Preserve the full search trail in an explicitly separate audit appendix.
+    # Membership here never promotes a hit into a research citation.
+    encountered_ids = set(state.get('source_ids', []))
+    encountered_sources = [_obj(item) for item in store.list_sources(ids=sorted(encountered_ids))]
+    paths['search_sources'] = output_dir / 'SEARCH_SOURCES.md'
+    search_lines = ['# 检索命中审计', '',
+                    '此处记录检索过程中遇到的来源，不表示相关、已读或支持当前结论。正式引用见研究报告。', '']
+    for source in encountered_sources:
+        links = _source_links({source['source_id']}, [source], output_dir, store)
+        label = _heading(source['source_id']) + '：' + _heading(source.get('title', ''))
+        search_lines.append(f"- [{label}]({links[0]['url']})" if links else '- ' + label)
+    paths['search_sources'].write_text('\n'.join(search_lines) + '\n', encoding='utf-8')
     paths['cost']=output_dir/'COST_REPORT.md'
     cost_entries='\n\n'.join(_text({key:call.get(key) for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper']}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost',{'run_id':run_id,'summary':cost_text,'entries':cost_entries}),encoding='utf-8')

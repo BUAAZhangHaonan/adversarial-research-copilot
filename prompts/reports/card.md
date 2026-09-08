@@ -2,7 +2,9 @@
 
 {{ decision_paragraph }}
 
-## 这个问题为什么值得做
+## 核心认识与研究价值
+
+{{ insight_paragraph }}
 
 {{ motivation_paragraph }}
 
@@ -40,8 +42,30 @@
 
 {{ next_step_paragraph }}
 
-## 来源
+## 审查记录与引用依据
+
+{{ review_paragraph }}
+
+{{ bindings_paragraph }}
+
+出处可定位只确认摘录存在，不代表摘录在当前设置下支持主张。保留判断仍需要事实归属与推理审查。
+
+{% for evidence in evidence_notes %}
+### {{ evidence.id }} → {{ evidence.source_id }}
+
+原文摘录：{{ evidence.excerpt }}
+
+定位：{{ evidence.locator }}；关系：{{ evidence.relation }}。
+
+适用条件：{{ evidence.conditions }}
+
+支持关系说明（待按内容审查）：{{ evidence.support_explanation }}
+{% endfor %}
+
+## 正式来源
 
 {% for source in sources %}
 - [{{ source.id }}：{{ source.title }}]({{ source.url }})
 {% endfor %}
+
+[完整调用与证据记录](../../PROMPT_TRACE_INDEX.md) · [检索命中审计](../../SEARCH_SOURCES.md)
