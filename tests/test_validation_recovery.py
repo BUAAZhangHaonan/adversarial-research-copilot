@@ -1,3 +1,4 @@
+import json
 import pytest
 from arc.config import Settings
 from arc.workflows import WorkflowEngine
@@ -123,7 +124,11 @@ async def test_cross_record_invalid_selection_pauses_without_acceptance_or_paid_
     engine = WorkflowEngine(store, runtime, Settings())
     result = await engine.execute(run.run_id)
     assert result.status == 'PAUSED_PROTOCOL'
-    assert result.stop_reason == 'MAIN_REPORT_PREREQUISITE_UNESTABLISHED'
+    diagnostics = json.loads(result.stop_reason)
+    assert len(diagnostics) == 1
+    assert diagnostics[0]['type'] == 'MAIN_REPORT_PREREQUISITE_UNESTABLISHED'
+    assert diagnostics[0]['loc'] == ['result', 'selection_checks', 'test_identifiability', 'status']
+    assert diagnostics[0]['supplied'] == 'unknown'
     assert not any(c.selection == 'MAIN_REPORT' for c in store.list_cards(run_id=run.run_id))
     prior_calls = len(runtime.calls)
     resumed = await engine.execute(run.run_id)
