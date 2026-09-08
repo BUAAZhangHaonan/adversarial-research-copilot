@@ -227,7 +227,7 @@ def retry_comparison_task(ctx: typer.Context, source_run: str,
                           system: str = typer.Option(...), task_key: str = typer.Option(...),
                           reason: str = typer.Option(...)):
     """显式重试冻结对照的失败任务；保留旧输出、已完成候选和原账本。"""
-    from .comparison_retry import prepare_comparison_retry
+    from .comparison_retry import prepare_comparison_retry, comparison_retry_options
     from .evaluation import run_comparison
     from .store import StateError
     store, ledger = services(ctx.obj)
@@ -236,7 +236,7 @@ def retry_comparison_task(ctx: typer.Context, source_run: str,
     except StateError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(json.dumps(retry, ensure_ascii=False))
-    asyncio.run(run_comparison(ctx.obj, source_run))
+    asyncio.run(run_comparison(ctx.obj, source_run, **comparison_retry_options(task_key)))
 
 
 @app.command(name='restart-direction')

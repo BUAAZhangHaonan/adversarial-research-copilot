@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 
 from arc.budget import BudgetLedger
 from arc.cli import app
-from arc.comparison_retry import frozen_reference_diagnostics, prepare_comparison_retry
+from arc.comparison_retry import frozen_reference_diagnostics, prepare_comparison_retry, comparison_retry_options
 from arc.evaluation import VALIDATION_PARENT, _frozen_call, run_comparison
 from arc.schemas import TaskRecord
 from arc.store import StateError
@@ -25,8 +25,8 @@ def failed_record(store, run, key='compose', *, status='PAUSED_PROTOCOL', cached
                'card_id': run.card_id, 'card_version': run.card_version}
     raw = json.dumps(cached) if cached is not None else '{"result": {"unexpected": true}}'
     prompt = store.save_artifact(f'tests/{task_id}.prompt.json', json.dumps({
-        'prompt_id': {'frame': 'discovery.FRAME', 'compose': 'discovery.COMPOSE',
-                      'judge': 'evaluator.INVOKE'}[key]}))
+        'prompt_id': 'evaluator.INVOKE' if key.startswith('judge') else
+            {'frame': 'discovery.FRAME', 'compose': 'discovery.COMPOSE'}[key]}))
     response = store.save_artifact(f'tests/{task_id}.failed.json', json.dumps({
         'subject': subject, 'response': {'message': {'content': raw}},
         'original_tools': [], 'tool_trace': [],
@@ -157,7 +157,10 @@ async def test_retry_does_not_redraw_a_needs_evidence_scientific_response(tmp_pa
         prepare_comparison_retry(store, ledger, source.run_id, 'ARC', 'compose', REASON)
 
 
-def test_retry_comparison_cli_routes_explicit_task_then_continues(tmp_path, monkeypatch):
+@pytest.mark.parametrize('key,system,options', [('compose', 'ARC', {}),
+    ('judge.seed20260908.forward', 'evaluator', {'seed': 20260908, 'include_swapped_order': False}),
+    ('judge.seed20260908.swapped', 'evaluator', {'seed': 20260908, 'include_swapped_order': True})])
+def test_retry_comparison_cli_routes_explicit_task_then_continues(tmp_path, monkeypatch, key, system, options):
     import arc.cli
     import arc.comparison_retry
     import arc.evaluation
@@ -166,15 +169,15 @@ def test_retry_comparison_cli_routes_explicit_task_then_continues(tmp_path, monk
     def prepare(*args):
         calls.append(('prepare', args))
         return {'replacement_key': 'compose.protocol_retry1'}
-    async def compare(settings, source_run):
-        calls.append(('compare', source_run))
+    async def compare(settings, source_run, **kwargs):
+        calls.append(('compare', source_run, kwargs))
     monkeypatch.setattr(arc.comparison_retry, 'prepare_comparison_retry', prepare)
     monkeypatch.setattr(arc.evaluation, 'run_comparison', compare)
     result = CliRunner().invoke(app, ['--data-dir', str(tmp_path), 'retry-comparison-task',
-        'source-run', '--system', 'ARC', '--task-key', 'compose', '--reason', REASON])
+        'source-run', '--system', system, '--task-key', key, '--reason', REASON])
     assert result.exit_code == 0, result.output
-    assert calls == [('prepare', ('store', 'ledger', 'source-run', 'ARC', 'compose', REASON)),
-                     ('compare', 'source-run')]
+    assert calls == [('prepare', ('store', 'ledger', 'source-run', system, key, REASON)),
+                     ('compare', 'source-run', options)]
 
 
 @pytest.mark.asyncio
@@ -198,6 +201,52 @@ async def test_explicit_evaluator_retry_preserves_anonymous_candidates_and_restr
     assert candidates == before and calls[-1]['payload']['candidates'] == before
     assert calls[-1]['tools'] == []
     assert store.get_task(run.run_id + '.judge').model_dump(mode='json') == original
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('key,options', [
+    ('judge.seed20260908.forward', {'seed': 20260908, 'include_swapped_order': False}),
+    ('judge.seed20260908.swapped', {'seed': 20260908, 'include_swapped_order': True}),
+    ('judge.seed20260907.swapped', {'seed': 20260907, 'include_swapped_order': True}),
+])
+async def test_seeded_order_retry_preserves_other_judgments_and_the_presented_candidates(tmp_path, monkeypatch, key, options):
+    import arc.cli
+    settings, store, source, calls = environment(tmp_path, monkeypatch)
+    ledger = BudgetLedger(store.db_path)
+    ledger.create_account(VALIDATION_PARENT, '100')
+    run = arc.cli.new_run(settings, 'evaluation', parent=VALIDATION_PARENT,
+        run_id=source.run_id + '.comparison.evaluator')
+    frozen_path = f'evaluations/{source.run_id}/evidence.json'
+    store.save_artifact(frozen_path, '{}')
+    candidates = [{'candidate_id': 'candidate_2', 'research_card': None},
+        {'candidate_id': 'candidate_1', 'research_card': None}]
+    runtime = ComparisonRuntime(store, calls)
+    other = await _frozen_call(store, runtime, run.run_id, 'judge', 'evaluator',
+        payload={'candidates': list(reversed(candidates))})
+    original = failed_record(store, store.get_run(run.run_id), key=key)
+    before = original.model_dump(mode='json')
+    raw = store.read_artifact(original.response_artifact_path)
+    old_state = copy.deepcopy(store.get_run(run.run_id).state)
+    budget = ledger.summary(VALIDATION_PARENT)
+    assert comparison_retry_options(key) == options
+    for system in ['ARC', 'direct-Pro']:
+        with pytest.raises(StateError, match='TASK_NOT_IN_SYSTEM'):
+            prepare_comparison_retry(store, ledger, source.run_id, system, key, REASON)
+    entry = prepare_comparison_retry(store, ledger, source.run_id, 'evaluator', key, REASON)
+    assert entry['replacement_key'] == key + '.protocol_retry1'
+    assert store.get_run(run.run_id).state['comparison_envelopes']['judge'] == old_state['comparison_envelopes']['judge']
+    result = await _frozen_call(store, runtime, run.run_id, key, 'evaluator', payload={'candidates': candidates})
+    assert [finding.candidate_id for finding in result.per_candidate_findings] == ['candidate_2', 'candidate_1']
+    assert calls[-1]['task_id'] == run.run_id + '.' + entry['replacement_key']
+    assert calls[-1]['payload']['candidates'] == candidates and calls[-1]['tools'] == []
+    assert ledger.summary(VALIDATION_PARENT) == budget
+    assert store.read_artifact(frozen_path) == '{}'
+    assert store.get_task(original.task_id).model_dump(mode='json') == before
+    assert store.read_artifact(original.response_artifact_path) == raw
+    count = len(calls)
+    assert await _frozen_call(store, runtime, run.run_id, 'judge', 'evaluator', payload={}) == other
+    assert await _frozen_call(store, runtime, run.run_id, key, 'evaluator', payload={}) == result
+    assert len(calls) == count
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pydantic import ValidationError
 
 from .schemas import Envelope, RESULT_SCHEMAS, utc_now
@@ -15,6 +16,17 @@ COMPARISON_TASKS = {
     'selection': ('selector', 'INVOKE'),
     'judge': ('evaluator', 'INVOKE'),
 }
+
+
+def comparison_retry_options(task_key):
+    """Recover the exact seeded presentation selected by the explicit task key."""
+    match = re.fullmatch(r'judge\.seed(-?\d+)\.(forward|swapped)', task_key)
+    if not match:
+        return {}
+    seed, order = int(match[1]), match[2]
+    if str(seed) != match[1] or (seed == 20260907 and order == 'forward'):
+        raise StateError('COMPARISON_RETRY_INVALID_SYSTEM_TASK_OR_REASON')
+    return {'seed': seed, 'include_swapped_order': order == 'swapped'}
 
 
 def frozen_reference_diagnostics(raw, material):
@@ -58,9 +70,11 @@ def frozen_reference_diagnostics(raw, material):
 
 def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, reason):
     """Record one user request; only execution creates the new physical task."""
-    if system not in ('ARC', 'direct-Pro', 'evaluator') or task_key not in COMPARISON_TASKS or not reason.strip():
+    options = comparison_retry_options(task_key)
+    spec = ('evaluator', 'INVOKE') if options else COMPARISON_TASKS.get(task_key)
+    if system not in ('ARC', 'direct-Pro', 'evaluator') or spec is None or not reason.strip():
         raise StateError('COMPARISON_RETRY_INVALID_SYSTEM_TASK_OR_REASON')
-    if ((system == 'evaluator') != (task_key == 'judge')
+    if ((system == 'evaluator') != (spec[0] == 'evaluator')
             or (system == 'direct-Pro' and task_key in ('frame', 'family'))):
         raise StateError('COMPARISON_RETRY_TASK_NOT_IN_SYSTEM')
     run_id = source_run_id + '.comparison.' + system
@@ -83,7 +97,7 @@ def prepare_comparison_retry(store, ledger, source_run_id, system, task_key, rea
     cached = envelopes.get(task_key)
     if cached is not None and cached.get('result_status') == 'complete':
         raise StateError('COMPARISON_RETRY_CANNOT_REPLACE_COMPLETED_RESULT')
-    role, task = COMPARISON_TASKS[task_key]
+    role, task = spec
     snapshot = json.loads(store.read_artifact(source.rendered_prompt_path))
     if snapshot['prompt_id'] != f'{role}.{task}':
         raise StateError('COMPARISON_RETRY_PROMPT_ROLE_MISMATCH')
