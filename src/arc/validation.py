@@ -246,40 +246,66 @@ def validate_evaluator_coverage(result, candidates):
             'duplicate': duplicates, 'unknown': sorted(set(supplied) - expected)}, ensure_ascii=False))
 
 
-def validate_selection(store, card, judgment: SelectorResult, novelty):
-    store.validate_references(judgment.model_dump(mode='json'))
-    store.validate_references(novelty.model_dump(mode='json'))
+def validate_selection(store, card, judgment: SelectorResult, novelty, *, check_references=True):
+    """Report independent selection prerequisites without changing scientific labels."""
+    from .store import StateError
+    if check_references:
+        store.validate_references(judgment.model_dump(mode='json'))
+        store.validate_references(novelty.model_dump(mode='json'))
+    errors = []
+
+    def reject(code, loc, **details):
+        errors.append({'type': code, 'loc': loc, **details})
+
+    def evidence_record(identifier):
+        try:
+            return store.get_record(identifier)
+        except StateError:
+            # Runtime diagnoses addresses independently. An unavailable address
+            # cannot establish any of the scientific prerequisites below.
+            return {}
+
     checks = judgment.selection_checks
     if judgment.selection == 'MAIN_REPORT':
         for name in ('motivation', 'knowledge_delta', 'test_identifiability', 'resource_path', 'stitching'):
             check = getattr(checks, name)
-            if check.status != 'supported' and not (name == 'stitching' and check.status == 'not_applicable'):
-                raise ProtocolViolation('MAIN_REPORT_PREREQUISITE_UNESTABLISHED')
+            allowed = ['supported', 'not_applicable'] if name == 'stitching' else ['supported']
+            if check.status not in allowed:
+                reject('MAIN_REPORT_PREREQUISITE_UNESTABLISHED',
+                    ['result', 'selection_checks', name, 'status'],
+                    supplied=check.status, expected=allowed, selection=judgment.selection)
             if not check.rationale:
-                raise ProtocolViolation('MAIN_REPORT_RATIONALE_REQUIRED')
+                reject('MAIN_REPORT_RATIONALE_REQUIRED', ['result', 'selection_checks', name, 'rationale'])
         if novelty.contribution_coverage in ('covered', 'unknown'):
-            raise ProtocolViolation('MAIN_REPORT_COVERAGE_UNESTABLISHED')
+            reject('MAIN_REPORT_COVERAGE_UNESTABLISHED', ['payload', 'novelty', 'contribution_coverage'],
+                supplied=novelty.contribution_coverage, expected=['not_covered', 'partial'])
         if not card.draft.motivation.evidence_ids:
-            raise ProtocolViolation('MAIN_REPORT_MOTIVATION_EVIDENCE_REQUIRED')
-        if not any(store.get_record(e).get('verification_status') == 'verified'
+            reject('MAIN_REPORT_MOTIVATION_EVIDENCE_REQUIRED', ['payload', 'card', 'draft', 'motivation', 'evidence_ids'])
+        if not any(evidence_record(e).get('verification_status') == 'verified'
                    for e in card.draft.motivation.evidence_ids):
-            raise ProtocolViolation('MAIN_REPORT_UNVERIFIED_MOTIVATION')
+            reject('MAIN_REPORT_UNVERIFIED_MOTIVATION', ['payload', 'card', 'draft', 'motivation', 'evidence_ids'])
         if judgment.stitching_type == 'unsupported_stitching':
-            raise ProtocolViolation('MAIN_REPORT_UNSUPPORTED_STITCHING')
-        if judgment.stitching_type == 'combination_exception' and not all((
-            judgment.meaningful_gain_basis, judgment.interaction_prediction, judgment.matched_budget_test)):
-            raise ProtocolViolation('COMBINATION_EXCEPTION_INCOMPLETE')
+            reject('MAIN_REPORT_UNSUPPORTED_STITCHING', ['result', 'stitching_type'])
+        if judgment.stitching_type == 'combination_exception':
+            for name in ('meaningful_gain_basis', 'interaction_prediction', 'matched_budget_test'):
+                if not getattr(judgment, name):
+                    reject('COMBINATION_EXCEPTION_INCOMPLETE', ['result', name])
     if novelty.contribution_coverage == 'covered':
-        covered = [w for w in novelty.closest_works if w.coverage == 'covered']
-        if not covered or not all(w.evidence_ids and w.established_claim and w.card_claim and w.rationale for w in covered):
-            raise ProtocolViolation('COVERAGE_REQUIRES_SPECIFIC_EVIDENCE')
-        for work in covered:
-            for evidence_id in work.evidence_ids:
-                evidence = store.get_record(evidence_id)
+        covered = [(index, work) for index, work in enumerate(novelty.closest_works) if work.coverage == 'covered']
+        if not covered:
+            reject('COVERAGE_REQUIRES_SPECIFIC_EVIDENCE', ['payload', 'novelty', 'closest_works'])
+        for index, work in covered:
+            if not all((work.evidence_ids, work.established_claim, work.card_claim, work.rationale)):
+                reject('COVERAGE_REQUIRES_SPECIFIC_EVIDENCE', ['payload', 'novelty', 'closest_works', index])
+            for ei, evidence_id in enumerate(work.evidence_ids):
+                evidence = evidence_record(evidence_id)
+                loc = ['payload', 'novelty', 'closest_works', index, 'evidence_ids', ei]
                 if evidence.get('source_id') != work.source_id:
-                    raise ProtocolViolation('COVERAGE_EVIDENCE_SOURCE_MISMATCH')
+                    reject('COVERAGE_EVIDENCE_SOURCE_MISMATCH', loc, supplied=evidence_id)
                 if evidence.get('verification_status') != 'verified':
-                    raise ProtocolViolation('COVERAGE_EVIDENCE_UNVERIFIED')
+                    reject('COVERAGE_EVIDENCE_UNVERIFIED', loc, supplied=evidence_id)
+    if errors:
+        raise ProtocolViolation(json.dumps(errors, ensure_ascii=False))
 
 
 def validate_revision(store, original, revision: DeveloperResult, *, edit_assessments=(), review_task_id=None):

@@ -333,8 +333,8 @@ class Runtime:
         """Collect independent read-only errors before spending JSON correction."""
         from .store import StateError
         from .scientific import validate_scientific_output_contract
-        from .schemas import LibrarianResult, EvaluatorResult
-        from .validation import validate_archive_comparisons, validate_evaluator_coverage
+        from .schemas import LibrarianResult, EvaluatorResult, SelectorResult, ResearchCard, NoveltyResult
+        from .validation import validate_archive_comparisons, validate_evaluator_coverage, validate_selection
         checks = [
             lambda: self._validate_output_reference_targets(envelope, payload, state),
             lambda: self._validate_evidence_request_targets(envelope, payload),
@@ -349,6 +349,11 @@ class Runtime:
         if isinstance(envelope.result, EvaluatorResult):
             checks.append(lambda: validate_evaluator_coverage(envelope.result,
                 payload.get('candidates', [])))
+        if isinstance(envelope.result, SelectorResult) and envelope.result_status == 'complete':
+            checks.append(lambda: validate_selection(self.store,
+                ResearchCard.model_validate(payload.get('card')),
+                envelope.result, NoveltyResult.model_validate(payload.get('novelty')),
+                check_references=False))
         errors = []
         for check in checks:
             try:
