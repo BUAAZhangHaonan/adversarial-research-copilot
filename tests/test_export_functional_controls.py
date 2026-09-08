@@ -104,3 +104,21 @@ def test_explicit_v1_fixture_and_input_mismatch_are_visible(tmp_path):
     assert report['cases'][0]['fixture_target_input_matches'] is False
     assert exporter.at_path({}, '/absent/0') == {'location_missing': True}
     assert exporter.at_path(['one'], '/-1') == {'location_missing': True}
+
+
+def test_correct_control_displays_its_paired_error_location_without_changing_expected_label(tmp_path):
+    fixture = setup_run(tmp_path)
+    data = json.loads(fixture.read_text(encoding='utf-8'))
+    data['cases'][0]['expected'].update(target_locations=[], has_target_hard_error=False)
+    fixture.write_text(json.dumps(data), encoding='utf-8')
+    report = exporter.export_controls(tmp_path, 'example', fixture)
+    case = report['cases'][0]
+    assert case['targets'][0]['location'] == 'minimal_test.measurements'
+    assert case['targets'][0]['original'] == ['wrong formula']
+    assert case['targets'][0]['final_saved'] == ['wrong formula']
+    assert case['display_locations_origin'] == 'paired_faulty_case_display_only'
+    assert case['expected']['target_locations'] == []
+    assert case['expected']['has_target_hard_error'] is False
+    assert case['human_acceptance']['scientific_acceptance'] is None
+    assert '仅用于展示，不改变 expected 标签' in exporter.render_markdown(report)
+    assert json.loads(fixture.read_text(encoding='utf-8')) == data

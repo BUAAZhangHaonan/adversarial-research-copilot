@@ -95,9 +95,17 @@ def export_controls(data_dir, prefix, fixture_path):
             unresolved = [{'finding': finding, 'latest_model_resolution': resolutions.get(finding.get('finding_id'))}
                           for finding in original_findings
                           if resolutions.get(finding.get('finding_id'), {}).get('status') not in {'resolved', 'reviewer_error'}]
+            target_locations = case['expected']['target_locations']
+            locations_origin = 'own_expected_target_locations'
+            if not target_locations and not case['expected']['has_target_hard_error']:
+                target_locations = list(dict.fromkeys(path
+                    for other in fixture['cases']
+                    if other['pair_id'] == case['pair_id'] and other['expected']['has_target_hard_error']
+                    for path in other['expected']['target_locations']))
+                locations_origin = 'paired_faulty_case_display_only'
             targets = [{'location': path, 'original': at_path(original, path), 'final_saved': at_path(final, path),
                         'text_changed': at_path(original, path) != at_path(final, path)}
-                       for path in case['expected']['target_locations']]
+                       for path in target_locations]
             alignment = all(target['original'] == at_path(case['model_visible']['card'], target['location']) for target in targets)
             alignment = alignment and (original or {}).get('problem_anchor', {}).get('question') == case['model_visible']['card']['problem_anchor']['question']
             account = run.get('budget_account_id')
@@ -118,6 +126,7 @@ def export_controls(data_dir, prefix, fixture_path):
                 'original_card_version': initial_version, 'final_saved_card_version': run.get('card_version'),
                 'actual_new_version': bool(initial_version is not None and run.get('card_version') is not None and run['card_version'] > initial_version),
                 'original_card': original, 'final_saved_card': final, 'targets': targets,
+                'display_locations_origin': locations_origin,
                 'initial_review': review_summary(initial_review),
                 'accepted_revision': {key: revision[key] for key in ('section_updates', 'claim_updates', 'remove_claim_ids', 'addressed_findings', 'change_summary', 'abandon') if key in revision} if revision else None,
                 'recheck': review_summary(recheck), 'support_review': review_summary(support_review),
@@ -158,6 +167,8 @@ def render_markdown(report):
                   case['review_scope_note'], '', '对照预期（人工判读用，未发给模型）：', block(case['expected']),
                   '费用（账本估计与保留额，CNY）：', block(case['cost']),
                   '### 目标原句与当前已保存句', '']
+        if case['display_locations_origin'] == 'paired_faulty_case_display_only':
+            lines += ['正确对照使用同组错误例的位置供并列阅读；仅用于展示，不改变 expected 标签或人工科学结论。', '']
         for target in case['targets']:
             lines += [f"位置 `{target['location']}`；文字变化：{target['text_changed']}", '',
                       '原句：', block(target['original']), '当前已保存句：', block(target['final_saved'])]
