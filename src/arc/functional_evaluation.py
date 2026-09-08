@@ -45,6 +45,40 @@ def _stable_artifact(store, path, value):
             raise ProtocolViolation('FUNCTIONAL_EVALUATION_INPUT_CHANGED_USE_NEW_EXPERIMENT_ID')
 
 
+def _review_reuse(store, source_run_id, target_payload, candidate_origin):
+    """Borrow an accepted observation only for an identical candidate and material."""
+    source = store.get_run(source_run_id)
+    origin = store.get_run(candidate_origin)
+    if (source.state.get('condition') != 'D' or origin.state.get('condition') != 'A'
+            or source.state.get('functional_experiment') != origin.state.get('functional_experiment')):
+        raise ProtocolViolation('ABLATION_REUSED_REVIEW_ORIGIN_MISMATCH')
+    frozen = source.state.get('task_inputs', {}).get('science.review', {})
+    envelope = source.state.get('comparison_envelopes', {}).get('science.review', {})
+    task = store.get_task(envelope.get('task_id', ''))
+    if (task is None or task.status != 'ACCEPTED' or task.run_id != source_run_id
+            or task.accepted_result != envelope or envelope.get('result_status') != 'complete'
+            or envelope.get('subject') != frozen.get('subject')):
+        raise ProtocolViolation('ABLATION_REUSED_REVIEW_ACCEPTED_TASK_MISMATCH')
+    prompt = json.loads(store.read_artifact(task.rendered_prompt_path)) if task.rendered_prompt_path else {}
+    if prompt.get('prompt_id') != 'scientific_reviewer.INVOKE':
+        raise ProtocolViolation('ABLATION_REUSED_REVIEW_ROLE_MISMATCH')
+    payload = frozen['payload']
+    subject = frozen['subject']
+    original = store.get_card(subject['card_id'], subject['card_version'])
+    origin_card = store.get_card(origin.card_id, origin.card_version)
+    if (original.draft != origin_card.draft
+            or original.draft.model_dump(mode='json') != payload.get('review_target')
+            or any(payload.get(key) != target_payload.get(key) for key in (
+                'review_target', 'original_task', 'mandate', 'sources', 'evidence'))):
+        raise ProtocolViolation('ABLATION_REUSED_REVIEW_INPUT_MISMATCH')
+    review = ScientificReview.model_validate(envelope['result'])
+    if source.state.get('scientific_cycles', {}).get('science', {}).get('review') != review.model_dump(mode='json'):
+        raise ProtocolViolation('ABLATION_REUSED_REVIEW_CYCLE_MISMATCH')
+    return {'source_task_id': task.task_id, 'source_run_id': source_run_id,
+            'source_subject': subject, 'review': review.model_dump(mode='json'),
+            'candidate_origin': candidate_origin}
+
+
 class FrozenEngine:
     def __init__(self, store, ledger, settings, material, runtime_factory):
         self.store, self.ledger, self.settings = store, ledger, settings
@@ -80,6 +114,11 @@ class FrozenEngine:
             self.checkpoint(run_id, task_inputs=inputs)
         reused = run.state.get('reused_reviews', {}).get(key)
         if reused:
+            expected_origin = run.state['functional_experiment'] + '.A'
+            verified = _review_reuse(self.store, run.state['functional_experiment'] + '.D',
+                                     inputs[key]['payload'], expected_origin)
+            if reused != verified:
+                raise ProtocolViolation('ABLATION_REUSED_REVIEW_BINDING_CHANGED')
             return ScientificReview.model_validate(reused['review'])
         runtime = await self.runtime_factory(run, phase, self.settings)
         try:
@@ -89,7 +128,8 @@ class FrozenEngine:
 
     def trace_tasks(self, run_id, key):
         reused = self.store.get_run(run_id).state.get('reused_reviews', {}).get(key)
-        return [reused['source_task_id'] if reused else f'{run_id}.{key}']
+        envelope = self.store.get_run(run_id).state.get('comparison_envelopes', {}).get(key, {})
+        return [reused['source_task_id'] if reused else envelope.get('task_id', f'{run_id}.{key}')]
 
     async def investigate(self, run_id, key, questions, *, fresh=False, extra=None):
         result = await self.call(run_id, key, 'investigator', payload={
@@ -246,17 +286,17 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                         card = store.save_card(a['draft'], creation_key=run.run_id + '.candidate', run_id=run.run_id)
                         store.update_run(run.run_id, card_id=card.card_id, card_version=card.version)
                         if condition == 'E':
-                            d = store.get_run(f'{experiment_id}.D')
-                            initial = d.state['scientific_cycles']['science']['review']
-                            engine.checkpoint(run.run_id, reused_reviews={'science.review': {
-                                'source_task_id': f'{experiment_id}.D.science.review',
-                                'source_run_id': d.run_id, 'review': initial,
-                                'candidate_origin': f'{experiment_id}.A'}})
+                            saved_initial = store.get_run(run.run_id).state.get('task_inputs', {}).get('science.review')
+                            initial_payload = (saved_initial['payload'] if saved_initial else
+                                {**engine.context(run.run_id), 'review_target': as_data(card.draft)})
+                            reuse = _review_reuse(store, f'{experiment_id}.D',
+                                initial_payload, f'{experiment_id}.A')
+                            engine.checkpoint(run.run_id, reused_reviews={'science.review': reuse})
                         card, scientific_review = await review_and_revise(engine, run.run_id,
                             'science', allow_revision=condition == 'E', tool_profile=[])
                         result = {'draft': as_data(card.draft), 'judgment': as_data(scientific_review),
                             'candidate_origin': f'{experiment_id}.A', 'card_version': card.version,
-                            'initial_review_origin': f'{experiment_id}.D.science.review'}
+                            'initial_review_origin': engine.trace_tasks(run.run_id, 'science.review')[-1]}
                 if not result.get('not_run_reason'):
                     engine.checkpoint(run.run_id, functional_result=result)
             dependency = 'D' if result.get('not_run_reason') == 'D_has_no_complete_initial_review' else 'A'

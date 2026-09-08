@@ -7,7 +7,7 @@ import pytest
 
 from arc.budget import BudgetLedger
 from arc.config import Settings
-from arc.functional_evaluation import run_ablation
+from arc.functional_evaluation import _review_reuse, run_ablation
 from arc.schemas import Envelope, TaskRecord
 from arc.validation import ProtocolViolation
 from tests.test_selection import research_store, research_draft, selection_result, novelty_result
@@ -209,3 +209,34 @@ async def test_failed_old_review_preserves_a_candidate_for_d_and_e(tmp_path, mon
     second = await run_ablation(settings, source.run_id, **{**arguments, 'runtime_factory': recovered})
     assert second['status'] == 'completed'
     assert len([c for c in calls if c['task'] == 'CONCEIVE']) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('changed', ['review_target', 'mandate', 'original_task', 'evidence'])
+async def test_borrowed_review_rejects_changed_candidate_or_material(tmp_path, monkeypatch, changed):
+    settings, store, _, source, _, arguments = environment(tmp_path, monkeypatch)
+    await run_ablation(settings, source.run_id, **arguments)
+    payload = deepcopy(store.get_run('ablation-test.E').state['task_inputs']['science.review']['payload'])
+    payload[changed] = {'changed': True}
+    with pytest.raises(ProtocolViolation, match='REUSED_REVIEW_INPUT_MISMATCH'):
+        _review_reuse(store, 'ablation-test.D', payload, 'ablation-test.A')
+
+
+@pytest.mark.asyncio
+async def test_borrowed_review_rejects_accepted_task_bound_to_another_card_version(tmp_path, monkeypatch):
+    settings, store, _, source, _, arguments = environment(tmp_path, monkeypatch)
+    await run_ablation(settings, source.run_id, **arguments)
+    payload = store.get_run('ablation-test.E').state['task_inputs']['science.review']['payload']
+    task = store.get_task('ablation-test.D.science.review')
+    accepted = deepcopy(task.accepted_result)
+    accepted['subject']['card_version'] += 1
+    accepted['task_id'] = 'ablation-test.D.unrelated-review'
+    response = store.save_artifact('tests/unrelated-review.json', json.dumps(accepted))
+    store.put_task(task.model_copy(update={'task_id': accepted['task_id'],
+        'response_artifact_path': response, 'accepted_result': accepted}))
+    run = store.get_run('ablation-test.D')
+    state = deepcopy(run.state)
+    state['comparison_envelopes']['science.review'] = accepted
+    store.update_run(run.run_id, state=state)
+    with pytest.raises(ProtocolViolation, match='REUSED_REVIEW_ACCEPTED_TASK_MISMATCH'):
+        _review_reuse(store, 'ablation-test.D', payload, 'ablation-test.A')
