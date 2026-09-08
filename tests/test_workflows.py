@@ -106,7 +106,7 @@ class ScriptedRuntime:
 
 def campaign_run(store,max_draws=5):
     campaign=store.create_campaign('Controlled recall mechanisms',max_draws=max_draws)
-    run=store.create_run('discover',campaign_id=campaign.campaign_id,state={'evidence_ids':['ev_synthetic'],'source_ids':['src_synthetic']})
+    run=store.create_run('discover',campaign_id=campaign.campaign_id,state={'workflow_variant':'legacy_discovery_v1','evidence_ids':['ev_synthetic'],'source_ids':['src_synthetic']})
     return campaign,run
 
 
@@ -165,13 +165,13 @@ async def test_three_stages_keep_same_card_and_full_anchor_without_auto_transiti
     await engine.execute(run.run_id)
     card=store.list_cards(run_id=run.run_id)[0]
     original=card.draft.model_dump(mode='json')
-    development=store.create_run('develop',card_id=card.card_id,card_version=1)
+    development=store.create_run('develop',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     developed=await engine.execute(development.run_id)
     assert developed.status=='COMPLETED' and developed.card_id==card.card_id and developed.card_version==2
     assert store.get_card(card.card_id,1).draft.model_dump(mode='json')==original
     assert store.get_card(card.card_id,2).draft.problem_anchor==card.draft.problem_anchor
     assert not any(c['task_id'].startswith('run.') for c in runtime.calls)
-    review=store.create_run('run',card_id=card.card_id,card_version=2)
+    review=store.create_run('run',card_id=card.card_id,card_version=2, state={'research_flow':'legacy_debate_v1'})
     reviewed=await engine.execute(review.run_id)
     assert reviewed.status=='COMPLETED' and reviewed.card_version==2
     assert reviewed.assessment=='PROMISING' and reviewed.stop_reason=='experiment_required'
@@ -188,7 +188,7 @@ async def test_three_stages_keep_same_card_and_full_anchor_without_auto_transiti
 async def test_develop_requires_real_trace_not_claimed_fresh_verification(tmp_path):
     store,_,_=research_store(tmp_path)
     card=store.save_card(research_draft())
-    run=store.create_run('develop',card_id=card.card_id,card_version=1)
+    run=store.create_run('develop',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     runtime=ScriptedRuntime(store,fresh_trace=False)
     result=await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
     assert result.status=='PAUSED_EXTERNAL'
@@ -204,7 +204,7 @@ async def test_resume_reuses_proposer_skeptic_and_long_context_tail(tmp_path):
     marker='DECISIVE_TAIL_CONDITION_DO_NOT_DROP'
     draft.problem_anchor.conditions.append('边界说明 '*4000+marker)
     card=store.save_card(draft)
-    run=store.create_run('run',card_id=card.card_id,card_version=1)
+    run=store.create_run('run',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     runtime=ScriptedRuntime(store,fail_once='round1.moderator')
     engine=WorkflowEngine(store,runtime,Settings())
     first=await engine.execute(run.run_id)
@@ -222,7 +222,7 @@ async def test_resume_reuses_proposer_skeptic_and_long_context_tail(tmp_path):
 async def test_resuming_at_round_limit_makes_no_new_call(tmp_path):
     store,_,_=research_store(tmp_path)
     card=store.save_card(research_draft())
-    run=store.create_run('run',card_id=card.card_id,card_version=1,state={'rounds_completed':1})
+    run=store.create_run('run',card_id=card.card_id,card_version=1,state={'research_flow':'legacy_debate_v1', **{'rounds_completed':1}})
     runtime=ScriptedRuntime(store)
     result=await WorkflowEngine(store,runtime,Settings(max_rounds=1)).execute(run.run_id)
     assert result.status=='COMPLETED' and result.stop_reason=='max_rounds_reached'
@@ -262,7 +262,7 @@ async def test_scope_change_audits_original_freezes_once_and_does_not_develop_br
     store,_,_=research_store(tmp_path)
     card=store.save_card(research_draft())
     original=card.draft.model_dump(mode='json')
-    run=store.create_run('develop',card_id=card.card_id,card_version=1)
+    run=store.create_run('develop',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     runtime=ScriptedRuntime(store,scope_change=True)
     engine=WorkflowEngine(store,runtime,Settings())
     result=await engine.execute(run.run_id)
@@ -285,7 +285,7 @@ async def test_context_contains_only_relevant_evidence_not_entire_archive(tmp_pa
     from arc.schemas import SourceRecord
     store.register_source(SourceRecord(source_id='src_unrelated',title='PRIVATE_UNRELATED_RECORD',url=None,source_type='user_material',access_status='retrieved',content_origin='original'),content='Unrelated material.')
     card=store.save_card(research_draft())
-    run=store.create_run('run',card_id=card.card_id,card_version=1)
+    run=store.create_run('run',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     runtime=ScriptedRuntime(store)
     await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
     for call in runtime.calls:
@@ -297,7 +297,7 @@ async def test_context_contains_only_relevant_evidence_not_entire_archive(tmp_pa
 async def test_explicit_user_question_import_does_not_invoke_discovery(tmp_path):
     store,_,_=research_store(tmp_path)
     question='Which intervention distinguishes the existing two explanations?'
-    run=store.create_run('run',state={'imported_input':question,'evidence_ids':['ev_synthetic'],'source_ids':['src_synthetic']})
+    run=store.create_run('run',state={'research_flow':'legacy_debate_v1', **{'imported_input':question,'evidence_ids':['ev_synthetic'],'source_ids':['src_synthetic']}})
     runtime=ScriptedRuntime(store)
     result=await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
     assert result.status=='COMPLETED' and result.card_version==1
@@ -310,7 +310,7 @@ async def test_explicit_user_question_import_does_not_invoke_discovery(tmp_path)
 async def test_scope_change_cannot_claim_original_revisit_without_read_trace(tmp_path):
     store,_,_=research_store(tmp_path)
     card=store.save_card(research_draft())
-    run=store.create_run('develop',card_id=card.card_id,card_version=1)
+    run=store.create_run('develop',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     class NoOriginalRead(ScriptedRuntime):
         def tool_trace(self,task_id):
             return [] if 'scope_original_audit' in task_id else super().tool_trace(task_id)
@@ -325,7 +325,7 @@ async def test_scope_change_cannot_claim_original_revisit_without_read_trace(tmp
 async def test_issue_commit_and_round_checkpoint_survive_postcommit_crash(tmp_path,monkeypatch):
     store,_,_=research_store(tmp_path)
     card=store.save_card(research_draft())
-    run=store.create_run('run',card_id=card.card_id,card_version=1)
+    run=store.create_run('run',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     runtime=ScriptedRuntime(store)
     engine=WorkflowEngine(store,runtime,Settings())
     apply=store.apply_issues
@@ -376,7 +376,7 @@ async def test_changed_claim_reselects_instead_of_inheriting_old_version_evidenc
     draft=research_draft()
     draft.claims=[Claim(claim_id='claim_observation',version=1,text='Distance and distractor count covary.',conditions=['synthetic controlled recall task'],kind='empirical',evidence_ids=['ev_synthetic'])]
     card=store.save_card(draft)
-    run=store.create_run('develop',card_id=card.card_id,card_version=1)
+    run=store.create_run('develop',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     class ChangedClaim(ScriptedRuntime):
         def reply(self,role,task,payload,task_id):
             result=super().reply(role,task,payload,task_id)
@@ -406,7 +406,7 @@ async def test_moderator_receives_previous_issue_and_cannot_silently_drop_it(tmp
     draft=research_draft()
     draft.claims=[Claim(claim_id='claim_observation',version=1,text='Distance and distractor count covary.',conditions=['synthetic controlled recall task'],kind='empirical',evidence_ids=['ev_synthetic'])]
     card=store.save_card(draft)
-    run=store.create_run('run',card_id=card.card_id,card_version=1)
+    run=store.create_run('run',card_id=card.card_id,card_version=1, state={'research_flow':'legacy_debate_v1'})
     issue=Issue(issue_id='issue_old',claim_id='claim_observation',claim_version=1,content='Two factors still covary.',status='needs_experiment',evidence_ids=['ev_synthetic'],resolution_criterion='Separate factors with a validated intervention.',change_this_round='Original unresolved issue.',next_action='HANDOFF_EXPERIMENT')
     transition=IssueTransition(issue_id='issue_old',from_status=None,to_status='needs_experiment',change_this_round='Registered from original evidence.',basis_evidence_ids=['ev_synthetic'],basis_argument=None,resolution_reason=None)
     store.apply_issues(run.run_id,[issue],[transition])
@@ -450,7 +450,7 @@ async def test_discovery_frame_receives_seed_material_provenance_before_new_sear
     store,_,_=research_store(tmp_path)
     campaign=store.create_campaign('Research topic')
     run=store.create_run('discover',campaign_id=campaign.campaign_id,
-        state={'source_ids':['src_synthetic'],'evidence_ids':['ev_synthetic']})
+        state={'workflow_variant':'legacy_discovery_v1','source_ids':['src_synthetic'],'evidence_ids':['ev_synthetic']})
     runtime=ScriptedRuntime(store)
     await WorkflowEngine(store,runtime,Settings()).execute(run.run_id)
     frame=runtime.calls[0]

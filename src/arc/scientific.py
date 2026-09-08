@@ -1,0 +1,220 @@
+"""Scientific review and one targeted revision, sharing ordinary runtime checkpoints."""
+from __future__ import annotations
+
+import json
+from .schemas import CardDraft, ScientificReview, ScientificRevision
+from .validation import ProtocolViolation, derive_claim_versions, remove_superseded_claim_evidence
+
+
+def apply_scientific_revision(original, revision: ScientificRevision):
+    draft = original.draft if hasattr(original, 'draft') else original
+    candidate = draft.model_dump(mode='json')
+    if revision.abandon:
+        return None
+    if not revision.section_updates and not revision.claim_updates and not revision.remove_claim_ids:
+        raise ProtocolViolation('SCIENTIFIC_REVISION_HAS_NO_CHANGE')
+    for update in revision.section_updates:
+        candidate[update.field] = update.value
+    claims = {item['claim_id']: item for item in candidate['claims']}
+    for claim_id in revision.remove_claim_ids:
+        if claim_id not in claims:
+            raise ProtocolViolation('SCIENTIFIC_REVISION_REMOVES_UNKNOWN_CLAIM')
+        del claims[claim_id]
+    for item in revision.claim_updates:
+        claims[item.claim_id] = item.model_dump(mode='json')
+    candidate['claims'] = list(claims.values())
+    candidate = CardDraft.model_validate(candidate)
+    if candidate == draft:
+        raise ProtocolViolation('SCIENTIFIC_REVISION_HAS_NO_CHANGE')
+    return candidate
+
+
+def pointer_value(body, pointer):
+    if not pointer.startswith('/'):
+        raise ProtocolViolation('SCIENTIFIC_FINDING_REQUIRES_JSON_POINTER')
+    target = body
+    try:
+        for part in pointer[1:].split('/'):
+            part = part.replace('~1', '/').replace('~0', '~')
+            if isinstance(target, list):
+                if not part.isascii() or not part.isdecimal() or (len(part) > 1 and part[0] == '0'):
+                    raise ValueError('invalid array index')
+                target = target[int(part)]
+            else:
+                target = target[part]
+    except (KeyError, ValueError, IndexError, TypeError) as exc:
+        raise ProtocolViolation('SCIENTIFIC_FINDING_LOCATION_NOT_IN_CARD') from exc
+    return target
+
+
+def validate_scientific_review(store, draft, review: ScientificReview, *, previous=None, previous_draft=None):
+    """Check that the actual review refers to this draft; do not decide scientific truth in code."""
+    store.validate_references(review)
+    body = draft.model_dump(mode='json')
+    for finding in review.decisive_findings:
+        target = pointer_value(body, finding.location)
+        target_text = target if isinstance(target, str) else json.dumps(target, ensure_ascii=False)
+        if finding.quoted_text and finding.quoted_text not in target_text:
+            raise ProtocolViolation('SCIENTIFIC_FINDING_QUOTE_NOT_AT_LOCATION')
+    expected = {f.finding_id for f in previous.decisive_findings} if previous else set()
+    if {f.finding_id for f in review.prior_findings} != expected:
+        raise ProtocolViolation('SCIENTIFIC_RECHECK_MUST_ADDRESS_PREVIOUS_FINDINGS')
+    if previous_draft is not None:
+        statuses = {f.finding_id: f.status for f in review.prior_findings}
+        old_body = previous_draft.model_dump(mode='json')
+        for finding in previous.decisive_findings:
+            if statuses[finding.finding_id] != 'resolved':
+                continue
+            old_value = pointer_value(old_body, finding.location)
+            try:
+                new_value = pointer_value(body, finding.location)
+            except ProtocolViolation:
+                continue  # Removing the faulty claim is a legitimate revision.
+            if old_value == new_value:
+                raise ProtocolViolation('SCIENTIFIC_REPAIR_LEFT_FAULTY_FIELD_UNCHANGED')
+    for work in review.verification_work:
+        if work.method == 'source_read' and not (work.evidence_ids or work.source_ids):
+            raise ProtocolViolation('SCIENTIFIC_SOURCE_REVIEW_REQUIRES_REFERENCE')
+    return review
+
+
+async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_profile=None, original=None, proposed=None):
+    """Initial review -> optional targeted change -> independent recheck; never refresh a draw."""
+    state = engine.store.get_run(run_id).state
+    completed = state.get('scientific_cycles', {}).get(key)
+    if completed:
+        return engine.store.get_card(completed['card_id'], completed['version']), ScientificReview.model_validate(completed['review'])
+    saved_input = state.get('task_inputs', {}).get(key + '.review', {})
+    subject = saved_input.get('subject') or {}
+    run = engine.store.get_run(run_id)
+    original = original or engine.store.get_card(subject.get('card_id') or run.card_id, subject.get('card_version') or run.card_version)
+    target = proposed or original.draft
+    review = await engine.call(run_id, key + '.review', 'scientific_reviewer', payload={
+        **engine.context(run_id), 'original_card': original.model_dump(mode='json') if proposed else None,
+        'proposed_revision': proposed.model_dump(mode='json') if proposed else None,
+        'review_target': target.model_dump(mode='json'), 'previous_review': None,
+    }, tool_profile=tool_profile)
+    validate_scientific_review(engine.store, target, review)
+    card = original
+    accepted_key = key + '.review'
+    revision = None
+    if review.action == 'revise' and allow_revision:
+        revision = await engine.call(run_id, key + '.revision', 'discovery', 'REVISE', payload={
+            **engine.context(run_id), 'original_card': original.model_dump(mode='json'),
+            'review_target': target.model_dump(mode='json'),
+            'scientific_review': review.model_dump(mode='json'),
+        }, tool_profile=tool_profile)
+        if {f.finding_id for f in revision.addressed_findings} != {f.finding_id for f in review.decisive_findings}:
+            raise ProtocolViolation('SCIENTIFIC_REVISION_MUST_ADDRESS_FINDINGS')
+        proposed = apply_scientific_revision(target, revision)
+        if proposed is not None:
+            recheck_key = key + '.recheck'
+            recheck = await engine.call(run_id, recheck_key, 'scientific_reviewer', payload={
+                **engine.context(run_id), 'original_card': original.model_dump(mode='json'),
+                'proposed_revision': proposed.model_dump(mode='json'),
+                'review_target': proposed.model_dump(mode='json'),
+                'previous_review': review.model_dump(mode='json'),
+                'revision_summary': revision.model_dump(mode='json'),
+            }, tool_profile=tool_profile)
+            validate_scientific_review(engine.store, proposed, recheck, previous=review, previous_draft=target)
+            target = proposed
+            accepted_key = recheck_key
+            review = recheck
+        else:
+            review = review.model_copy(update={'action': 'reject', 'value_reason': '修订者确认核心价值无法保留。' + '；'.join(revision.change_summary)})
+    # No selection is silently inherited into a different scientific review.
+    if target != original.draft:
+        derived, _, _ = derive_claim_versions(original, target, edit_assessments=review.edit_assessments)
+        derived, removed = remove_superseded_claim_evidence(engine.store, derived)
+        review_task = engine.trace_tasks(run_id, accepted_key)[-1]
+        card = engine.store.save_card(derived, card_id=original.card_id, parent_version=original.version,
+            creation_key=f'{run_id}.{key}.science_revision.card', run_id=run_id,
+            edit_assessments=review.edit_assessments, review_task_id=review_task,
+            state_patch={'scientific_last_revision': revision.model_dump(mode='json') if revision else None})
+        if removed:
+            engine.checkpoint(run_id, **{key + '.support_removals': removed})
+            evidence_key = key + '.support_recheck'
+            result = await engine.investigate(run_id, evidence_key, [], fresh=False, extra={
+                'verification_target': 'superseded_claim_evidence_reselection',
+                'claim_evidence_recheck': {'removed_references': removed},
+                'target_source_ids': sorted({item['source_id'] for item in removed}),
+            })
+            # Only the investigator's explicit new claim-target declarations are attached.
+            registered = engine.store.register_findings(result.findings + result.contrary_findings,
+                task_id=f'{run_id}.{evidence_key}', allowed_claims=card.draft.claims)
+            supported = card.draft.model_copy(deep=True)
+            for claim in supported.claims:
+                claim.evidence_ids = sorted(set(claim.evidence_ids) | {
+                    ev.evidence_id for ev in registered
+                    if (ev.claim_id, ev.claim_version) == (claim.claim_id, claim.version)})
+            support_key = key + '.support_review'
+            support_review = await engine.call(run_id, support_key, 'scientific_reviewer', payload={
+                **engine.context(run_id), 'original_card': card.model_dump(mode='json'),
+                'proposed_revision': supported.model_dump(mode='json'),
+                'review_target': supported.model_dump(mode='json'),
+                'previous_review': review.model_dump(mode='json'),
+            }, tool_profile=tool_profile)
+            validate_scientific_review(engine.store, supported, support_review, previous=review)
+            if supported != card.draft:
+                card = engine.store.save_card(supported, card_id=card.card_id, parent_version=card.version,
+                    creation_key=f'{run_id}.{key}.support.card', run_id=run_id)
+            review = support_review
+    elif original.selection_result is not None:
+        card = engine.store.save_card(original.draft, card_id=original.card_id, parent_version=original.version,
+            creation_key=f'{run_id}.{key}.reviewed.card', run_id=run_id)
+    cycles = dict(engine.store.get_run(run_id).state.get('scientific_cycles', {}))
+    cycles[key] = {'card_id': card.card_id, 'version': card.version, 'review': review.model_dump(mode='json')}
+    engine.checkpoint(run_id, scientific_cycles=cycles)
+    return card, review
+
+
+async def discover(engine, run_id):
+    run = engine.store.get_run(run_id)
+    campaign = engine.store.get_campaign(run.campaign_id)
+    if not run.state.get('evidence_ids'):
+        await engine.investigate(run_id, 'shared_investigation', [campaign.topic], fresh=False,
+            extra={'original_task': engine.context(run_id)['original_task']})
+    for number in range(1, campaign.max_draws + 1):
+        run = engine.store.get_run(run_id)
+        draws = dict(run.state.get('draws', {}))
+        draw_id = f'{campaign.campaign_id}.draw{number}'
+        current = dict(draws.get(draw_id, {}))
+        if current.get('finished'):
+            engine.store.update_run(run_id, card_id=None, card_version=None)
+            continue
+        conception = await engine.call(run_id, f'draw{number}.conception', 'discovery', 'CONCEIVE', payload={
+            **engine.context(run_id), 'previous_draws': draws, 'draw_id': draw_id,
+            'opportunities_remaining': campaign.max_draws - number + 1,
+        }, on_admitted=lambda: engine.store.claim_draw(campaign.campaign_id, draw_id))
+        if conception.continue_or_stop == 'STOP':
+            engine.checkpoint(run_id, scientific_stop_reason=conception.composition_reason)
+            engine.complete(run_id, 'no_worthwhile_distinct_insight')
+            return
+        if conception.card_candidate is None:
+            current.update(finished=True, reason=conception.composition_reason)
+            draws[draw_id] = current
+            engine.checkpoint(run_id, draws=draws)
+            continue
+        if 'card_id' not in current:
+            card = engine.store.save_card(conception.card_candidate, creation_key=f'{run_id}.draw{number}.card', run_id=run_id)
+            current.update(card_id=card.card_id, card_version=card.version, conception_reason=conception.composition_reason)
+            draws[draw_id] = current
+            engine.checkpoint(run_id, draws=draws)
+        engine.store.update_run(run_id, card_id=current['card_id'], card_version=current['card_version'])
+        card = engine.store.get_card(current['card_id'], current['card_version'])
+        relations = await engine.archive_compare(run_id, f'draw{number}.card_archive', card.draft.problem_anchor.question,
+                                                 card.model_dump(mode='json'))
+        duplicate = any(r['relation'] == 'same_contribution' or (r['relation'] == 'reopening_candidate' and not r['reopening_condition_met'])
+                        for r in relations.get('comparisons', []))
+        if duplicate:
+            current.update(finished=True, reason='historical_contribution_requires_new_evidence')
+        else:
+            card, review = await review_and_revise(engine, run_id, f'draw{number}.science')
+            current.update(finished=True, card_version=card.version, selection={
+                'selection': review.selection, 'assessment': review.assessment}, scientific_review=review.model_dump(mode='json'))
+            engine.store.record_selection(run_id, card.card_id, card.version, review)
+        draws = dict(engine.store.get_run(run_id).state.get('draws', {}))
+        draws[draw_id] = current
+        engine.checkpoint(run_id, draws=draws)
+        engine.store.update_run(run_id, card_id=None, card_version=None)
+    engine.complete(run_id, 'draw_limit_reached')

@@ -100,28 +100,8 @@ class WorkflowEngine:
         return result
 
     def context(self, run_id):
-        run = self.store.get_run(run_id)
-        card = self.store.get_card(run.card_id, run.card_version) if run.card_id else None
-        evidence_ids = set(run.state.get('evidence_ids', []))
-        source_ids = set(run.state.get('source_ids', []))
-        if card:
-            evidence_ids.update(card.draft.motivation.evidence_ids)
-            source_ids.update(card.draft.closest_work_delta.source_ids)
-            for claim in card.draft.claims:
-                evidence_ids.update(claim.evidence_ids)
-        evidence = self.store.list_evidence(ids=sorted(evidence_ids))
-        source_ids.update(e.source_id for e in evidence)
-        return {
-            'subject': data(Subject(campaign_id=run.campaign_id, run_id=run.run_id,
-                                    card_id=run.card_id, card_version=run.card_version)),
-            'card': data(card), 'issues': data(self.store.get_issues(run_id)),
-            'claim_evidence_bindings': self.store.claim_evidence_bindings(card.draft) if card else [],
-            'evidence': data(evidence),
-            'sources': data(self.store.list_sources(ids=sorted(source_ids))),
-            'constraints': run.config.get('constraints', {}),
-            'input_provenance': run.state.get('input_provenance'),
-            'claim_evidence_reselection': run.state.get('claim_evidence_removals', {}),
-        }
+        from .research_context import build_research_context
+        return build_research_context(self.store, self.store.get_run(run_id))
 
     async def call(self, run_id, key, role, task='INVOKE', payload=None,
                    on_admitted: Callable | None = None, tool_profile=None, request_depth=0):
@@ -429,91 +409,83 @@ class WorkflowEngine:
         return data(result)
 
     async def discover(self, run_id):
+        state = self.store.get_run(run_id).state
+        if state.get('workflow_variant') == 'legacy_discovery_v1' or 'frame' in state.get('task_inputs', {}):
+            from .legacy_discovery import discover
+        else:
+            from .scientific import discover
+        await discover(self, run_id)
+
+    def research_flow(self, run_id):
+        """Select a new scientific stage or an explicitly recoverable old one."""
         run = self.store.get_run(run_id)
-        campaign = self.store.get_campaign(run.campaign_id)
-        frame = await self.call(run_id, 'frame', 'discovery', 'FRAME', {
-            **self.context(run_id),
-            'topic': campaign.topic, 'boundaries': campaign.boundaries,
-            'resources': run.config.get('constraints', {}),
-        })
-        await self.investigate(run_id, 'shared_investigation', frame.initial_search_questions,
-                               extra={'mandate': data(frame.mandate)})
-        for number in range(1, campaign.max_draws + 1):
-            run = self.store.get_run(run_id)
-            draws = dict(run.state.get('draws', {}))
-            draw_id = f'{campaign.campaign_id}.draw{number}'
-            current = dict(draws.get(draw_id, {}))
-            if current.get('finished'):
-                self.store.update_run(run_id, card_id=None, card_version=None)
-                continue
-            history = await self.archive_compare(run_id, f'draw{number}.archive',
-                                                  campaign.topic, data(frame.mandate),
-                                                  on_admitted=lambda: self.store.claim_draw(campaign.campaign_id, draw_id))
-            plan = await self.call(run_id, f'draw{number}.next', 'discovery', 'NEXT_DRAW', {
-                **self.context(run_id), 'mandate': data(frame.mandate),
-                'previous_draws': draws, 'archive_relations': history,
-                'draw_id': draw_id, 'opportunities_remaining': campaign.max_draws - number + 1,
-            }, on_admitted=lambda: self.store.claim_draw(campaign.campaign_id, draw_id))
-            current['plan'] = data(plan)
-            draws[draw_id] = current
-            self.checkpoint(run_id, draws=draws)
-            if plan.continue_or_stop == 'STOP':
-                self.complete(run_id, 'no_distinct_direction')
-                return
-            if not plan.anchor_evidence_ids:
-                self.checkpoint(run_id, pending_draw=draw_id)
-                raise WorkflowPause('PAUSED_EXTERNAL', 'direction_missing_evidence_anchor')
-            composed = await self.call(run_id, f'draw{number}.compose', 'discovery', 'COMPOSE', {
-                **self.context(run_id), 'mandate': data(frame.mandate),
-                'approved_family': data(plan), 'draw_id': draw_id,
-            })
-            if composed.card_candidate is None:
-                current.update(finished=True, reason=composed.composition_reason,
-                               unresolved_prerequisites=composed.unresolved_prerequisites)
-                draws[draw_id] = current
-                self.checkpoint(run_id, draws=draws)
-                continue
-            if 'card_id' in current:
-                card = self.store.get_card(current['card_id'], current['card_version'])
-            else:
-                card = self.store.save_card(composed.card_candidate, creation_key=f'{run_id}.draw{number}.card')
-                current.update(card_id=card.card_id, card_version=card.version)
-                draws[draw_id] = current
-                self.checkpoint(run_id, draws=draws)
-            self.store.update_run(run_id, card_id=card.card_id, card_version=card.version)
-            relations = await self.archive_compare(run_id, f'draw{number}.card_archive',
-                                                    card.draft.problem_anchor.question,
-                                                    data(card))
-            duplicates = [r for r in relations.get('comparisons', []) if
-                          r['relation'] == 'same_contribution' or
-                          (r['relation'] == 'reopening_candidate' and not r['reopening_condition_met'])]
-            if duplicates:
-                current.update(finished=True, reason='historical_contribution_requires_new_evidence',
-                               archive_relations=relations)
-                draws[draw_id] = current
-                self.checkpoint(run_id, draws=draws)
-                self.store.update_run(run_id, card_id=None, card_version=None)
-                continue
-            novelty = await self.call(run_id, f'draw{number}.novelty', 'novelty_examiner',
-                                      payload={**self.context(run_id), 'archive_relations': relations})
-            trace = self.task_trace(run_id, f'draw{number}.novelty')
-            if not self.has_external_evidence_action(trace):
-                raise WorkflowPause('PAUSED_EXTERNAL', 'closest_work_check_not_executed')
-            judgment = await self.call(run_id, f'draw{number}.selection', 'selector', payload={
-                **self.context(run_id), 'novelty': data(novelty), 'archive_relations': relations,
-            })
-            validate_selection(self.store, card, judgment, novelty)
-            current.update(finished=True, selection=data(judgment), novelty=data(novelty),
-                           archive_relations=relations)
-            draws[draw_id] = current
-            self.store.record_selection(run_id, card.card_id, card.version, judgment,
-                                         state_patch={'draws': draws})
-            # The next draw sees every retained and failed family; remaining quota
-            # alone never supplies an instruction to continue.
-            self.store.update_run(run_id, card_id=None, card_version=None)
-        self.complete(run_id, 'draw_quota_exhausted')
+        selected = run.state.get('research_flow')
+        if selected is not None:
+            if selected not in {'scientific_v2', 'legacy_debate_v1'}:
+                raise WorkflowPause('PAUSED_PROTOCOL', 'unknown_research_flow')
+            return selected
+        inputs = run.state.get('task_inputs', {})
+        legacy = (any(key.startswith('round') or key in {'development', 'fresh_verification'}
+                      for key in inputs)
+                  or any(key in run.state for key in ('rounds_completed', 'developed_version',
+                      'pending_issue_application_retry', 'final_ruling')))
+        selected = 'legacy_debate_v1' if legacy else 'scientific_v2'
+        self.checkpoint(run_id, research_flow=selected)
+        return selected
 
     async def develop(self, run_id):
+        if self.research_flow(run_id) == 'legacy_debate_v1':
+            return await self._legacy_develop(run_id)
+        from .scientific import review_and_revise
+        run = self.store.get_run(run_id)
+        if not run.card_id:
+            raise WorkflowPause('PAUSED_PROTOCOL', 'card_required')
+        original = self.store.get_card(run.card_id, run.state.get('input_version', run.card_version))
+        self.checkpoint(run_id, input_version=original.version)
+        revision = await self.call(run_id, 'development', 'developer', payload={
+            **self.context(run_id), 'original_card': data(original),
+        })
+        if revision.direction_change is not None:
+            await self.scope_change(run_id, revision.direction_change)
+            return
+        if revision.proposed_revision is None:
+            raise WorkflowPause('PAUSED_PROTOCOL', 'revision_required')
+        # The independent reviewer checks the user's actual scope and changed
+        # scientific support before this draft is saved. Method conditions in a
+        # model's first card are not frozen user requirements.
+        card, review = await review_and_revise(self, run_id, 'development.science',
+            original=original, proposed=revision.proposed_revision)
+        self.checkpoint(run_id, change_summary=revision.change_summary)
+        self.finish_scientific_stage(run_id, card, review)
+
+    async def debate(self, run_id):
+        if self.research_flow(run_id) == 'legacy_debate_v1':
+            return await self._legacy_debate(run_id)
+        from .scientific import review_and_revise
+        run = self.store.get_run(run_id)
+        if not run.card_id:
+            raise WorkflowPause('PAUSED_PROTOCOL', 'card_required')
+        original = self.store.get_card(run.card_id, run.state.get('input_version', run.card_version))
+        self.checkpoint(run_id, input_version=original.version)
+        # An explicit pressure-test stage uses independent scientific checking
+        # and bounded revision, not another mandatory trio of debating roles.
+        card, review = await review_and_revise(self, run_id, 'pressure.science', original=original)
+        self.finish_scientific_stage(run_id, card, review)
+
+    def finish_scientific_stage(self, run_id, card, review):
+        action = 'HANDOFF_EXPERIMENT' if review.action == 'retain' else 'STOP'
+        reasons = {'retain': 'experiment_required', 'needs_evidence': 'scientific_evidence_required',
+                   'reject': 'scientific_not_retained', 'revise': 'scientific_revision_unresolved'}
+        state = {'final_scientific_review': data(review),
+                 'final_scientific_card_version': card.version, 'next_action': action}
+        self.store.update_run(run_id, card_id=card.card_id, card_version=card.version)
+        self.store.record_selection(run_id, card.card_id, card.version, review, state_patch=state)
+        # Also restore the final checkpoint if selection was already committed
+        # immediately before interruption; do not rewrite a prior judgment.
+        self.checkpoint(run_id, **state)
+        self.complete(run_id, reasons[review.action], review.assessment)
+
+    async def _legacy_develop(self, run_id):
         run = self.store.get_run(run_id)
         if not run.card_id:
             raise WorkflowPause('PAUSED_PROTOCOL', 'card_required')
@@ -564,7 +536,7 @@ class WorkflowEngine:
         self.store.update_run(run_id, assessment='SCOPE_CHANGE_PROPOSED')
         raise WorkflowPause('PAUSED_SCOPE_CHANGE', 'scope_change_requires_user')
 
-    async def debate(self, run_id):
+    async def _legacy_debate(self, run_id):
         run = self.store.get_run(run_id)
         if not run.card_id:
             raise WorkflowPause('PAUSED_PROTOCOL', 'card_required')
