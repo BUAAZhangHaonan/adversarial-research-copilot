@@ -1,5 +1,7 @@
 # 当前功能与软件交付
 
+> 2026-09-09 Discover First 改造：当前产品主线、轻量idea交接与本轮验证状态以 [DISCOVER_FIRST.md](DISCOVER_FIRST.md) 为准。下面保留上一轮的交付、测试与费用原记录，不代表新版本已经完成真实验收。
+
 **55a134c：707 passed，0 failed/error/skipped**，2026-09-08 21:08:02 UTC完成全套、sdist→wheel、仓库外隔离安装、38提示词/18任务/3配置、4CLI及依赖检查。唯一两包和SOFTWARE_VALIDATION.json已于21:08:53 UTC同步Windows，原件`work/software-validation-20260908T210458748151Z/`，回执`work/FINAL_PACKAGE_DELIVERY_RECEIPT.json`。
 
 05cf26e上一完整快照为706 passed/1 failed，旧测试精确错误字符串落后于结构化诊断；55a134c改为检查type/loc/supplied，未删除测试，9相关与707全套通过。更早31fc58c/694（当时删除过期逐字trace文案断言）及195失败也是独立历史事件，不能混为本次少测；所有原失败保留。`empty-actual-searches-check.json`仅证明0付费离线恢复。

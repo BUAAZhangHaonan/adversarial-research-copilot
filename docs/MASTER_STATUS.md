@@ -1,5 +1,7 @@
 # ARC master 当前状态
 
+> 2026-09-09 Discover First 改造：当前产品主线、轻量idea交接与本轮验证状态以 [DISCOVER_FIRST.md](DISCOVER_FIRST.md) 为准。下面保留上一轮的交付、测试与费用原记录，不代表新版本已经完成真实验收。
+
 更新于2026-09-09。正式源码位于 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，只维护master，细粒度提交。软件通过与研究判断分开报告；完整逐条映射见[功能重构](FUNCTIONAL_REDESIGN.md)，科学结果和阶段费用见[本轮验收](FUNCTIONAL_VALIDATION_RESULTS.md)。
 
 | 当前项目 | 已完成与边界 |

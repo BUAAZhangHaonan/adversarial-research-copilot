@@ -1,99 +1,90 @@
-# ARC — 研究 idea 抽卡与可行性分析
+# ARC — 文献驱动的研究灵感与可行性预研
 
-ARC 帮助研究者找到值得调查的问题，形成可比较的研究卡，再展开方案和压力测试。
-实验和论文由人完成。`PROMISING` 表示值得下一步调查，不表示结果已证明或论文会被录用。
+ARC 帮助人找到有新意、有意义、值得继续讨论的研究方向。默认工作链是：
 
-当前代码只维护 master。新默认流程以核心洞察和实质纠错为主线；本轮改动与验证边界见[功能重构进度](docs/FUNCTIONAL_REDESIGN.md)。此前三组对照和自然运行保留为历史开发记录，不能作为新流程已经改善研究质量的证明。
+**共享领域调查 → 一张短灵感 → 快速价值筛选 → 仅对入围想法补查文献与可行性 → 交给人选择。**
 
-最终软件、费用、清理及尚未达到的科学质量目标见[最终收尾记录](docs/FINAL_CLOSEOUT.md)。
+事实需要准确，假设可以大胆，无法判断的部分明确留下。实验、完整论证和论文由人完成。系统不保证生成好选题，也不把模型的自评当作科研认证。本轮接线与验收状态见 [Discover First](docs/DISCOVER_FIRST.md)。只维护 `master`，保留细粒度提交。
 
-## 安装和运行
+## 安装与开始使用
 
-Python 3.11+。在 g203 的项目目录安装锁定依赖；现有 MCP 服务只连接，不修改。
+Python 3.11+。在项目目录安装锁定依赖，复用已配置的模型凭据与 MCP 服务：
 
 ```bash
 uv sync --locked --extra dev
 source .venv/bin/activate
 arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data discover "研究主题" --draws 5 --budget-cny 20
-arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data develop --card CARD_ID --version 1 --budget-cny 20
-arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run --card CARD_ID --version 2 --budget-cny 20
 ```
 
-三个入口默认各自结束即停。一次 discover 的最多五次机会共用 20 元和同一份原始文献；
-次数不是产出目标，零张推荐卡也是合法结果。每次由 Pro 连贯构思一张卡，独立审查关键事实、逻辑和研究价值；有必要时定向修订一次并复核。修订不新增抽卡机会。
-develop 用于用户选中后的方案展开，run 用于独立压力检查。两者沿用科学审查和必要修订，不默认追加旧多角色辩论。原始研究范围保持稳定，模型提出的方法、数据集和指标可以修改。实验尚未执行时只交付可行性分析和最小验证方案。
+一次主题最多五次构思机会，共享调查与预算，不要求用满。每次先保存 `IdeaSeed`，编辑决定是否继续投入；普通或重复想法尽早放下，有启发但暂时无法核查的想法可以暂存。只有入围候选继续 `CHECK`，形成短 `IdeaNote`。默认 discover 不先生成完整 `CardDraft`，不串联全面审查、修订、复核、付费报告员或排序裁判。
 
-已有问题可以直接使用 `develop --question "具体问题"` 或 `run --proposal proposal.md`，
-无需先 discover。`import-card card.json` 接受严格的 ResearchCard draft JSON。
-`--card`、`--question` 和 `--proposal` 三选一。
+每完成一项调查或候选记录就更新本地 Markdown。输出位于 `DATA_DIR/reports/RUN_ID/`；预算暂停时，已经保存但未完成预研的灵感仍可查看。
+
+## 人选择之后再进入后续阶段
+
+从报告取得稳定的 `IDEA_ID`，显式选择后续任务：
+
+```bash
+arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data develop --idea IDEA_ID --budget-cny 20
+arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run --idea IDEA_ID --budget-cny 20
+```
+
+`develop --idea` 补充近邻比较、最简实现路线、资源与风险；`run --idea` 讨论影响是否值得继续的前提和替代解释。两者直接接收轻量想法及已有调查，不填造完整研究卡、不自动启动研究实验，也不要求消除所有科学未知。每个阶段独立结束，由人决定下一步。
+
+已有完整卡仍可显式使用 `develop/run --card CARD_ID --version N`；已有问题或文档仍可使用 `--question "具体问题"`、`--proposal proposal.md`。这些是保留的完整卡/问题路径，可能执行原有较完整的方案和科学审查逻辑，不是新 discover 的隐含步骤。`--idea`、`--card`、`--question`、`--proposal` 每次选一个。`import-card card.json` 继续接受完整 `CardDraft` JSON。
+
+## 读什么、怎样理解状态
+
+| 输出 | 内容 |
+| --- | --- |
+| `REPORT.md` | 核心想法、意义、风险及当前去留；待预研单列 |
+| `ideas/IDEA_ID.md` | 短灵感或已完成的预研卡，含相关来源及阅读边界 |
+| `FIELD_BRIEF.md` | 共享领域现状、路线关系、开放切入点和关键资料 |
+| `SEARCH_SOURCES.md` | 全部检索命中审计；不是正式引文清单 |
+| `PROMPT_TRACE_INDEX.md` | 已保存提示词、任务结果和原始调用材料入口 |
+| `COST_REPORT.md`、`DISCOVERY_USAGE.json` | 费用、实际请求/工具动作、token及首个产物时间 |
+
+`discuss` 是值得讨论，`lead` 是有条件线索，`drop` 是本次放下；都不是永久科研判决。编辑的 `park` 保留未做定向预研的线索。`pending` 表示任务尚未完成，不能当作推荐。执行状态 `COMPLETED`、`PAUSED_BUDGET`、`PAUSED_PROTOCOL` 等与研究判断分开：预算或工具暂停不等于想法被否定。
+
+SourceNote 记录原始来源 ID、相关性、实际阅读层级和限制。检索摘要不等于全文，来源可定位不等于其推论正确；新假设不强制拥有逐主张的“verified”证据。全文按需从缓存分页读取，`read_record` 单次上限为 64000 字符。报告直接渲染已保存对象，不另付费重述。原始响应、历史失败与费用保留，私有 reasoning 不进入研究报告。
+
+## 模型配置与预算
+
+科研 Markdown 不绑定具体型号。`research_model` 指向配置中的模型别名，默认 `scout`、`ideator`、`editor` 共用该别名；需要时由人显式覆盖角色。当前接入仍为 DeepSeek V4 Flash/Pro，默认主模型为 Pro，当前 DeepSeek 的 `max` 与完整输出上限保持不变。
+
+```yaml
+research_model: deepseek-v4-pro
+roles:
+  scout: deepseek-v4-pro
+  ideator: deepseek-v4-pro
+  editor: deepseek-v4-pro
+```
+
+```bash
+arc --config runtime.yaml --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data discover "研究主题"
+```
+
+别名在 `models` 中配置 `provider`、实际 `model`、凭据环境变量、能力和上限；计费配置必须与实际型号及上限一致。当前适配 `deepseek` 和符合已支持 Chat Completions/JSON/工具调用/streaming usage 协议的 `openai_compatible` 端点。未知别名、缺少凭据或不支持的操作明确报错。供应商专有协议仍需独立适配，不能认为已兼容所有服务；详见 [配置边界](docs/DISCOVER_FIRST.md#模型配置边界) 和 [配置样例](configs/runtime.yaml)。不会自动降档或购买新服务。
+
+每个用户阶段默认 20 元；SURVEY、SKETCH、TRIAGE、CHECK 共用本次 discover 账本。每次付费请求前按完整响应上界预留；已开始回复自然完成，余额不足暂停下一请求。预留不是实际花费，不清零历史，不把未知费用当作零。
 
 ```bash
 arc --data-dir /path/to/private/arc-data status RUN_ID
 arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data resume RUN_ID
-# 仅在用户明确追加授权时使用；父预算不会因此重置。
-arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data resume RUN_ID --add-budget-cny 5
 ```
 
-CLI 显式参数优先于 `--config runtime.yaml`，未填写的选项使用配置值。已开始 run 的配置和提示词
-冻结；研究输入改变需要新 run。原任务协议失败后的显式新版本入口见[协议纠正](docs/PROTOCOL_CORRECTION.md)，保留原失败与同一预算。长时间中断不清除旧调查，也不宣称恢复服务丢失的生成流。
-远端长期运行可由用户用 `nohup`/tmux 启动 ARC，SSH 断开不影响该独立进程。
+恢复沿用已保存任务、原 draw 与预算。工具参数错误和最终 JSON 错误每项 Agent 任务各有一次纠正机会；开发中的显式修复不等于自动增加任务纠错额度。协议与显式重试见 [协议纠正](docs/PROTOCOL_CORRECTION.md)。能力需求交给用户评估和实施，正式服务不依赖 CodeX；见 [改进需求](docs/CAPABILITY_REQUESTS.md)。
 
-## 卡片、证据和记忆
-
-卡片解释问题价值、最接近工作差异、假设与替代解释、可辨识的最小检验和 3090/A100 资源范围。
-主报告允许有依据但尚未实验的合理假设；关键前提不明的卡进入待补证。
-无必要性的模块拼接不能通过。组合例外同时要求可信的实际改善理由、新机制预测与同预算检验。
-
-SQLite 保存状态、版本、争点、来源索引和预算；原文、模型原始消息、提示词快照和工具返回保存为私有文件。
-报告是可重建视图。来源由 runtime 登记，二级模型分析不会被当成已经核对的原文。
-中文 FTS 召回只找可能相似的历史卡，再比较问题、机制和知识增量；不自动学习用户品味。
-
-新主张可以引用已有观察作为背景依据；报告和后续角色会看到这类引用不会转移原主张的验证状态。
-直接针对主张的证据仍绑定其 ID 和版本。旧版本证据不能直接用于新版主张，也不能靠背景引用关闭经验争点。
-独立科学审查区分表达修正与实质主张变更。前者保留语义版本并记录等价审查，后者派生新版本，只移除并复核受影响的支持关系；原卡、来源、旧证据和原始响应保留。
-证据的 `verified` 仅表示摘录可在原文定位，不能证明它支持卡片的解读。数字归属、适用条件、分母、因果推断和最近工作差异仍须科学审查。
-
-每个 run 输出 `REPORT.md`、单卡详情、`PROMPT_TRACE_INDEX.md` 和 `COST_REPORT.md`。主报告先呈现洞察、价值、最小检验与关键风险；只有实际引用进入正式来源。检索中碰到的其他链接放在 `SEARCH_SOURCES.md`，不自动进入后续工作材料。
-缺少工具能力或提出改进需求时输出 `MCP_REQUIREMENTS.md`，正式运行默认交给用户评估和实施。
-`requirements list/review/export` 支持比较方案并导出用户执行说明；不会自动改限额或创建任务。
-开发时可显式选择 CodeX 评估；正式服务不依赖 CodeX。使用说明见[改进需求流程](docs/CAPABILITY_REQUESTS.md)。
-`read_record` 单次上限现为 64000 字符，仍按需要读取和分页。
-原始 reasoning 只用于协议恢复与私有调试，不进入报告。
-真正的新问题只产生一个冻结建议；明确批准后用 `restart-direction RUN_ID --approve-scope-change`
-从新 seed 重新开始，不继承旧通过状态。
-
-## 模型和预算
-
-仅 DeepSeek V4 Flash / Pro，所有语义调用（含结构修复、开发评价）显式 `max`。
-模型 SDK 禁用自动重试，使用原生 Chat Completions streaming/tool calls，保存完整 reasoning/tool关联。
-正文非空不等于成功；截断、非法结束或不完整对象不能参与科研判断。
-
-每个 Agent 任务的最终 JSON 结构错误和工具参数错误各有一次纠正机会，两类分别计数。非法工具参数执行前被拒绝，
-错误字段及实际 schema 反馈给模型；只允许修改报错字段，原工具、目标和合法字段保持不变。
-工具纠正成功后可以继续正常调用工具；同类纠正再次失败才暂停。最终 JSON 修复仅整理响应，不重新启动研究工具。无法核对原目标的非法 JSON 参数可提交
-blocked 改进需求；不能通过任意替换目标继续执行。详见[协议纠正](docs/PROTOCOL_CORRECTION.md)。
-调查引文无法对应原文时，原任务保留为失败；可另开一次受同一预算约束的
-原文复核，重新读取已登记材料，逐字校验后才登记证据。复核仍失败就暂停，不自动改写引文或科研结论。
-
-每次付费请求前按官方完整输出上限预留。正在进行的回复自然完成，额度不足只暂停下一次请求。
-预留金额不是实际支出。费用按人民币整数微元记账，reasoning 不重复计入输出；缺失费用不写成零。
-价格来源和核查时间见 `configs/pricing.json`；新请求使用经复核的价格快照，旧账目保持原样。
-
-g203 当前可核查的网页搜索/读取、论文原文读取路径已记录费用依据。
-ScholarTrace 的内部收费查询尚无可靠费用上界，不作为可执行工具注入；其能力仍保留在清单中。
-详细边界见 [服务审计](docs/SERVICE_AUDIT.md)。不要修改 MCP 服务来绕过预算。
-
-## 开发验收
+## 本轮开发验收
 
 ```bash
-uv run pytest -q
-arc --env-file /path/to/existing/.env --data-dir /path/to/private/validation test-e2e --allow-stage-transition
-arc --env-file /path/to/existing/.env --data-dir /path/to/private/validation test-compare --source-run RUN_ID
+uv run pytest tests/test_discovery_workflow.py tests/test_discovery_reports.py tests/test_model_adapters.py -q
 ```
 
-开发验证复用同一个私有 `.arc-validation/arc.sqlite` 和已有父账户，追加预算必须有用户授权，不能改目录重置花费。本轮沿用用户已追加的账户余额授权；正式阶段默认仍为 20 元。
-新验证先检查四组正误对照的发现、修订与复核，再做同材料构思/模型/审查消融和新主题迁移，最后验证同卡三入口。原先三个主题均已成为开发回归，不能再称作未见留出集。
-开发命令的串联不改变正式命令默认停止。自动评价只是初步检查，不代替研究者认可。
-当前实际完成范围与费用见[本轮功能验收](docs/FUNCTIONAL_VALIDATION_RESULTS.md)，实现映射见[功能重构](docs/FUNCTIONAL_REDESIGN.md)，软件包见[交付入口](docs/DELIVERY.md)。新主题discover→辅助develop→run已完成，原五张无辅助候选均未通过独立科学验收；后续已知目标定向修复不等于未见质量提高。[A–E两轮及双序已完成](docs/FUNCTIONAL_ABLATION_RESULTS.md)，局部纠错有效但最终E仍有硬错误，r2自身复核仍要求修订，不能宣称ARC优于直接Pro。当前软件55a134c/707完整验收通过，与科学质量未通过分开报告。旧 `E2E_REPORT.md`、`COST_REPORT.md`、`IMPLEMENTATION_AUDIT.md` 保留重构前历史范围。
+检查默认轻量对象、早筛停止、共享材料更新、五次机会与恢复、人工交接、型号别名与已安装 Markdown 资源，再进行必要整体回归和正常打包。
 
-[本轮功能要求](docs/FUNCTIONAL_REDESIGN_REQUEST.md) · [原任务要求](EXECUTION_SPEC.md) · [提示词清单](docs/PROMPT_INVENTORY.md) · [迁移说明](docs/MIGRATION.md)
+**本轮真实验证最多两个 discover，各自上限 20 元，累计不超过 40 元且受现有已授权父账本剩余额度约束。** 不根据历史余额新建授权，不加额凑满五次。使用开发样例“多模态模型在真实任务中何时需要主动获取额外信息”和“具身智能在环境变化后如何使用和更新既有经验”；不预填答案、数据集或方法。具体完成情况与花费以 [本轮记录](docs/DISCOVER_FIRST.md#验证记录) 为准。
+
+人工阅读判断想法是否有意义、是否只是改名重复、背景是否有依据和阅读成本是否合理。最多针对一个主要问题调整一轮；若额外真实复核仍共用累计 40 元。允许没有推荐结果，不宣布科学质量通过或超过单模型。此次不运行 Flash/Pro、A–E 对照，也不为形式上的全链成功付费串联 develop/run；后续交接可离线验证。
+
+旧 `test-e2e`、`test-compare`、`test-ablation` 保留为显式历史开发工具，不是安装步骤、默认产品路径或本轮必跑验收。以前的结果与费用不回写为本轮通过，参见 [历史功能验收](docs/FUNCTIONAL_VALIDATION_RESULTS.md)、[历史收尾](docs/FINAL_CLOSEOUT.md)。
