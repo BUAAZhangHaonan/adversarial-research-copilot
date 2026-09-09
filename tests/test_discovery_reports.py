@@ -85,7 +85,10 @@ def test_note_direct_render_has_only_relevant_refs_and_keeps_unknowns(tmp_path):
     assert '摘要；全文未取得' in text and '去掉没有依据的效果承诺' in text
     assert '缺少工作量依据' in text and 'GPU：未记录' in text
     assert '无关检索命中' not in text
-    assert '核心想法' in text and text.index('核心想法') < text.index('文献已经做到哪里')
+    assert text.index('本次实质调整') < text.index('初始灵感（预研前') < text.index('文献已经做到哪里')
+    overview = paths['overview'].read_text()
+    assert overview.index('有值得讨论的具体差异') < overview.index('共享调研概览')
+    assert note()['seed']['insight'] not in overview
 
 
 @pytest.mark.parametrize('status,label', [('drop', '本次没有继续的方向'), ('park', '还值得留意的线索')])

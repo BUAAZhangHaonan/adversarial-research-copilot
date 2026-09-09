@@ -2,12 +2,8 @@
 
 {{ conclusion }}
 
-{{ landscape_summary }}
-
 {% for item in discuss %}
 ## {{ item.title }}
-
-{{ item.insight }}
 
 {{ item.reason }}
 
@@ -19,7 +15,7 @@
 {% if leads %}
 ## 还值得留意的线索
 {% for item in leads %}
-**{{ item.title }}**：{{ item.insight }}
+**{{ item.title }}**
 
 待查：{{ item.reason }}
 
@@ -44,6 +40,12 @@
 - {{ item.title }}：{{ item.reason }}{% if item.path %}（[查看记录]({{ item.path }})）{% endif %}
 {% endfor %}
 {% endif %}
+
+## 共享调研概览
+
+以下概览形成于调研阶段，后续候选预研可能修正其中的背景与缺口判断；以各卡当前预研判断和实质调整为准。
+
+{{ landscape_summary }}
 
 ## 调查与费用
 
