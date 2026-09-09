@@ -1,0 +1,161 @@
+{
+  "scope": "two development examples, not quality superiority validation",
+  "samples": [
+    {
+      "run_id": "discover-first-20260909.sample1",
+      "topic": "多模态模型在真实任务中何时需要主动获取额外信息。",
+      "status": "PAUSED_EXTERNAL",
+      "stop_reason": "REMOTE_RESULT_UNKNOWN",
+      "created_at": "2026-09-09T09:36:06.483259+00:00",
+      "updated_at": "2026-09-09T10:08:54.101168+00:00",
+      "first_seed_at": "2026-09-09T09:56:05.775559+00:00",
+      "first_note_at": null,
+      "draws_started": 1,
+      "idea_count": 1,
+      "decisions": {
+        "investigate": 1
+      },
+      "budget": {
+        "account_id": "discover-first-20260909.sample1",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 3474191,
+        "spent_upper_micro": 3474208,
+        "reserved_micro": 15912000,
+        "remaining_micro": 613792,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "3.474191",
+        "spent_upper_cny": "3.474208",
+        "reserved_cny": "15.912000",
+        "remaining_cny": "0.613792",
+        "unknown_calls": 1,
+        "call_count": 72,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      },
+      "usage": {
+        "semantic_tasks": 4,
+        "model_requests": 22,
+        "tool_actions": 50,
+        "tool_trace_unavailable_tasks": 0,
+        "input_tokens": 1088608,
+        "input_tokens_missing_requests": 1,
+        "completion_tokens": 71888,
+        "completion_tokens_missing_requests": 1,
+        "first_seed_at": "2026-09-09T09:56:05.775559+00:00",
+        "first_note_at": null
+      },
+      "tool_actions": {
+        "search_web": 24,
+        "read_paper": 5,
+        "read_record": 10,
+        "read_web": 11
+      },
+      "brief_source_access": {
+        "passage": 4,
+        "abstract": 4,
+        "metadata": 11
+      },
+      "software_cards_created": 0,
+      "tasks": [
+        {
+          "task_id": "discover-first-20260909.sample1.survey",
+          "status": "ACCEPTED"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.sketch",
+          "status": "ACCEPTED"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.triage",
+          "status": "ACCEPTED"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.check",
+          "status": "UNKNOWN"
+        }
+      ]
+    },
+    {
+      "run_id": "discover-first-20260909.sample2",
+      "topic": "具身智能在环境变化后如何使用和更新既有经验。",
+      "status": "PAUSED_PROTOCOL",
+      "stop_reason": "INVALID_OUTPUT_AFTER_REPAIR",
+      "created_at": "2026-09-09T10:15:09.646794+00:00",
+      "updated_at": "2026-09-09T10:35:22.367753+00:00",
+      "first_seed_at": null,
+      "first_note_at": null,
+      "draws_started": 0,
+      "idea_count": 0,
+      "decisions": {},
+      "budget": {
+        "account_id": "discover-first-20260909.sample2",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 20000000,
+        "spent_lower_micro": 1516973,
+        "spent_upper_micro": 1516984,
+        "reserved_micro": 0,
+        "remaining_micro": 18483016,
+        "limit_cny": "20.000000",
+        "spent_lower_cny": "1.516973",
+        "spent_upper_cny": "1.516984",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "18.483016",
+        "unknown_calls": 0,
+        "call_count": 48,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      },
+      "usage": {
+        "semantic_tasks": 1,
+        "model_requests": 11,
+        "tool_actions": 37,
+        "tool_trace_unavailable_tasks": 0,
+        "input_tokens": 705277,
+        "input_tokens_missing_requests": 0,
+        "completion_tokens": 37181,
+        "completion_tokens_missing_requests": 0,
+        "first_seed_at": null,
+        "first_note_at": null
+      },
+      "tool_actions": {
+        "search_web": 26,
+        "read_paper": 6,
+        "read_record": 5
+      },
+      "brief_source_access": {},
+      "software_cards_created": 0,
+      "tasks": [
+        {
+          "task_id": "discover-first-20260909.sample2.survey",
+          "status": "PAUSED_PROTOCOL"
+        }
+      ]
+    }
+  ],
+  "spent_upper_cny": "4.991192",
+  "parent": {
+    "account_id": "arc-vnext-validation-20260907",
+    "parent_id": null,
+    "limit_micro": 285562384,
+    "spent_lower_micro": 184867766,
+    "spent_upper_micro": 185017914,
+    "reserved_micro": 15912000,
+    "remaining_micro": 84632470,
+    "limit_cny": "285.562384",
+    "spent_lower_cny": "184.867766",
+    "spent_upper_cny": "185.017914",
+    "reserved_cny": "15.912000",
+    "remaining_cny": "84.632470",
+    "unknown_calls": 1,
+    "call_count": 3107,
+    "currency": "CNY",
+    "unsettled_lower_micro": 0,
+    "unsettled_lower_cny": "0.000000"
+  },
+  "reserved_cny": "15.912000",
+  "maximum_current_exposure_cny": "20.903192",
+  "unknown_calls": 1
+}
