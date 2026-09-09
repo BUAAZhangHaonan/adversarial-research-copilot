@@ -156,3 +156,51 @@ async def test_configured_price_output_bound_must_match_capabilities(tmp_path):
         await invoke(runtime)
     assert ledger.summary('stage')['call_count'] == 0 and requests == []
     await runtime.close()
+
+
+@pytest.mark.parametrize('message', [
+    {'role': 'system', 'content': 'Return JSON with the requested fields.'},
+    {'role': 'user', 'content': 'Return json.'},
+    {'role': 'user', 'content': [{'type': 'text', 'text': 'Return Json.'}]},
+])
+def test_deepseek_json_keyword_checked_in_actual_system_or_user_prompt(message):
+    from arc.model_adapters import request_parameters
+    config = {'provider': 'deepseek', 'model': 'deepseek-v4-pro', 'max_tokens': 384000}
+    messages = [message]
+    request = request_parameters(config, messages, [])
+    assert request['messages'] == messages
+    assert request['response_format'] == {'type': 'json_object'}
+
+
+@pytest.mark.parametrize('extra', [
+    {'role': 'assistant', 'content': 'JSON'},
+    {'role': 'tool', 'content': 'JSON'},
+    {'role': 'system', 'content': 'Return the structure.', 'reasoning_content': 'JSON'},
+])
+def test_deepseek_json_keyword_in_nonprompt_fields_does_not_satisfy_prerequisite(extra):
+    from arc.model_adapters import request_parameters
+    with pytest.raises(ValueError, match='DEEPSEEK_JSON_PROMPT_KEYWORD_REQUIRED'):
+        request_parameters({'provider': 'deepseek'}, [
+            {'role': 'user', 'content': 'Repair the missing field.'}, extra], [])
+
+
+def test_deepseek_json_prerequisite_is_not_imposed_on_other_adapters():
+    from arc.model_adapters import request_parameters
+    messages = [{'role': 'user', 'content': 'Return the requested structure.'}]
+    request = request_parameters({'provider': 'openai_compatible', 'model': 'fixture'}, messages, [])
+    assert request['messages'] == messages
+
+
+@pytest.mark.asyncio
+async def test_missing_json_keyword_stops_before_reservation_and_sdk_send(tmp_path):
+    from types import SimpleNamespace
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [])
+    spec = runtime.models['deepseek-v4-flash']
+    config = spec.invocation_config('deepseek-v4-flash', runtime.prices, [])
+    state = {'messages': [{'role': 'system', 'content': 'Repair the requested structure.'},
+                         {'role': 'user', 'content': 'The required field is missing.'}], 'tools': []}
+    with pytest.raises(ValueError, match='DEEPSEEK_JSON_PROMPT_KEYWORD_REQUIRED'):
+        await runtime._model_request(SimpleNamespace(), state, config, None)
+    assert ledger.summary('stage')['call_count'] == 0 and requests == []
+    assert 'pending_model' not in state
+    await runtime.close()

@@ -78,6 +78,22 @@ def default_models():
 
 
 def request_parameters(config, messages, tools):
+    if config['provider'] == 'deepseek':
+        # The provider rejects JSON mode unless a system/user prompt names JSON.
+        # Validate the actual wire messages, including replacement repair prompts;
+        # do not silently inject instructions or count assistant/tool output.
+        prompt_text = []
+        for message in messages:
+            if message.get('role') not in {'system', 'user'}:
+                continue
+            content = message.get('content')
+            if isinstance(content, str):
+                prompt_text.append(content)
+            elif isinstance(content, list):
+                prompt_text.extend(part['text'] for part in content if isinstance(part, dict)
+                    and part.get('type') == 'text' and isinstance(part.get('text'), str))
+        if not any('json' in text.casefold() for text in prompt_text):
+            raise ValueError('DEEPSEEK_JSON_PROMPT_KEYWORD_REQUIRED')
     request = {k: v for k, v in config.items()
         if k not in {'thinking', 'tools', 'model_alias', 'provider', 'endpoint'}}
     # DeepSeek needs reasoning_content on tool continuations; standard compatible
