@@ -20,5 +20,11 @@
     "dependencies": "49 compatible",
     "paid_calls": 0
   },
-  "scope": "software behavior and packaging; not research quality certification"
+  "scope": "software behavior and packaging; not research quality certification",
+  "followup_regression": {
+    "reason": "web transport classification must allow retrieved repository code",
+    "passed": 37,
+    "failed": 0,
+    "command": "pytest tests/test_discovery_validation.py tests/test_discovery_workflow.py -q"
+  }
 }

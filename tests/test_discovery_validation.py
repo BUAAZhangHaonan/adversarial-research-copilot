@@ -140,3 +140,10 @@ def test_different_sources_do_not_share_eof_count_and_arguments_supply_identity(
     assert repeated_exhausted_read([first, deepcopy(first)])
     missing = {'name': 'read_record', 'result': {'error':'SOURCE_END_REACHED'}}
     assert not repeated_exhausted_read([missing, missing])
+
+
+def test_retrieved_repository_page_is_not_rejected_by_transport_classification(tmp_path):
+    store, source = source_store(tmp_path, content='def policy(observation): return observation',
+                                  source_type='web_unclassified')
+    validate_source_access(store, brief(source, 'code'))
+    assert store.get_source(source.source_id).source_type == 'web_unclassified'

@@ -19,7 +19,9 @@ def validate_source_access(store, result):
                 raise ValueError(f"source_retrieved_content_empty:{note.source_id}; use metadata and state limits")
             if note.access == "full_text" and not source.content_complete:
                 raise ValueError(f"source_full_text_not_available:{note.source_id}; use passage and state truncation limits")
-            if note.access == "code" and source.source_type != "author_code":
+            # The web reader registers original repository pages as web_unclassified.
+            # That transport label does not certify or disprove authorship/code semantics.
+            if note.access == "code" and source.source_type not in {"author_code", "web_unclassified", "official_documentation"}:
                 raise ValueError(f"source_is_not_original_code:{note.source_id}")
         if note.access == "abstract" and source.content_origin == "secondary_analysis":
             raise ValueError(f"secondary_analysis_is_not_original_abstract:{note.source_id}")
