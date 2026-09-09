@@ -357,7 +357,9 @@ class Runtime:
         from .scientific import validate_scientific_output_contract
         from .schemas import LibrarianResult, EvaluatorResult, SelectorResult, ResearchCard, NoveltyResult
         from .validation import validate_archive_comparisons, validate_evaluator_coverage, validate_selection
+        from .discovery_validation import validate_source_access
         checks = [
+            lambda: validate_source_access(self.store, envelope.result),
             lambda: self._validate_output_reference_targets(envelope, payload, state),
             lambda: self._validate_evidence_request_targets(envelope, payload),
             # References are checked independently above, so an address typo
@@ -663,6 +665,11 @@ class Runtime:
                      'prompt_manifest': rendered.source_hashes}
             self._checkpoint(record, state)
         while True:
+            if state.get('source_read_no_progress'):
+                from .discovery_validation import repeated_exhausted_read
+                state['source_read_no_progress'] = repeated_exhausted_read(state['tool_trace'])
+                if state['source_read_no_progress']:
+                    raise RuntimePaused('PAUSED_EXTERNAL', 'SOURCE_READ_NO_PROGRESS')
             if state.get('tool_correction_failure'):
                 raise RuntimePaused('PAUSED_PROTOCOL', state['tool_correction_failure'])
             for trace in state['tool_trace']:
@@ -715,6 +722,8 @@ class Runtime:
                     correction['phase'] = 'awaiting'
                 elif correction and correction.get('corrected_response_id') == response['call_id']:
                     correction['phase'] = 'completed'
+                from .discovery_validation import repeated_exhausted_read
+                state['source_read_no_progress'] = repeated_exhausted_read(state['tool_trace'])
                 state['response'] = None
                 state['assistant_appended'] = False
                 self._checkpoint(record, state, 'PENDING')
