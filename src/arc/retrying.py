@@ -12,6 +12,11 @@ from .validation import output_validation_errors
 def retry_working_view(protocol_retry, *, audit_path=None):
     """Condense repetitive empty cache reads for a new task, preserving its audit."""
     view = copy.deepcopy(protocol_retry)
+    refreshed = view.pop('refreshed_validation_errors', None)
+    if refreshed is not None:
+        view['validation_errors'] = refreshed
+        if audit_path is not None:
+            view['original_validation_errors_audit_path'] = audit_path
     retained, boundaries = [], {}
     for item in view.get('previous_successful_tools', []):
         result = item.get('result') or {}
@@ -42,18 +47,104 @@ def retry_working_view(protocol_retry, *, audit_path=None):
     return view
 
 
+def _confirmed_rejected_call(store, call, run_id):
+    """Allow explicit retry of a received HTTP 400, never of an unknown response."""
+    metadata = call.get('metadata') or {}
+    if (call.get('state') != 'UNKNOWN' or metadata.get('run_id') != run_id
+            or not metadata.get('model_requested') or metadata.get('error') != 'BadRequestError'):
+        return None
+    task = store.get_task(metadata.get('task_id', ''))
+    if (task is None or task.run_id != run_id or task.status != 'UNKNOWN'
+            or task.error != 'BadRequestError' or task.accepted_result is not None
+            or not task.response_artifact_path):
+        return None
+    saved = json.loads(store.read_artifact(task.response_artifact_path))
+    if saved.get('partial_chunks') != [] or saved.get('pending_model') != call['call_id']:
+        return None
+    if (saved.get('response') or {}).get('call_id') == call['call_id']:
+        return None
+    request_error = saved.get('request_error')
+    if request_error is not None and (request_error.get('type') != 'BadRequestError'
+                                     or request_error.get('status_code') != 400):
+        return None
+    return {'call_id': call['call_id'], 'task_id': task.task_id,
+        'error': 'BadRequestError', 'http_status': 400, 'partial_chunk_count': 0,
+        'basis': 'saved_http_status' if request_error is not None else 'legacy_sdk_bad_request_type',
+        'ledger_state_preserved': 'UNKNOWN', 'response_artifact_path': task.response_artifact_path}
+
+
+def _last_settled_task_response(store, calls, task_id):
+    """Recover the draft preceding a rejected correction from this task only."""
+    for call in reversed(calls):
+        metadata = call.get('metadata') or {}
+        path = metadata.get('response_artifact_path')
+        if (call.get('state') != 'SETTLED' or metadata.get('task_id') != task_id
+                or not metadata.get('model_requested') or not path):
+            continue
+        state = json.loads(store.read_artifact(path))
+        response = state.get('response') or {}
+        raw = (response.get('message') or {}).get('content')
+        if response.get('call_id') == call['call_id'] and response.get('finish_reason') == 'stop' and raw:
+            return raw, {'call_id': call['call_id'], 'response_artifact_path': path}
+    return '', None
+
+
+def _refreshed_reference_errors(store, errors, payload, tools):
+    """Replace only diagnostic displays, leaving raw outputs and audit errors intact."""
+    from .runtime import reference_ids, SOURCE_REF_KEYS, EVIDENCE_REF_KEYS
+    from .validation import output_reference_diagnostics
+    visible = {kind: reference_ids([payload, tools], keys) for kind, keys in
+        [('source', SOURCE_REF_KEYS), ('evidence', EVIDENCE_REF_KEYS)]}
+    refreshed, changed = [], False
+    marker = 'OUTPUT_REFERENCE_INVALID; '
+    for error in errors:
+        if not isinstance(error, str) or marker not in error:
+            refreshed.append(error)
+            continue
+        prefix, serialized = error.split(marker, 1)
+        try:
+            previous = json.loads(serialized)
+        except ValueError:
+            refreshed.append(error)
+            continue
+        entries = previous.get('errors', []) if isinstance(previous, dict) else previous
+        if not isinstance(entries, list) or any(not isinstance(item, dict) for item in entries):
+            refreshed.append(error)
+            continue
+        entries = copy.deepcopy(entries)
+        for item in entries:
+            item.pop('visible_candidates', None)
+            if 'reference_kind' not in item:
+                item['reference_kind'] = ('evidence' if any(part in EVIDENCE_REF_KEYS
+                    for part in item.get('loc', []) if isinstance(part, str)) else 'source')
+        diagnostics = output_reference_diagnostics(store, entries, visible)
+        refreshed.append(prefix + marker + json.dumps(diagnostics, ensure_ascii=False))
+        changed = True
+    return refreshed if changed else None
+
+
 def prepare_task_retry(store, ledger, run_id, task_key, reason):
     run = store.get_run(run_id)
-    if run.status != 'PAUSED_PROTOCOL' or not reason.strip():
+    if run.status not in {'PAUSED_PROTOCOL', 'PAUSED_EXTERNAL'} or not reason.strip():
         raise StateError('TASK_RETRY_REQUIRES_PROTOCOL_PAUSE_AND_REASON')
-    if any(c['state'] not in ('SETTLED', 'NOT_SENT') for c in ledger.list_calls(run.budget_account_id)):
-        raise StateError('TASK_RETRY_HAS_UNSETTLED_CALLS')
+    calls = ledger.list_calls(run.budget_account_id)
+    rejected_calls = []
+    for call in calls:
+        if call['state'] in ('SETTLED', 'NOT_SENT'):
+            continue
+        rejected = _confirmed_rejected_call(store, call, run_id)
+        if rejected is None:
+            raise StateError('TASK_RETRY_HAS_UNSETTLED_CALLS')
+        rejected_calls.append(rejected)
     if task_key not in run.state.get('task_inputs', {}):
         raise StateError('TASK_RETRY_REQUIRES_UNACCEPTED_TASK_KEY')
     retries = dict(run.state.get('task_retries', {}))
     history = list(retries.get(task_key, []))
     source_key = history[-1]['replacement_key'] if history else task_key
     source = store.get_task(f'{run_id}.{source_key}')
+    rejected_source = source is not None and any(item['task_id'] == source.task_id for item in rejected_calls)
+    if run.status == 'PAUSED_EXTERNAL' and not rejected_source:
+        raise StateError('TASK_RETRY_REQUIRES_CONFIRMED_REQUEST_REJECTION')
     application_failure = None
     issue_application_retry = False
     prior_input = run.state['task_inputs'].get(source_key, run.state['task_inputs'][task_key])
@@ -123,7 +214,7 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
                 'instruction': 'Preserve the already saved current card. Correct only issue evidence references and issue status/ruling as justified by current registered evidence; return proposed_card_revision=null. Do not change claim text, conditions, versions, or research scope.'}
         else:
             raise StateError('TASK_RETRY_REQUIRES_UNACCEPTED_TASK_KEY')
-    if (source is None or (not application_failure and (source.status != 'PAUSED_PROTOCOL'
+    if (source is None or (not application_failure and ((source.status != 'PAUSED_PROTOCOL' and not rejected_source)
             or source.accepted_result is not None))
             or not source.response_artifact_path or not source.rendered_prompt_path):
         raise StateError('TASK_RETRY_REQUIRES_FAILED_TASK_RECORD')
@@ -142,9 +233,12 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
     envelope_type = Envelope[result_schema]
     saved = json.loads(store.read_artifact(source.response_artifact_path))
     raw = ((saved.get('response') or {}).get('message') or {}).get('content') or ''
+    recovered_draft = None
+    if rejected_source and not raw:
+        raw, recovered_draft = _last_settled_task_response(store, calls, source.task_id)
     if (application_failure or resumed_issue_application) and role != 'moderator':
         raise StateError('TASK_RETRY_APPLICATION_ROLE_MISMATCH')
-    errors = [application_failure] if application_failure else saved.get('final_validation_errors', [])
+    errors = [application_failure] if application_failure else (saved.get('final_validation_errors') or saved.get('repair_validation_errors', []))
     if not errors:
         try:
             envelope_type.model_validate_json(raw)
@@ -175,6 +269,13 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
                  'previous_task_id': source.task_id, 'previous_error': source.error or run.stop_reason,
                  'validation_errors': errors, 'unaccepted_response': raw,
                  'previous_successful_tools': successful_tools}}
+    refreshed = _refreshed_reference_errors(store, errors, original_input['payload'], successful_tools)
+    if refreshed is not None:
+        audit['protocol_retry']['refreshed_validation_errors'] = refreshed
+    if rejected_calls:
+        audit['confirmed_rejected_calls'] = rejected_calls
+    if recovered_draft:
+        audit['recovered_unaccepted_response'] = recovered_draft
     audit = json.loads(json.dumps(audit, ensure_ascii=False, default=str))
     try:
         previous = json.loads(store.read_artifact(path))
