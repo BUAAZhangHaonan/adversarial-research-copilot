@@ -47,6 +47,58 @@ def pointer_value(body, pointer):
     return target
 
 
+def pending_finding_ids(review):
+    """Carry open objections across rechecks without repeating resolved history."""
+    if review is None:
+        return set()
+    return ({item.finding_id for item in review.decisive_findings}
+            | {item.finding_id for item in review.prior_findings if item.status == 'unresolved'})
+
+
+def _faulty_value_remains(old, new, pointer):
+    """Locate an old target after array shifts; positions are not object identity."""
+    parts = pointer[1:].split('/')
+    pointer_value(old, pointer)  # Validate the original address before relocation.
+
+    def visit(before, after, remaining):
+        if not remaining:
+            return before == after
+        part, *rest = remaining
+        part = part.replace('~1', '/').replace('~0', '~')
+        if isinstance(before, list):
+            item = before[int(part)]
+            if not isinstance(after, list):
+                return False
+            if isinstance(item, dict) and 'claim_id' in item:
+                candidates = [v for v in after if isinstance(v, dict)
+                              and v.get('claim_id') == item['claim_id']]
+            elif item in after:
+                candidates = [item]
+            else:
+                # Unkeyed objects have no stable index. Check remaining targets
+                # rather than treating the old index becoming invalid as deletion.
+                candidates = after
+            return any(visit(item, candidate, rest) for candidate in candidates)
+        if not isinstance(after, dict) or part not in after:
+            return False
+        return visit(before[part], after[part], rest)
+
+    return visit(old, new, parts)
+
+
+def _has_research_addition_or_edit(old, new):
+    """An edit signal only, not a semantic certificate of a scientific repair."""
+    if isinstance(old, dict) and isinstance(new, dict):
+        return any(key not in old or _has_research_addition_or_edit(old[key], value)
+                   for key, value in new.items()
+                   if key not in {'risks', 'title', 'version', 'evidence_ids'})
+    if isinstance(old, list) and isinstance(new, list):
+        # Reordering or deleting other array entries cannot repair a retained
+        # target. Added/rewritten research content may fix a related condition.
+        return any(value not in old for value in new)
+    return old != new
+
+
 def validate_scientific_review(store, draft, review: ScientificReview, *, previous=None, previous_draft=None,
                                check_references=True):
     """Check draft addressing; independent errors must share one correction view."""
@@ -68,7 +120,7 @@ def validate_scientific_review(store, draft, review: ScientificReview, *, previo
                 'finding_index': index, 'finding_id': finding.finding_id,
                 'location': finding.location, 'supplied_quote': finding.quoted_text,
                 'target_value': target}, ensure_ascii=False))
-    expected = {f.finding_id for f in previous.decisive_findings} if previous else set()
+    expected = pending_finding_ids(previous)
     supplied = [f.finding_id for f in review.prior_findings]
     if set(supplied) != expected:
         errors.append('SCIENTIFIC_RECHECK_MUST_ADDRESS_PREVIOUS_FINDINGS; '
@@ -80,12 +132,8 @@ def validate_scientific_review(store, draft, review: ScientificReview, *, previo
         for finding in previous.decisive_findings:
             if statuses.get(finding.finding_id) != 'resolved':
                 continue
-            old_value = pointer_value(old_body, finding.location)
-            try:
-                new_value = pointer_value(body, finding.location)
-            except ProtocolViolation:
-                continue  # Removing the faulty claim is a legitimate revision.
-            if old_value == new_value:
+            if (_faulty_value_remains(old_body, body, finding.location)
+                    and not _has_research_addition_or_edit(old_body, body)):
                 errors.append('SCIENTIFIC_REPAIR_LEFT_FAULTY_FIELD_UNCHANGED')
     for work in review.verification_work:
         if work.method == 'source_read' and not (work.evidence_ids or work.source_ids):
@@ -109,7 +157,7 @@ def validate_scientific_output_contract(store, payload, result, *, check_referen
         # the scientific defect has been fixed.
         apply_scientific_revision(target, result)
         previous = ScientificReview.model_validate(payload['scientific_review'])
-        expected = {item.finding_id for item in previous.decisive_findings}
+        expected = pending_finding_ids(previous)
         supplied = [item.finding_id for item in result.addressed_findings]
         if len(supplied) != len(set(supplied)) or set(supplied) != expected:
             raise ProtocolViolation('SCIENTIFIC_REVISION_MUST_ADDRESS_FINDINGS; expected=' +
@@ -121,7 +169,10 @@ def validate_scientific_output_contract(store, payload, result, *, check_referen
     from .validation import claim_edit_assessments
     target = CardDraft.model_validate(payload['review_target'])
     previous = ScientificReview.model_validate(payload['previous_review']) if payload.get('previous_review') else None
-    validate_scientific_review(store, target, result, previous=previous, check_references=check_references)
+    previous_target = (CardDraft.model_validate(payload['previous_review_target'])
+                       if payload.get('previous_review_target') else None)
+    validate_scientific_review(store, target, result, previous=previous,
+        previous_draft=previous_target, check_references=check_references)
     if payload.get('original_card') and payload.get('proposed_revision'):
         original = ResearchCard.model_validate(payload['original_card'])
         proposed = CardDraft.model_validate(payload['proposed_revision'])
@@ -246,7 +297,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
             'review_target': target.model_dump(mode='json'),
             'scientific_review': review.model_dump(mode='json'),
         }, tool_profile=tool_profile)
-        if {f.finding_id for f in revision.addressed_findings} != {f.finding_id for f in review.decisive_findings}:
+        if {f.finding_id for f in revision.addressed_findings} != pending_finding_ids(review):
             raise ProtocolViolation('SCIENTIFIC_REVISION_MUST_ADDRESS_FINDINGS')
         proposed = apply_scientific_revision(target, revision)
         if proposed is not None:
@@ -257,6 +308,7 @@ async def review_and_revise(engine, run_id, key, *, allow_revision=True, tool_pr
                 'proposed_revision': proposed.model_dump(mode='json'),
                 'review_target': proposed.model_dump(mode='json'),
                 'previous_review': review.model_dump(mode='json'),
+                'previous_review_target': target.model_dump(mode='json'),
                 'revision_summary': revision.model_dump(mode='json'),
             }, tool_profile=tool_profile)
             validate_scientific_review(engine.store, proposed, recheck, previous=review, previous_draft=target)

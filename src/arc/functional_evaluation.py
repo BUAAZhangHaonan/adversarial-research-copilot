@@ -137,8 +137,10 @@ class FrozenEngine:
             'fresh_verification': False, **(extra or {})}, tool_profile=[])
         run = self.store.get_run(run_id)
         card = self.store.get_card(run.card_id, run.card_version)
+        from .scientific import _accepted_result_task
+        accepted_task = _accepted_result_task(self, run_id, key, result, card, 'investigator')
         evidence = self.store.register_findings(result.findings + result.contrary_findings,
-            task_id=f'{run_id}.{key}', allowed_claims=card.draft.claims)
+            task_id=accepted_task.task_id, allowed_claims=card.draft.claims)
         self.checkpoint(run_id, evidence_ids=sorted(set(run.state.get('evidence_ids', [])) |
                                                   {e.evidence_id for e in evidence}))
         return result
@@ -163,9 +165,7 @@ def _prompt_factory(store, ledger, experiment_id, legacy_prompt_root):
         def progress(event):
             print(json.dumps(event, ensure_ascii=False, default=str), flush=True)
         return Runtime(store=store, ledger=ledger, account_id=run.budget_account_id,
-            loader=PromptLoader(roots[phase]), role_models=settings.roles, prices=prices,
-            api_key=os.environ.get('DEEPSEEK_API_KEY'),
-            base_url=os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
+            loader=PromptLoader(roots[phase]), role_models=settings.roles, models=settings.models, prices=prices,
             tools={}, on_progress=progress)
     return create
 
