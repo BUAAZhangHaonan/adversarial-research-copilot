@@ -166,6 +166,8 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     run = _obj(store.get_run(run_id))
+    if run.get('state', {}).get('discover_first'):
+        return render_discovery_run(store, run_id, output_dir, loader)
     cards = [_obj(item) for item in store.list_cards(run_id=run_id)]
     focused_stage = run['mode'] in {'develop', 'run'}
     if focused_stage and run.get('card_id'):
@@ -351,4 +353,181 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     if capabilities:
         paths['capabilities']=output_dir/'MCP_REQUIREMENTS.md'
         paths['capabilities'].write_text(loader.render_report('capabilities',{'run_id':run_id,'requests':[{'blocked_question':_heading(r['blocked_question']),'details':render_capability_handoff(r,loader)} for r in capabilities]}),encoding='utf-8')
+    return paths
+
+
+DISCOVERY_ACCESS = {'metadata': '元数据', 'abstract': '摘要', 'passage': '定向段落',
+                    'full_text': '全文', 'code': '代码', 'secondary': '二手材料'}
+DISCOVERY_DECISIONS = {'discuss': '值得讨论', 'lead': '有条件线索', 'drop': '本次放下'}
+
+
+def _discovery_sources(ids, notes, sources, output_dir, store):
+    by_id = {source['source_id']: source for source in sources}
+    note_by_id = {note['source_id']: note for note in notes}
+    result = []
+    for source_id in dict.fromkeys(ids):
+        source = by_id.get(source_id, {})
+        note = note_by_id.get(source_id, {})
+        access = DISCOVERY_ACCESS.get(note.get('access'), '阅读层级未记录')
+        if note.get('limits'):
+            access += '；' + note['limits']
+        result.append({'id': source_id, 'title': _heading(source.get('title') or source_id),
+                       'url': _public_url(source.get('url')) or _artifact_path(source.get('content_path'), output_dir, store),
+                       'finding': note.get('finding', '未记录材料摘记'),
+                       'relevance': note.get('relevance', '候选引用；未记录来源笔记'), 'access_text': access})
+    return result
+
+
+def _discovery_usage(store, tasks, calls):
+    tools, unavailable = 0, 0
+    for task in tasks:
+        path = task.get('response_artifact_path')
+        if not path:
+            continue
+        try:
+            state = json.loads(store.read_artifact(path))
+            tools += len(state.get('tool_trace', []))
+        except (OSError, ValueError, KeyError):
+            unavailable += 1
+    requests = [call for call in calls if not call.get('tool_call_id')
+                and not (call.get('metadata') or {}).get('tool_call_id')
+                and (call.get('started_at') or call.get('state') in {'SETTLED', 'UNKNOWN'})
+                and call.get('state') != 'NOT_SENT']
+    counts = {'semantic_tasks': len(tasks), 'model_requests': len(requests), 'tool_actions': tools,
+              'tool_trace_unavailable_tasks': unavailable}
+    for field in ['input_tokens', 'completion_tokens']:
+        values = [call.get(field) for call in requests]
+        counts[field] = sum(value for value in values if value is not None)
+        counts[field + '_missing_requests'] = sum(value is None for value in values)
+    return counts
+
+
+def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
+                         prompt_loader: PromptLoader | None = None) -> dict[str, Path]:
+    """Publish saved lightweight objects; never construct a card or invoke a model."""
+    from arc.budget import BudgetLedger
+    loader = prompt_loader or PromptLoader()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    run = _obj(store.get_run(run_id))
+    state = run.get('state', {})
+    ideas = [_obj(idea) for idea in store.list_discovery_ideas(run_id=run_id)]
+    selected = state.get('idea_input') or {}
+    brief = state.get('field_brief') or selected.get('field_brief') or {}
+    if selected:
+        original = _obj(store.get_discovery_idea(selected['idea_id']))
+        # A prior discovery recommendation is not acceptance of this stage.
+        ideas = [{**original, 'seed': selected['seed'], 'note': state.get('prestudy_note'),
+                  'triage': None, 'status': 'checked' if state.get('prestudy_note') else 'pending'}]
+    tasks = [_obj(task) for task in store.list_tasks(run_id)]
+    ledger = BudgetLedger(store.db_path)
+    account = run.get('budget_account_id')
+    budget = ledger.summary(account) if account else None
+    calls = ledger.list_calls(account) if account else []
+    cost_text = (_text({key: value for key, value in budget.items() if not key.endswith('_micro')})
+                 if budget else '费用账本未登记，费用未知。')
+    all_ids = set(state.get('source_ids', [])) | _reference_ids([brief, ideas], SOURCE_KEYS)
+    sources = [_obj(source) for source in store.list_sources(ids=sorted(all_ids))]
+    paths: dict[str, Path] = {}
+    discuss, leads, skipped, pending = [], [], [], []
+    field_notes = brief.get('source_notes', [])
+    for idea in ideas:
+        note, triage = idea.get('note') or {}, idea.get('triage') or {}
+        seed = note.get('seed') or idea.get('seed')
+        if seed is None:
+            skipped.append({'title': '未提交候选', 'reason': idea.get('reason') or (idea.get('sketch') or {}).get('reason') or triage.get('reason') or idea.get('status', '未记录'), 'path': None})
+            continue
+        idea_id = _safe_id(idea['idea_id'])
+        relative = f'ideas/{idea_id}.md'
+        target = output_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        note_ids = _reference_ids([seed, note], SOURCE_KEYS)
+        source_notes = field_notes + note.get('source_notes', [])
+        references = _discovery_sources(sorted(note_ids), source_notes, sources, target.parent, store)
+        provenance = (f"想法 `{idea_id}`；运行 `{_safe_id(run_id)}`；抽卡机会 {idea.get('draw_id', '未记录')}；"
+                      f"资料版本 {idea.get('brief_version', '未记录')}。原题：{idea.get('topic', '')}")
+        context = {'title': _heading(seed['title']), 'insight': seed['insight'],
+                   'why_it_matters': seed['why_it_matters'], 'sources': references,
+                   'provenance_line': provenance}
+        reason = note.get('reason') or triage.get('reason') or '已保存灵感，等待价值筛选或候选预研'
+        item = {'title': context['title'], 'insight': seed['insight'], 'reason': reason,
+                'risk': note.get('main_risk') or seed['key_unknown'], 'path': relative}
+        if note:
+            decision = note['decision']
+            nearest = '\n\n'.join(
+                f"- {work['source_id']}：已做到 {work['already_established']}；剩余差异：{work['remaining_difference']}。"
+                + (f" 待查：{work['uncertainty']}" if work.get('uncertainty') else '')
+                for work in note.get('nearest_work', []))
+            resources = note.get('resources') or {}
+            resource_fields = {'GPU': resources.get('gpu_type'), '数量': resources.get('gpu_count'),
+                               '训练时长粗估': resources.get('training_hours_estimate'),
+                               '推理时长粗估': resources.get('inference_hours_estimate'), '依据与未知': resources.get('basis')}
+            context.update(status_text=DISCOVERY_DECISIONS[decision] + '：' + reason,
+                           literature_paragraph=nearest or '尚未形成足够的近邻比较，不能据此宣称不存在重复。',
+                           feasibility_paragraph=note['feasibility'], resource_paragraph=_text(resource_fields),
+                           main_risk=note['main_risk'], limits_paragraph=_text(note.get('limits', [])),
+                           next_question=note['next_question'], changes=_text(note['changes_from_seed']) if note.get('changes_from_seed') else '')
+            target.write_text(loader.render_report('discovery_idea', context), encoding='utf-8')
+            {'discuss': discuss, 'lead': leads, 'drop': skipped}[decision].append(item)
+        else:
+            status = {'park': '暂存线索，未做定向预研', 'drop': '初筛放下，未做定向预研'}.get(idea.get('status'), '待预研')
+            context.update(status_text=status, question=seed['question'], difference=seed['difference_from_known'],
+                           reason=reason, unknown=seed['key_unknown'], questions=_text(triage.get('check_questions', [])))
+            target.write_text(loader.render_report('discovery_pending', context), encoding='utf-8')
+            (leads if idea.get('status') == 'park' else skipped if idea.get('status') == 'drop' else pending).append(item)
+        paths['idea:' + idea_id] = target
+    # Non-submissions consume a draw but do not invent an IdeaSeed.
+    for direction in state.get('previous_directions', []):
+        if direction.get('action') in {'skip', 'stop'}:
+            skipped.append({'title': direction.get('title', '未提交候选'),
+                            'reason': direction.get('reason', ''), 'path': None})
+    paths['field_brief'] = output_dir / 'FIELD_BRIEF.md'
+    paths['field_brief'].write_text(loader.render_report('discovery_field', {
+        'original_topic': ideas[0].get('topic', '') if ideas else state.get('original_task', ''),
+        'overview': brief.get('overview', '领域调查尚未完成。'), 'research_lines': _text(brief.get('research_lines', [])),
+        'openings': _text(brief.get('openings', [])), 'search_limits': _text(brief.get('search_limits', [])),
+        'sources': _discovery_sources([note['source_id'] for note in field_notes], field_notes, sources, output_dir, store),
+    }), encoding='utf-8')
+    usage = _discovery_usage(store, tasks, calls)
+    usage.update(first_seed_at=state.get('first_seed_at'), first_note_at=state.get('first_note_at'))
+    paths['usage'] = output_dir / 'DISCOVERY_USAGE.json'
+    paths['usage'].write_text(json.dumps(usage, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    if selected:
+        paths['input_idea'] = output_dir / 'INPUT_IDEA.json'
+        paths['input_idea'].write_text(json.dumps(selected, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    paths['overview'] = output_dir / 'REPORT.md'
+    paths['overview'].write_text(loader.render_report('discovery_overview', {
+        'report_title': {'develop': '已选想法的预研展开', 'run': '已选想法的压力讨论'}.get(run['mode'], '本次发现'),
+        'conclusion': f"已保存 {sum(idea.get('seed') is not None for idea in ideas)} 个想法：{len(discuss)} 个值得讨论，{len(leads)} 条线索，{len(pending)} 个待预研。建议由人选择，不代表科学认证。",
+        'landscape_summary': brief.get('overview', '领域调查尚未完成。'), 'discuss': discuss, 'leads': leads,
+        'skipped': skipped, 'pending': pending,
+        'investigation_scope': ('[本阶段收到的想法和此前预研](INPUT_IDEA.json)；' if selected else '') + '[共享领域调查与阅读边界](FIELD_BRIEF.md)；[全部检索命中](SEARCH_SOURCES.md)；[原始任务索引](PROMPT_TRACE_INDEX.md)。',
+        'cost_summary': cost_text + f"\n\n语义任务 {usage['semantic_tasks']} 项；实际模型请求 {usage['model_requests']} 次；工具动作 {usage['tool_actions']} 次。"
+                        + '\n\n[调用、token 与首个产物时间](DISCOVERY_USAGE.json)。',
+        'stop_reason': f"执行状态：{run['status']}；停止原因：{_text(run.get('stop_reason'))}。预算或工具暂停不等于否定想法。",
+        'next_stage_instruction': f"先由人选择想法，再显式调用 develop 或 run。{'恢复本次：`arc resume ' + _safe_id(run_id) + '`。' if str(run['status']).startswith('PAUSED') else ''}",
+    }), encoding='utf-8')
+    paths['search_sources'] = output_dir / 'SEARCH_SOURCES.md'
+    paths['search_sources'].write_text(loader.render_report('discovery_search', {
+        'sources': _discovery_sources(sorted(set(state.get('source_ids', []))), [], sources, output_dir, store)
+    }), encoding='utf-8')
+    trace_tasks = []
+    for task in tasks:
+        artifacts = []
+        for key in ['rendered_prompt_path', 'response_artifact_path', 'environment_snapshot_path']:
+            if relative := _artifact_path(task.get(key), output_dir, store):
+                artifacts.append({'label': key, 'path': relative})
+        if task.get('accepted_result') is not None:
+            accepted_path = output_dir / 'accepted' / f"{_safe_id(task['task_id'])}.json"
+            accepted_path.parent.mkdir(parents=True, exist_ok=True)
+            accepted_path.write_text(json.dumps(task['accepted_result'], ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            artifacts.append({'label': '已保存的结构化对象', 'path': accepted_path.relative_to(output_dir).as_posix()})
+        trace_tasks.append({'id': task['task_id'], 'status': task['status'],
+                            'identity': _text({key: task.get(key) for key in ['model_id', 'attempt_ids']}),
+                            'evidence': _text(task.get('evidence_ids', [])), 'artifacts': artifacts})
+    paths['trace'] = output_dir / 'PROMPT_TRACE_INDEX.md'
+    paths['trace'].write_text(loader.render_report('trace', {'run_id': run_id, 'tasks': trace_tasks, 'evidence_records': []}), encoding='utf-8')
+    paths['cost'] = output_dir / 'COST_REPORT.md'
+    entries = '\n\n'.join(_text({key: call.get(key) for key in ['call_id', 'state', 'cost_status', 'reserved_cny', 'cost_estimate_lower', 'cost_estimate_upper']}) for call in calls)
+    paths['cost'].write_text(loader.render_report('cost', {'run_id': run_id, 'summary': cost_text, 'entries': entries}), encoding='utf-8')
     return paths
