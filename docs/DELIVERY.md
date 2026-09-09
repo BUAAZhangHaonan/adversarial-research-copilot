@@ -1,6 +1,6 @@
 # 当前功能与软件交付
 
-> 2026-09-09 Discover First：默认轻量发现链已替换，软件检查通过；两个真实样例均暂停，尚无已接受的预研卡，真实端到端验收未通过。先读 [当前接线](DISCOVER_FIRST.md) 和 [真实结果与限制](DISCOVER_FIRST_REAL_RUN_NOTES.md)。以下是上一轮历史交付记录，原结论与费用保持不变。
+> 2026-09-09 Discover First：两个原暂停样例均已续跑完成，各5次构思和5份预研结果；新增已结算上界20.371510元。见[续跑结果与限制](DISCOVER_FIRST_CONTINUATION.md)及[机器可读费用记录](DISCOVER_FIRST_CONTINUATION_RESULTS.json)。这表示发现流程完成，科研品味仍交由人判断。以下上一轮历史结论与费用保留。
 
 **55a134c：707 passed，0 failed/error/skipped**，2026-09-08 21:08:02 UTC完成全套、sdist→wheel、仓库外隔离安装、38提示词/18任务/3配置、4CLI及依赖检查。唯一两包和SOFTWARE_VALIDATION.json已于21:08:53 UTC同步Windows，原件`work/software-validation-20260908T210458748151Z/`，回执`work/FINAL_PACKAGE_DELIVERY_RECEIPT.json`。
 

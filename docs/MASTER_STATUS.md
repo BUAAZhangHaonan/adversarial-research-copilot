@@ -1,6 +1,6 @@
 # ARC master 当前状态
 
-> 2026-09-09 Discover First：默认轻量发现链已替换，软件检查通过；两个真实样例均暂停，尚无已接受的预研卡，真实端到端验收未通过。先读 [当前接线](DISCOVER_FIRST.md) 和 [真实结果与限制](DISCOVER_FIRST_REAL_RUN_NOTES.md)。以下是上一轮历史交付记录，原结论与费用保持不变。
+> 2026-09-09 Discover First：两个原暂停样例均已续跑完成，各5次构思和5份预研结果；新增已结算上界20.371510元。见[续跑结果与限制](DISCOVER_FIRST_CONTINUATION.md)及[机器可读费用记录](DISCOVER_FIRST_CONTINUATION_RESULTS.json)。这表示发现流程完成，科研品味仍交由人判断。以下上一轮历史结论与费用保留。
 
 更新于2026-09-09。正式源码位于 g203 `/home/g203/zhanghaonan/adversarial-research-copilot`，只维护master，细粒度提交。软件通过与研究判断分开报告；完整逐条映射见[功能重构](FUNCTIONAL_REDESIGN.md)，科学结果和阶段费用见[本轮验收](FUNCTIONAL_VALIDATION_RESULTS.md)。
 
