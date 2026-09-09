@@ -1,6 +1,5 @@
 """Assemble installed resources and configured read-only services."""
 import json
-import os
 from importlib.resources import files
 from pathlib import Path
 import shutil
@@ -27,11 +26,7 @@ async def make_runtime(store, ledger, run, settings):
         from .runtime import RuntimePaused
         raise RuntimePaused('PAUSED_PROTOCOL', 'RUN_PROMPT_BUNDLE_CHANGED_FORK_REQUIRED')
     config_root = files('arc_config_assets')
-    prices = PriceBook(Path(str(config_root.joinpath('pricing.json'))))
-    price_check = await prices.verify_online()
-    store.save_artifact(f'runs/{run.run_id}/price-verification.json', json.dumps(price_check, ensure_ascii=False))
-    if price_check['status'] != 'unchanged':
-        print(json.dumps({'price_snapshot_warning': price_check}, ensure_ascii=False), flush=True)
+    prices = PriceBook(settings.pricing_path or Path(str(config_root.joinpath('pricing.json'))))
     mappings = json.loads(config_root.joinpath('mcp.json').read_text(encoding='utf-8'))
     hub = MCPHub.from_environment(mappings)
     await hub.prepare()
@@ -58,7 +53,6 @@ async def make_runtime(store, ledger, run, settings):
         print(json.dumps(event, ensure_ascii=False, default=str), flush=True)
 
     return Runtime(store=store, ledger=ledger, account_id=run.budget_account_id,
-        loader=loader, role_models=settings.roles, prices=prices,
-        api_key=os.environ.get('DEEPSEEK_API_KEY'),
-        base_url=os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'), tools=tools,
+        loader=loader, role_models=settings.roles, models=settings.models, prices=prices,
+        tools=tools,
         on_progress=progress)

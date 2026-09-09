@@ -19,6 +19,7 @@ from pydantic import BaseModel, ValidationError
 
 from .mcp_client import ToolArgumentError, model_schema, validate_arguments
 from .pricing import PriceBook
+from .model_adapters import ModelSpec, default_models, request_parameters, normalized_usage
 from .budget import BudgetExceeded
 from .validation import output_validation_errors
 
@@ -279,13 +280,21 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
 
 class Runtime:
     def __init__(self, *, store, ledger, account_id: str, loader, role_models: dict[str, str],
-                 prices: PriceBook, client=None, api_key=None, base_url='https://api.deepseek.com',
-                 tools: dict[str, BoundTool] | None = None, timeout_seconds=1800, on_progress=None):
+                 prices: PriceBook, client=None, api_key=None, base_url=None,
+                 tools: dict[str, BoundTool] | None = None, timeout_seconds=1800, on_progress=None,
+                 models: dict[str, ModelSpec] | None = None):
         self.store, self.ledger, self.account_id = store, ledger, account_id
         self.loader, self.role_models, self.prices = loader, role_models, prices
-        self.client = client or AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0,
-                                          timeout=timeout_seconds)
-        if getattr(self.client, 'max_retries', 0) != 0:
+        self.models = {alias: ModelSpec.model_validate(spec) for alias, spec in
+                       (models if models is not None else default_models()).items()}
+        for alias in role_models.values():
+            if alias not in self.models:
+                raise ValueError('UNKNOWN_MODEL_ALIAS:' + alias)
+        self.client = client
+        self._clients = {}
+        self._api_key, self._base_url = api_key, base_url
+        self._timeout_seconds = timeout_seconds
+        if client is not None and getattr(client, 'max_retries', 0) != 0:
             raise ValueError('SDK_RETRIES_MUST_BE_ZERO')
         self.tools = tools or {}
         self.on_progress = on_progress
@@ -297,7 +306,20 @@ class Runtime:
                               'budget': self.ledger.summary(self.account_id)})
 
     async def close(self):
-        await self.client.close()
+        clients = [self.client] if self.client is not None else list(self._clients.values())
+        for client in clients:
+            await client.close()
+
+    def _model_client(self, alias):
+        if self.client is not None:
+            return self.client
+        spec = self.models[alias]
+        endpoint = self._base_url or spec.endpoint()
+        if alias not in self._clients:
+            key = self._api_key or spec.credentials()
+            self._clients[alias] = AsyncOpenAI(api_key=key, base_url=endpoint,
+                max_retries=0, timeout=self._timeout_seconds)
+        return self._clients[alias]
 
     def _checkpoint(self, record, state, status=None):
         path = f'runs/{record.run_id}/tasks/{digest(record.task_id)}/states/{uuid4().hex}.json'
@@ -557,7 +579,9 @@ class Runtime:
         from .schemas import Envelope, TaskRecord
         envelope_type = Envelope[result_schema]
         subject_data = subject.model_dump(mode='json') if isinstance(subject, BaseModel) else subject
-        model = self.role_models[role]
+        alias = self.role_models[role]
+        spec = self.models[alias]
+        model = spec.model
         self.prices.model(model)
         profile = sorted(tool_profile or [])
         if set(profile) - self.tools.keys():
@@ -582,8 +606,9 @@ class Runtime:
             functions = [dict(type='function', function={
                 'name': name, 'description': self.loader.tool_description(name),
                 'parameters': model_schema(self.tools[name].parameters)}) for name in profile]
-        config = {'model': model, 'reasoning_effort': 'max', 'thinking': {'type': 'enabled'},
-                  'max_tokens': self.prices.maximum_output(model), 'tools': functions}
+        config = spec.invocation_config(alias, self.prices, functions)
+        if self._base_url:
+            config['endpoint'] = self._base_url
         input_hash = digest({'payload': payload, 'subject': subject_data, 'schema': envelope_type.model_json_schema()})
         data = {'task_id': task_id, 'subject': subject_data, 'payload': payload}
         if record:
@@ -838,15 +863,11 @@ class Runtime:
             record.error = 'REMOTE_RESULT_UNKNOWN'
             self._checkpoint(record, state, 'UNKNOWN')
             raise RuntimePaused('PAUSED_EXTERNAL', record.error)
+        # Fail credentials before reserving budget or creating a remote attempt.
+        client = self._model_client(config['model_alias'])
         call_id = 'call_' + uuid4().hex
         maximum = self.prices.admission_bound(config['model'])
-        request = {k: v for k, v in config.items() if k not in {'thinking', 'tools'}}
-        request.update(messages=state['messages'], stream=True, stream_options={'include_usage': True},
-                       extra_body={'thinking': config['thinking']}, response_format={'type': 'json_object'})
-        if state['tools']:
-            # Thinking mode uses the provider's automatic choice; its official
-            # integration explicitly excludes the tool_choice request field.
-            request.update(tools=state['tools'])
+        request = request_parameters(config, state['messages'], state['tools'])
         started = datetime.now(UTC).isoformat()
         request_path = f'runs/{record.run_id}/tasks/{digest(record.task_id)}/requests/{call_id}.json'
         self.store.save_artifact(request_path, encoded(request))
@@ -855,7 +876,8 @@ class Runtime:
         self.ledger.reserve(self.account_id, call_id, maximum, run_id=record.run_id, task_id=record.task_id,
             stage=self.account_id, environment_snapshot_path=record.environment_snapshot_path,
             environment_snapshot_hash=record.environment_snapshot_hash,
-            campaign_id=state['subject'].get('campaign_id'), model_requested=config['model'], thinking='enabled', effort='max',
+            campaign_id=state['subject'].get('campaign_id'), model_requested=config['model'], thinking=(config.get('thinking') or {}).get('type'),
+            effort=config.get('reasoning_effort'), provider=config['provider'], model_alias=config['model_alias'],
             price_snapshot_id=self.prices.snapshot_id, price_snapshot_hash=self.prices.content_hash,
             price_snapshot_path=price_path,
             prompt_hash=state['prompt_hash'], prompt_manifest=state['prompt_manifest'],
@@ -879,14 +901,14 @@ class Runtime:
         response_id = returned_model = fingerprint = finish = usage = None
         stream = None
         try:
-            stream = await self.client.chat.completions.create(**request)
+            stream = await client.chat.completions.create(**request)
             async for item in stream:
                 chunk = item.model_dump(mode='json', exclude_none=False)
                 chunks.append(chunk)
                 response_id = chunk.get('id') or response_id
                 returned_model = chunk.get('model') or returned_model
                 fingerprint = chunk.get('system_fingerprint') or fingerprint
-                usage = chunk.get('usage') or usage
+                usage = normalized_usage(config['provider'], chunk.get('usage')) or usage
                 for choice in chunk.get('choices', []):
                     if choice.get('index', 0) != 0: raise ValueError('MULTIPLE_CHOICES')
                     delta = choice.get('delta') or {}

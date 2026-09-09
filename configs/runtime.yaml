@@ -4,3 +4,32 @@ budget_cny: '20'
 reasoning_effort: max
 archive_window: 8
 allow_stage_transition: false
+
+# Aliases resolve in the adapter. All discover responsibilities share this alias
+# unless the user explicitly overrides scout, ideator or editor in roles.
+research_model: deepseek-v4-pro
+models:
+  deepseek-v4-flash:
+    provider: deepseek
+    model: deepseek-v4-flash
+    reasoning_effort: max
+    thinking: enabled
+    capabilities:
+      json_output: true
+      tools: true
+      streaming_usage: true
+      max_output_tokens: 384000
+  deepseek-v4-pro:
+    provider: deepseek
+    model: deepseek-v4-pro
+    reasoning_effort: max
+    thinking: enabled
+    capabilities:
+      json_output: true
+      tools: true
+      streaming_usage: true
+      max_output_tokens: 384000
+# Additional compatible aliases may specify provider: openai_compatible,
+# base_url, base_url_env: null, api_key_env and their actual capabilities.
+# Supply pricing_path with that model's reviewed CNY usage rates and limits.
+# Provider-specific protocols or billing schemes require a separate adapter.
