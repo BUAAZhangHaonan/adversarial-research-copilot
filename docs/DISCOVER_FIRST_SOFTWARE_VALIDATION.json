@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-09",
+  "source_revision": "7f34493",
+  "pytest": {
+    "passed": 779,
+    "failed": 0,
+    "seconds": 186.31,
+    "log": "work/discover-first-pytest-final.log"
+  },
+  "build": {
+    "wheel": "work/discover-first-release/dist/adversarial_research_copilot-0.2.0-py3-none-any.whl",
+    "sdist": "work/discover-first-release/dist/adversarial_research_copilot-0.2.0.tar.gz",
+    "isolated_backend": true
+  },
+  "installed_validation": {
+    "python": "3.12.3",
+    "new_registered_tasks": 6,
+    "markdown_rendered": true,
+    "cli_idea_option": true,
+    "dependencies": "49 compatible",
+    "paid_calls": 0
+  },
+  "scope": "software behavior and packaging; not research quality certification"
+}
