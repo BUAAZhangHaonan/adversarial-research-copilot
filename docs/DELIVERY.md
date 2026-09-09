@@ -1,6 +1,6 @@
 # 当前功能与软件交付
 
-> 2026-09-09 Discover First 改造：当前产品主线、轻量idea交接与本轮验证状态以 [DISCOVER_FIRST.md](DISCOVER_FIRST.md) 为准。下面保留上一轮的交付、测试与费用原记录，不代表新版本已经完成真实验收。
+> 2026-09-09 Discover First：默认轻量发现链已替换，软件检查通过；两个真实样例均暂停，尚无已接受的预研卡，真实端到端验收未通过。先读 [当前接线](DISCOVER_FIRST.md) 和 [真实结果与限制](DISCOVER_FIRST_REAL_RUN_NOTES.md)。以下是上一轮历史交付记录，原结论与费用保持不变。
 
 **55a134c：707 passed，0 failed/error/skipped**，2026-09-08 21:08:02 UTC完成全套、sdist→wheel、仓库外隔离安装、38提示词/18任务/3配置、4CLI及依赖检查。唯一两包和SOFTWARE_VALIDATION.json已于21:08:53 UTC同步Windows，原件`work/software-validation-20260908T210458748151Z/`，回执`work/FINAL_PACKAGE_DELIVERY_RECEIPT.json`。
 
