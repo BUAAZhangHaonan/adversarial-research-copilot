@@ -26,5 +26,18 @@
     "passed": 37,
     "failed": 0,
     "command": "pytest tests/test_discovery_validation.py tests/test_discovery_workflow.py -q"
+  },
+  "json_mode_followup": {
+    "adapter_runtime_tests_passed": 109,
+    "repair_runtime_tests_passed": 88,
+    "provider_requirement": "https://api-docs.deepseek.com/guides/json_mode/",
+    "original_failure_retained": true,
+    "old_unknown_cost_reservation_retained": true
+  },
+  "final_wheel_validation": {
+    "source_revision": "bd70b60",
+    "tasks_and_repairs_rendered": 6,
+    "source": "final built wheel",
+    "paid_calls": 0
   }
 }
