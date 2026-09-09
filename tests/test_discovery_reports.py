@@ -155,3 +155,13 @@ def test_usage_distinguishes_model_requests_tools_and_unsent_reservations(tmp_pa
     counts = _discovery_usage(store, [], calls)
     assert counts['model_requests'] == 1 and counts['input_tokens'] == 100
     assert counts['completion_tokens'] == 20 and counts['input_tokens_missing_requests'] == 0
+
+
+def test_repair_prompt_explicitly_requests_json_without_diagnostic_keyword():
+    loader = PromptLoader(ASSETS)
+    data = {'task_id': 'check-json-repair', 'subject': {'campaign_id': None, 'run_id': 'r1',
+            'card_id': None, 'card_version': None}, 'payload': {}}
+    snapshot = loader.render('scout.CHECK', data, schema={'type': 'object'}, tool_profile=[])
+    repair = loader.render_repair(snapshot, data, schema={'type': 'object'},
+        previous_response={}, validation_errors=[{'type': 'extra_forbidden'}])
+    assert 'json' in repair.messages[-1]['content'].lower()
