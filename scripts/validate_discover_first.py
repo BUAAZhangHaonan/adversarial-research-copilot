@@ -25,8 +25,13 @@ def main():
     settings = Settings(data_dir=args.data_dir.resolve())
     store, ledger = services(settings)
     parent = ledger.summary(args.parent)
-    if parent["unknown_calls"] or parent["reserved_micro"]:
-        raise RuntimeError("PARENT_HAS_UNSETTLED_CALLS")
+    pending = [call for call in ledger.list_calls(args.parent) if call["state"] not in {"SETTLED", "NOT_SENT"}]
+    # HTTP 400 was rejected before streaming; preserve its full unknown-cost
+    # reservation while allowing this independent sample. Never replay it here.
+    rejected = [call for call in pending if call["state"] == "UNKNOWN"
+                and call.get("metadata", {}).get("error") == "BadRequestError"]
+    if len(rejected) != len(pending):
+        raise RuntimeError("PARENT_HAS_ACTIVE_OR_UNIDENTIFIED_REQUESTS")
     if parent["remaining_micro"] < 20_000_000:
         raise RuntimeError("INSUFFICIENT_EXISTING_AUTHORIZED_BALANCE")
     run_id = f"discover-first-20260909.sample{args.sample}"

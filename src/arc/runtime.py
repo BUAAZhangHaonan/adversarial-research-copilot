@@ -949,6 +949,8 @@ class Runtime:
         except BaseException as exc:
             state['partial_chunks'] = chunks
             record.error = type(exc).__name__
+            state['request_error'] = {'type': type(exc).__name__, 'status_code': getattr(exc, 'status_code', None),
+                'request_id': getattr(exc, 'request_id', None), 'body': getattr(exc, 'body', None)}
             self.ledger.settle(call_id, '0', maximum, 'unknown', error=type(exc).__name__)
             self._checkpoint(record, state, 'UNKNOWN')
             if isinstance(exc, (KeyboardInterrupt, asyncio.CancelledError)): raise
