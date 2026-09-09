@@ -399,6 +399,110 @@
         "request_capability"
       ],
       "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "scout.SURVEY": {
+      "role": "scout",
+      "task": "SURVEY",
+      "system": [
+        "discover/policy.md",
+        "discover/researcher.md"
+      ],
+      "task_template": "discover/invoke.md",
+      "repair_template": "discover/repair.md",
+      "tools": [
+        "search_literature",
+        "read_paper",
+        "search_web",
+        "read_web",
+        "read_record",
+        "request_capability"
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "scout.CHECK": {
+      "role": "scout",
+      "task": "CHECK",
+      "system": [
+        "discover/policy.md",
+        "discover/researcher.md"
+      ],
+      "task_template": "discover/invoke.md",
+      "repair_template": "discover/repair.md",
+      "tools": [
+        "search_literature",
+        "read_paper",
+        "search_web",
+        "read_web",
+        "read_record",
+        "request_capability"
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "ideator.SKETCH": {
+      "role": "ideator",
+      "task": "SKETCH",
+      "system": [
+        "discover/policy.md",
+        "discover/ideator.md",
+        "discover/calibration.md"
+      ],
+      "task_template": "discover/invoke.md",
+      "repair_template": "discover/repair.md",
+      "tools": [],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "editor.TRIAGE": {
+      "role": "editor",
+      "task": "TRIAGE",
+      "system": [
+        "discover/policy.md",
+        "discover/editor.md",
+        "discover/calibration.md"
+      ],
+      "task_template": "discover/invoke.md",
+      "repair_template": "discover/repair.md",
+      "tools": [],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "scout.DEVELOP": {
+      "role": "scout",
+      "task": "DEVELOP",
+      "system": [
+        "discover/policy.md",
+        "prestudy/develop_scope.md",
+        "prestudy/output.md"
+      ],
+      "task_template": "discover/invoke.md",
+      "repair_template": "discover/repair.md",
+      "tools": [
+        "search_literature",
+        "read_paper",
+        "search_web",
+        "read_web",
+        "read_record",
+        "request_capability"
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "scout.PRESSURE": {
+      "role": "scout",
+      "task": "PRESSURE",
+      "system": [
+        "discover/policy.md",
+        "prestudy/pressure_scope.md",
+        "prestudy/output.md"
+      ],
+      "task_template": "discover/invoke.md",
+      "repair_template": "discover/repair.md",
+      "tools": [
+        "search_literature",
+        "read_paper",
+        "search_web",
+        "read_web",
+        "read_record",
+        "request_capability"
+      ],
+      "tool_repair_template": "tasks/correct_tool_arguments.md"
     }
   },
   "tools": {
@@ -417,6 +521,11 @@
     "trace": "reports/trace.md",
     "cost": "reports/cost.md",
     "capabilities": "reports/capabilities.md",
-    "capability_handoff": "reports/capability_handoff.md"
+    "capability_handoff": "reports/capability_handoff.md",
+    "discovery_idea": "discover/idea_note.md",
+    "discovery_overview": "discover/overview.md",
+    "discovery_pending": "discover/pending.md",
+    "discovery_field": "discover/field_brief.md",
+    "discovery_search": "discover/search_sources.md"
   }
 }

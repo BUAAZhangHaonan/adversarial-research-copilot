@@ -40,6 +40,9 @@ def test_registered_roles_render_traceable_task_and_minimal_prefix():
         assert 'card_version' in rendered.messages[1]['content']
         assert '{{ task_id }}' not in rendered.messages[1]['content']
         assert set(rendered.source_hashes)==set(rendered.dependencies)
+        if 'discover/policy.md' in rendered.dependencies:
+            assert not any(name.startswith('common/') for name in rendered.dependencies)
+            continue
         assert 'common/research_policy.md' in rendered.dependencies
         role_path='roles/discovery_staged.md' if prompt_id in {'discovery.FRAME','discovery.NEXT_DRAW','discovery.COMPOSE'} else f"roles/{entry['role']}.md"
         assert role_path in rendered.dependencies
@@ -53,6 +56,10 @@ def test_request_ownership_is_visible_to_every_semantic_role():
     for prompt_id in loader.manifest['prompts']:
         rendered=loader.render(prompt_id,DATA,schema=SCHEMA)
         system=rendered.messages[0]['content']
+        if 'discover/policy.md' in rendered.dependencies:
+            assert '保持用户原始主题' in system
+            assert '初步实验' in system
+            continue
         assert 'Nullable fields do not permit all three to be null for an existing card.' in system
         assert 'scoped to the actual task_id and subject.run_id' in system
         assert 'Never invent an identifier' in system
