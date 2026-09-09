@@ -427,7 +427,7 @@ class Runtime:
                                 reason = 'reference_not_supplied_to_task'
                         if reason:
                             errors.append({'loc': list(loc), 'type': reason, 'supplied': identifier,
-                                           'visible_candidates': sorted(visible[kind])})
+                                           'reference_kind': kind})
         research_references = envelope.model_dump(mode='json')
         from .schemas import InvestigatorResult
         if isinstance(envelope.result, InvestigatorResult):
@@ -436,7 +436,9 @@ class Runtime:
             research_references['result'].pop('actual_searches')
         walk(research_references)
         if errors:
-            raise ValueError('OUTPUT_REFERENCE_INVALID; ' + json.dumps(errors, ensure_ascii=False))
+            from .validation import output_reference_diagnostics
+            diagnostics = output_reference_diagnostics(self.store, errors, visible)
+            raise ValueError('OUTPUT_REFERENCE_INVALID; ' + json.dumps(diagnostics, ensure_ascii=False))
 
     def _validate_evidence_request_targets(self, envelope, payload):
         """Pure claim/issue/draw addressing; no source checks or registry writes."""

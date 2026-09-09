@@ -10,6 +10,103 @@ class ProtocolViolation(ValueError):
     """A typed response violates a cross-record research contract."""
 
 
+def output_reference_diagnostics(store, errors, visible):
+    """One bounded visible-source directory; exact identity hints, never ID repair."""
+    import re
+    from urllib.parse import urlsplit, urlunsplit
+    from .store import StateError
+
+    def arxiv(value):
+        value = (value or '').strip()
+        try:
+            parsed = urlsplit(value)
+        except ValueError:
+            return None
+        if parsed.hostname in {'arxiv.org', 'www.arxiv.org', 'export.arxiv.org'}:
+            match = re.fullmatch(r'/(?:abs|pdf|html)/(.+?)(?:\.pdf)?/?', parsed.path)
+            value = match[1] if match else ''
+        value = re.sub(r'^arxiv:', '', value, flags=re.I)
+        match = re.fullmatch(r'(\d{4}\.\d{4,5}|[A-Za-z.-]+/\d{7})(v\d+)?', value)
+        return (match[1].lower(), (match[2] or '')[1:]) if match else None
+
+    def url(value):
+        try:
+            parsed = urlsplit(value or '')
+            if parsed.scheme.lower() not in {'http', 'https'} or not parsed.hostname:
+                return None
+            return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(),
+                               parsed.path.rstrip('/'), parsed.query, ''))
+        except ValueError:
+            return None
+
+    sources = store.list_sources(ids=sorted(visible['source']))
+    by_id = {source.source_id: source for source in sources}
+    matches, preferred = [], []
+    submitted = list(dict.fromkeys(error['supplied'] for error in errors
+        if error.get('reference_kind') == 'source' and isinstance(error.get('supplied'), str)))
+    for identifier in submitted[:32]:
+        external, exact_url = arxiv(identifier), url(identifier)
+        candidates = []
+        for source in sources:
+            source_external = arxiv(source.arxiv_id) or arxiv(source.canonical_id) or arxiv(source.url)
+            if source_external and not source_external[1] and source.version:
+                source_external = (source_external[0], source.version.removeprefix('v'))
+            same_arxiv = (external and source_external and external[0] == source_external[0]
+                          and (not external[1] or external[1] == source_external[1]))
+            if identifier == source.source_id:
+                reason = 'exact_internal_id'
+            elif same_arxiv:
+                reason = 'exact_arxiv_version' if external[1] else 'same_arxiv_unversioned'
+            elif exact_url and exact_url == url(source.url):
+                reason = 'exact_url'
+            else:
+                continue
+            candidates.append({'source_id': source.source_id, 'match': reason})
+        preferred.extend(item['source_id'] for item in candidates)
+        matches.append({'supplied': identifier[:1000], 'candidate_count': len(candidates),
+            'ambiguous': len(candidates) > 1, 'candidates': candidates[:16],
+            'omitted_candidates': max(0, len(candidates) - 16)})
+    selected = list(dict.fromkeys(preferred + sorted(by_id)))[:40]
+    directory = []
+    for identifier in selected:
+        source = by_id[identifier]
+        directory.append({'source_id': identifier, 'title': source.title[:240],
+            'canonical_url': (source.url or '')[:600], 'arxiv_id': source.arxiv_id,
+            'version': source.version, 'content_origin': source.content_origin,
+            'access_status': source.access_status, 'content_complete': source.content_complete,
+            'representation_id': source.representation_id})
+    evidence_ids = sorted(visible['evidence']) if any(
+        error.get('reference_kind') == 'evidence' for error in errors) else []
+    evidence = []
+    for identifier in evidence_ids[:40]:
+        try:
+            item = store.get_record(identifier)
+        except StateError:
+            continue
+        evidence.append({key: item.get(key) for key in ('evidence_id', 'source_id', 'claim_id', 'claim_version')})
+    bounded_errors = []
+    for error in errors[:100]:
+        item = dict(error)
+        supplied = item.get('supplied')
+        if not isinstance(supplied, str):
+            supplied = json.dumps(supplied, ensure_ascii=False, default=str)
+            item['supplied_representation'] = 'json'
+        if len(supplied) > 512:
+            item.update(supplied=supplied[:512], supplied_truncated=True,
+                        supplied_original_chars=len(supplied))
+        elif not isinstance(item.get('supplied'), str):
+            item['supplied'] = supplied
+        bounded_errors.append(item)
+    return {'errors': bounded_errors, 'omitted_errors': max(0, len(errors) - 100),
+        'reference_directory': {'scope': 'references_visible_in_current_task_only',
+            'sources': directory, 'visible_source_count': len(sources),
+            'omitted_source_count': max(0, len(sources) - len(directory)),
+            'exact_identity_candidates': matches,
+            'omitted_submitted_id_count': max(0, len(submitted) - len(matches)),
+            'evidence': evidence, 'omitted_evidence_count': max(0, len(evidence_ids) - len(evidence)),
+            'automatic_replacement': False}}
+
+
 def output_validation_errors(raw: str, envelope_type, original_error: ValidationError) -> list[dict]:
     """Augment syntax feedback with strict prefix diagnostics, never parsed output."""
     errors = original_error.errors(include_url=False, include_input=False)
