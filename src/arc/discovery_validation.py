@@ -27,14 +27,20 @@ def validate_source_access(store, result):
             raise ValueError(f"secondary_analysis_is_not_original_abstract:{note.source_id}")
 
 
-def repeated_exhausted_read(trace):
-    """Repeated EOF pauses only while no later material progress supersedes it.
+def source_read_progress(trace):
+    """Measure successive cache reads that add no original material.
 
-    Scan to the end: a batch can contain both old exhausted reads and a useful
-    new fetch/page. Re-reading already seen material does not reset the guard.
-    This uses source metadata and ranges, not content hashes or scientific scores.
+    Scan to batch end so later useful fetches/pages supersede old empty or
+    repeated reads. Source identity and read ranges are enough; no content
+    hashes, scientific scores, or total tool-call ceiling are introduced.
     """
     exhausted, available, ranges, latest = {}, {}, {}, {}
+    stale_reads, last_progress = 0, -1
+
+    def progress(index):
+        nonlocal stale_reads, last_progress
+        exhausted.clear()
+        stale_reads, last_progress = 0, index
 
     def identity(source, fallback=None):
         return (source.get("source_id") or fallback, source.get("version"),
@@ -62,19 +68,22 @@ def repeated_exhausted_read(trace):
         previous.append((start, end))
         return new
 
-    for item in trace:
+    for index, item in enumerate(trace):
         result = item.get("result") or {}
         arguments = item.get("arguments") or {}
         if item.get("name") != "read_record":
             if result.get("is_error"):
                 continue
-            progress = False
+            gained = False
             for source in result.get("sources") or []:
                 if not isinstance(source, dict) or source.get("content_origin") == "metadata":
                     continue
-                progress = observe(identity(source), source.get("content_chars", 0)) or progress
-            if progress:
-                exhausted.clear()
+                key = identity(source)
+                if not key[0]:
+                    continue
+                gained = observe(key, source.get("content_chars", 0)) or gained
+            if gained:
+                progress(index)
             continue
         key = identity(result, arguments.get("record_id"))
         if not key[0]:
@@ -84,10 +93,11 @@ def repeated_exhausted_read(trace):
         if is_eof:
             # A larger cache or changed representation reopens a useful path.
             was_known = key in available or key[0] in latest
-            progress = observe(key, result.get("cached_content_chars", 0))
-            if was_known and progress:
-                exhausted.clear()
+            gained = observe(key, result.get("cached_content_chars", 0))
+            if was_known and gained:
+                progress(index)
             exhausted[boundary] = exhausted.get(boundary, 0) + 1
+            stale_reads += 1
             continue
         content = result.get("content")
         if result.get("is_error") or not isinstance(content, str) or not content:
@@ -97,5 +107,14 @@ def repeated_exhausted_read(trace):
         material_progress = observe(key, size)
         range_progress = read_new_range(key, start, len(content))
         if material_progress or range_progress:
-            exhausted.clear()
-    return any(count >= 2 for count in exhausted.values())
+            progress(index)
+        else:
+            stale_reads += 1
+    return {"repeated_eof": any(count >= 2 for count in exhausted.values()),
+            "consecutive_nonprogress_reads": stale_reads,
+            "last_progress_trace_index": last_progress, "trace_count": len(trace)}
+
+
+def repeated_exhausted_read(trace):
+    """Compatibility query for existing EOF checks, without a total tool cap."""
+    return source_read_progress(trace)["repeated_eof"]

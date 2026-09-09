@@ -527,5 +527,6 @@
     "discovery_pending": "discover/pending.md",
     "discovery_field": "discover/field_brief.md",
     "discovery_search": "discover/search_sources.md"
-  }
+  },
+  "read_progress_template": "tasks/source_read_no_progress.md"
 }

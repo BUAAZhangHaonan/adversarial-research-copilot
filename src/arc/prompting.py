@@ -100,6 +100,8 @@ class PromptLoader:
         self.manifest_text = self._source("manifest.json")
         self.manifest = json.loads(self.manifest_text, object_pairs_hook=_unique_object)
         self.registered_files = {"manifest.json"}
+        if self.manifest.get("read_progress_template"):
+            self.registered_files.add(self.manifest["read_progress_template"])
         for entry in self.manifest["prompts"].values():
             self.registered_files.update(entry["system"])
             self.registered_files.update([entry["task_template"], entry["repair_template"]])
@@ -158,6 +160,8 @@ class PromptLoader:
                              validation_errors_json=_json(repair["validation_errors"]))
         sources = {"manifest.json": self.manifest_text}
         recovery_templates = [entry['tool_repair_template']] if entry.get('tool_repair_template') else []
+        if self.manifest.get('read_progress_template'):
+            recovery_templates.append(self.manifest['read_progress_template'])
         for name in entry["system"] + [entry["task_template"], entry["repair_template"]] + recovery_templates + [self.manifest["tools"][n] for n in names]:
             sources.update(self._dependencies(name))
         messages = [{"role": "system", "content": "\n\n".join(self.env.get_template(name).render(**variables).rstrip() for name in entry["system"])},
@@ -179,6 +183,27 @@ class PromptLoader:
                       previous_response: Any, validation_errors: Any) -> RenderedPrompt:
         return render_repair(snapshot, data, schema=schema, previous_response=previous_response,
                              validation_errors=validation_errors)
+
+    def render_read_progress(self, snapshot: RenderedPrompt, diagnostics: dict) -> dict:
+        """Persist this registered notice separately without replacing original task prompts."""
+        original = json.loads(snapshot.sources['manifest.json'])
+        name = original.get('read_progress_template')
+        use_original = bool(name and name in snapshot.sources)
+        if use_original:
+            sources = snapshot.sources
+        else:
+            # Existing tasks can receive this newly added runtime notice. The
+            # operator controls their registered resource bundle; original task
+            # system/user messages and their snapshot stay unchanged.
+            name = self.manifest.get('read_progress_template')
+            if not name:
+                raise ValueError('SOURCE_READ_NOTICE_TEMPLATE_UNAVAILABLE')
+            sources = {'manifest.json': self.manifest_text, **self._dependencies(name)}
+        env = Environment(loader=DictLoader(sources), undefined=StrictUndefined,
+                          autoescape=False, keep_trailing_newline=True)
+        instruction = env.get_template(name).render(diagnostics_json=_json(diagnostics))
+        return {'template': name, 'source': sources[name], 'instruction': instruction,
+                'uses_original_task_snapshot': use_original, 'diagnostics': diagnostics}
 
     @staticmethod
     def render_tool_correction(snapshot: RenderedPrompt, failures: list[dict]) -> str:

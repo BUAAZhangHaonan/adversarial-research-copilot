@@ -351,6 +351,29 @@ class Runtime:
         except (ValueError, KeyError, TypeError, FileNotFoundError) as exc:
             raise RuntimePaused('PAUSED_PROTOCOL', str(exc)) from exc
 
+    def _check_source_read_progress(self, record, state):
+        from .discovery_validation import source_read_progress
+        diagnostics = source_read_progress(state.get('tool_trace', []))
+        stalled = (diagnostics['repeated_eof']
+                   or diagnostics['consecutive_nonprogress_reads'] >= 8)
+        state['source_read_no_progress'] = False
+        if not stalled:
+            return
+        notice = state.get('source_read_progress_notice')
+        if notice is None:
+            try:
+                notice = self.loader.render_read_progress(self._load_prompt_snapshot(record), diagnostics)
+            except ValueError as exc:
+                raise RuntimePaused('PAUSED_EXTERNAL', str(exc)) from exc
+            state['source_read_progress_notice'] = notice
+            state['messages'].append({'role': 'user', 'content': notice['instruction']})
+            self._checkpoint(record, state, 'PENDING')
+        elif diagnostics['trace_count'] > notice['diagnostics']['trace_count']:
+            state['source_read_no_progress'] = True
+            record.error = 'SOURCE_READ_NO_PROGRESS'
+            self._checkpoint(record, state, 'PAUSED_EXTERNAL')
+            raise RuntimePaused('PAUSED_EXTERNAL', record.error)
+
     def _validate_output_contracts(self, envelope, payload, state):
         """Collect independent read-only errors before spending JSON correction."""
         from .store import StateError
@@ -667,11 +690,6 @@ class Runtime:
                      'prompt_manifest': rendered.source_hashes}
             self._checkpoint(record, state)
         while True:
-            if state.get('source_read_no_progress'):
-                from .discovery_validation import repeated_exhausted_read
-                state['source_read_no_progress'] = repeated_exhausted_read(state['tool_trace'])
-                if state['source_read_no_progress']:
-                    raise RuntimePaused('PAUSED_EXTERNAL', 'SOURCE_READ_NO_PROGRESS')
             if state.get('tool_correction_failure'):
                 raise RuntimePaused('PAUSED_PROTOCOL', state['tool_correction_failure'])
             for trace in state['tool_trace']:
@@ -681,6 +699,7 @@ class Runtime:
                     self.ledger.settle(trace['call_id'], '0', bound, 'bounded_estimate',
                         completed_at=trace['completed_at'], response_artifact_path=record.response_artifact_path)
             if state.get('response') is None:
+                self._check_source_read_progress(record, state)
                 response = await self._model_request(record, state, config, on_admitted)
                 state['response'] = response
                 self._checkpoint(record, state, 'RESPONSE_SAVED')
@@ -724,8 +743,6 @@ class Runtime:
                     correction['phase'] = 'awaiting'
                 elif correction and correction.get('corrected_response_id') == response['call_id']:
                     correction['phase'] = 'completed'
-                from .discovery_validation import repeated_exhausted_read
-                state['source_read_no_progress'] = repeated_exhausted_read(state['tool_trace'])
                 state['response'] = None
                 state['assistant_appended'] = False
                 self._checkpoint(record, state, 'PENDING')
