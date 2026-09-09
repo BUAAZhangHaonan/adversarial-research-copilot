@@ -414,6 +414,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     ideas = [_obj(idea) for idea in store.list_discovery_ideas(run_id=run_id)]
     selected = state.get('idea_input') or {}
     brief = state.get('field_brief') or selected.get('field_brief') or {}
+    topic = (store.get_campaign(run['campaign_id']).topic if run.get('campaign_id') else selected.get('original_question', ''))
     if selected:
         original = _obj(store.get_discovery_idea(selected['idea_id']))
         # A prior discovery recommendation is not acceptance of this stage.
@@ -483,7 +484,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
                             'reason': direction.get('reason', ''), 'path': None})
     paths['field_brief'] = output_dir / 'FIELD_BRIEF.md'
     paths['field_brief'].write_text(loader.render_report('discovery_field', {
-        'original_topic': ideas[0].get('topic', '') if ideas else state.get('original_task', ''),
+        'original_topic': topic or (ideas[0].get('topic', '') if ideas else state.get('original_task', '')),
         'overview': brief.get('overview', '领域调查尚未完成。'), 'research_lines': _text(brief.get('research_lines', [])),
         'openings': _text(brief.get('openings', [])), 'search_limits': _text(brief.get('search_limits', [])),
         'sources': _discovery_sources([note['source_id'] for note in field_notes], field_notes, sources, output_dir, store),
@@ -530,4 +531,10 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     paths['cost'] = output_dir / 'COST_REPORT.md'
     entries = '\n\n'.join(_text({key: call.get(key) for key in ['call_id', 'state', 'cost_status', 'reserved_cny', 'cost_estimate_lower', 'cost_estimate_upper']}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost', {'run_id': run_id, 'summary': cost_text, 'entries': entries}), encoding='utf-8')
+    capabilities = store.list_capability_requests(run_id)
+    if capabilities:
+        paths['capabilities'] = output_dir / 'MCP_REQUIREMENTS.md'
+        paths['capabilities'].write_text(loader.render_report('capabilities', {'run_id': run_id,
+            'requests': [{'blocked_question': _heading(item['blocked_question']),
+                          'details': render_capability_handoff(item, loader)} for item in capabilities]}), encoding='utf-8')
     return paths

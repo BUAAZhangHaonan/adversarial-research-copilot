@@ -51,6 +51,7 @@ class Store:
     def list_discovery_ideas(self, *, run_id): return self.ideas
     def get_discovery_idea(self, idea_id): return self.original_idea
     def list_tasks(self, run_id): return []
+    def list_capability_requests(self, run_id): return []
     def list_sources(self, ids=None):
         return [{'source_id': key, 'title': title, 'url': 'https://example.org/' + key}
                 for key, title in [('s1', '启发文献'), ('s2', '最近工作'), ('noise', '无关检索命中')]
