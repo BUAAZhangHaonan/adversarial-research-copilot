@@ -73,15 +73,29 @@ def services(settings):
 
 def new_run(settings, mode, *, topic=None, card_id=None, version=None,
             budget='20', parent=None, run_id=None, campaign_id=None, input_text=None,
-            parent_card_id=None, parent_card_version=None, boundaries=None):
+            parent_card_id=None, parent_card_version=None, boundaries=None, idea_id=None):
     store, ledger = services(settings)
     run_id = run_id or f'run_{uuid4().hex}'
     amount = Decimal(str(budget))
     if amount <= 0:
         raise typer.BadParameter('budget_cny must be positive')
     inherited = None
+    idea_input = None
+    if idea_id:
+        if mode not in ('develop', 'run') or card_id or input_text:
+            raise typer.BadParameter('--idea requires develop/run and cannot be combined with another input')
+        idea = store.get_discovery_idea(idea_id)
+        if not idea.get('seed'): raise typer.BadParameter('idea has no submitted seed')
+        origin = store.get_run(idea['run_id'])
+        campaign_id = origin.campaign_id
+        campaign = store.get_campaign(campaign_id)
+        idea_input = {'idea_id': idea_id, 'original_question': campaign.topic, 'user_boundaries': campaign.boundaries,
+            'seed': idea['seed'], 'latest_note': idea['note'], 'field_brief': origin.state.get('field_brief')}
+        latest = store.latest_idea_prestudy(idea_id)
+        if latest:
+            idea_input.update(latest_note=latest['note'], latest_note_origin={'run_id': latest['run_id'], 'mode': latest['mode']})
     if mode in ('develop', 'run'):
-        if not card_id and not input_text:
+        if not card_id and not input_text and not idea_id:
             raise typer.BadParameter('--card is required')
         if card_id:
             version = store.get_card(card_id, version).version
@@ -99,6 +113,11 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
     code_hash = hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path(__file__).parent.glob('*.py')))).hexdigest()
     state = {'source_ids': inherited['source_ids'], 'evidence_ids': inherited['evidence_ids'],
              'input_provenance': inherited} if inherited else {}
+    if mode == 'discover':
+        state.update(discover_first=True, idea_ids=[])
+        reusable = store.reusable_discovery_brief(topic, boundaries)
+        if reusable: state['reusable_survey'] = reusable
+    if idea_input: state.update(idea_input=idea_input, discover_first=True)
     if input_text:
         from .schemas import SourceRecord
         source = store.register_source(SourceRecord(title='用户导入的研究问题', url=None,
@@ -146,24 +165,26 @@ def discover(ctx: typer.Context, topic: str, draws: Optional[int] = typer.Option
 @app.command()
 def develop(ctx: typer.Context, card: Optional[str] = typer.Option(None),
             version: Optional[int] = typer.Option(None, min=1), budget_cny: Optional[str] = typer.Option(None),
-            question: Optional[str] = typer.Option(None), proposal: Optional[Path] = typer.Option(None)):
-    text = explicit_input(card, question, proposal)
+            question: Optional[str] = typer.Option(None), proposal: Optional[Path] = typer.Option(None),
+            idea: Optional[str] = typer.Option(None)):
+    text = explicit_input(card, question, proposal, idea)
     run = new_run(ctx.obj, 'develop', card_id=card, version=version,
-                  budget=budget_cny or ctx.obj.budget_cny, input_text=text)
+                  budget=budget_cny or ctx.obj.budget_cny, input_text=text, idea_id=idea)
     asyncio.run(execute(ctx.obj, run.run_id))
 
 @app.command(name='run')
 def pressure_test(ctx: typer.Context, card: Optional[str] = typer.Option(None),
                   version: Optional[int] = typer.Option(None, min=1), budget_cny: Optional[str] = typer.Option(None),
-                  question: Optional[str] = typer.Option(None), proposal: Optional[Path] = typer.Option(None)):
-    text = explicit_input(card, question, proposal)
+                  question: Optional[str] = typer.Option(None), proposal: Optional[Path] = typer.Option(None),
+            idea: Optional[str] = typer.Option(None)):
+    text = explicit_input(card, question, proposal, idea)
     run = new_run(ctx.obj, 'run', card_id=card, version=version,
-                  budget=budget_cny or ctx.obj.budget_cny, input_text=text)
+                  budget=budget_cny or ctx.obj.budget_cny, input_text=text, idea_id=idea)
     asyncio.run(execute(ctx.obj, run.run_id))
 
-def explicit_input(card, question, proposal):
-    if sum(value is not None for value in (card, question, proposal)) != 1:
-        raise typer.BadParameter('choose exactly one of --card, --question, --proposal')
+def explicit_input(card, question, proposal, idea=None):
+    if sum(value is not None for value in (card, question, proposal, idea)) != 1:
+        raise typer.BadParameter('choose exactly one of --idea, --card, --question, --proposal')
     return proposal.read_text(encoding='utf-8') if proposal is not None else question
 
 @app.command()

@@ -104,3 +104,13 @@ def build_research_context(store, run) -> dict:
         'input_provenance': {key: value for key, value in provenance.items() if key != 'source_ids'} or None,
         'claim_evidence_reselection': state.get('claim_evidence_removals', {}),
     }
+
+
+def build_discovery_context(engine, run_id):
+    run = engine.store.get_run(run_id)
+    campaign = engine.store.get_campaign(run.campaign_id)
+    brief = run.state.get("field_brief") or run.state.get("reusable_survey", {}).get("field_brief")
+    ids = sorted({n["source_id"] for n in (brief or {}).get("source_notes", [])})
+    return {"original_question": campaign.topic, "user_boundaries": campaign.boundaries,
+            "field_brief": brief, "brief_version": run.state.get("brief_version", 0),
+            "sources": [s.model_dump(mode="json") for s in engine.store.list_sources(ids=ids)] if ids else []}

@@ -106,7 +106,9 @@ class WorkflowEngine:
     async def call(self, run_id, key, role, task='INVOKE', payload=None,
                    on_admitted: Callable | None = None, tool_profile=None, request_depth=0):
         run = self.store.get_run(run_id)
-        schema_key = f'{role}.{task}' if role == 'discovery' else role
+        if f'{role}.{task}' not in self.runtime.loader.manifest['prompts']:
+            raise WorkflowPause('PAUSED_PROTOCOL', 'unknown_registered_task:' + f'{role}.{task}')
+        schema_key = f'{role}.{task}' if f'{role}.{task}' in RESULT_SCHEMAS else role
         if key in run.state:
             return RESULT_SCHEMAS[schema_key].model_validate(run.state[key])
         retries = run.state.get('task_retries', {}).get(key, [])
@@ -156,7 +158,7 @@ class WorkflowEngine:
                             pending_evidence_requests=data(envelope.evidence_requests),
                             pending_capability_requests=data(envelope.capability_requests),
                             pending_note=envelope.note)
-            if envelope.result_status == 'needs_evidence' and role != 'investigator':
+            if envelope.result_status == 'needs_evidence' and role not in {'investigator', 'scout', 'ideator', 'editor'}:
                 if request_depth >= self.settings.max_rounds:
                     raise WorkflowPause('PAUSED_EXTERNAL', 'evidence_action_exhausted')
                 request_key = key + '.requested_evidence'
@@ -243,6 +245,10 @@ class WorkflowEngine:
             return run
         self.store.update_run(run_id, status='RUNNING', stop_reason=None)
         try:
+            if run.state.get('idea_input'):
+                from .discovery_workflow import prestudy
+                await prestudy(self, run_id)
+                return self.store.get_run(run_id)
             if run.mode in ('develop', 'run') and not run.card_id and run.state.get('imported_input'):
                 await self.import_input(run_id)
             if run.mode == 'discover':
@@ -414,7 +420,9 @@ class WorkflowEngine:
 
     async def discover(self, run_id):
         state = self.store.get_run(run_id).state
-        if state.get('workflow_variant') == 'legacy_discovery_v1' or 'frame' in state.get('task_inputs', {}):
+        if state.get('discover_first'):
+            from .discovery_workflow import discover
+        elif state.get('workflow_variant') == 'legacy_discovery_v1' or 'frame' in state.get('task_inputs', {}):
             from .legacy_discovery import discover
         else:
             from .scientific import discover

@@ -138,7 +138,7 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
         raise StateError('TASK_RETRY_SUBJECT_CHANGED')
     snapshot = json.loads(store.read_artifact(source.rendered_prompt_path))
     role, task = snapshot['prompt_id'].split('.', 1)
-    result_schema = RESULT_SCHEMAS[f'{role}.{task}' if role == 'discovery' else role]
+    result_schema = RESULT_SCHEMAS[f'{role}.{task}' if f'{role}.{task}' in RESULT_SCHEMAS else role]
     envelope_type = Envelope[result_schema]
     saved = json.loads(store.read_artifact(source.response_artifact_path))
     raw = ((saved.get('response') or {}).get('message') or {}).get('content') or ''
