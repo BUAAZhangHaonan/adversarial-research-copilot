@@ -35,9 +35,39 @@
     "old_unknown_cost_reservation_retained": true
   },
   "final_wheel_validation": {
-    "source_revision": "bd70b60",
+    "source_revision": "336cc4b",
     "tasks_and_repairs_rendered": 6,
     "source": "final built wheel",
+    "source_identity_diagnostics_imported_from_wheel": true,
     "paid_calls": 0
+  },
+  "source_reference_followup": {
+    "passed": 38,
+    "failed": 0,
+    "paid_calls": 0,
+    "replay": {
+      "task_id": "discover-first-20260909.sample2.survey",
+      "original_task_status": "PAUSED_PROTOCOL",
+      "original_run_status": "PAUSED_PROTOCOL",
+      "task_state_changed": false,
+      "model_calls": 0,
+      "old_feedback_chars": 215177,
+      "new_feedback_chars": 21607,
+      "reduction_percent": 89.96,
+      "reference_error_locations": 22,
+      "visible_source_count": 241,
+      "directory_entries": 40,
+      "directory_omitted": 201,
+      "unique_external_ids": 20,
+      "external_ids_with_exact_candidates": 15,
+      "ambiguous_external_ids": 2,
+      "unmatched_external_ids": [
+        "nature14422",
+        "arxiv:2112.04467",
+        "arxiv:2402.19161",
+        "arxiv:2407.15325",
+        "arxiv:2605.27366"
+      ]
+    }
   }
 }
