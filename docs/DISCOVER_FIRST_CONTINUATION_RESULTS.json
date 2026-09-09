@@ -1,0 +1,618 @@
+{
+  "scope": "same two development samples continued under subsequent user authorization; not a new held-out evaluation",
+  "exported_at": "2026-09-09T14:01:23.020157+00:00",
+  "samples": [
+    {
+      "run_id": "discover-first-20260909.sample1",
+      "topic": "多模态模型在真实任务中何时需要主动获取额外信息。",
+      "status": "COMPLETED",
+      "stop_reason": "discover_draws_finished_human_selection",
+      "created_at": "2026-09-09T09:36:06.483259+00:00",
+      "updated_at": "2026-09-09T11:51:30.163664+00:00",
+      "max_draws": 5,
+      "draws_started": 5,
+      "draw_records": [
+        {
+          "id": "discover-first-20260909.sample1.idea1",
+          "ordinal": 1,
+          "started_at": "2026-09-09T09:53:38.180059+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample1.idea2",
+          "ordinal": 2,
+          "started_at": "2026-09-09T10:59:48.311808+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample1.idea3",
+          "ordinal": 3,
+          "started_at": "2026-09-09T11:13:14.217100+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample1.idea4",
+          "ordinal": 4,
+          "started_at": "2026-09-09T11:28:44.294791+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample1.idea5",
+          "ordinal": 5,
+          "started_at": "2026-09-09T11:40:03.297800+00:00"
+        }
+      ],
+      "idea_count": 5,
+      "idea_records": [
+        {
+          "idea_id": "idea_268a0ddddca64ab79dde15c015d812d1",
+          "draw_id": "idea1",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T09:56:05.775559+00:00",
+          "updated_at": "2026-09-09T10:59:48.030572+00:00"
+        },
+        {
+          "idea_id": "idea_f111f6c427964160a11865b8016449da",
+          "draw_id": "idea2",
+          "status": "checked",
+          "decision": "lead",
+          "created_at": "2026-09-09T11:01:43.136402+00:00",
+          "updated_at": "2026-09-09T11:13:13.861694+00:00"
+        },
+        {
+          "idea_id": "idea_13010f16869342db8325889f6b88b544",
+          "draw_id": "idea3",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T11:15:27.242404+00:00",
+          "updated_at": "2026-09-09T11:28:43.858787+00:00"
+        },
+        {
+          "idea_id": "idea_9c0d2b7123e14c1595dfce441f056482",
+          "draw_id": "idea4",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T11:29:44.803569+00:00",
+          "updated_at": "2026-09-09T11:40:02.778929+00:00"
+        },
+        {
+          "idea_id": "idea_382bc034c1194b5e9aee5aaa53bb57b3",
+          "draw_id": "idea5",
+          "status": "checked",
+          "decision": "drop",
+          "created_at": "2026-09-09T11:41:36.710848+00:00",
+          "updated_at": "2026-09-09T11:51:29.664913+00:00"
+        }
+      ],
+      "decisions": {
+        "discuss": 3,
+        "lead": 1,
+        "drop": 1
+      },
+      "software_cards_created": 0,
+      "budget": {
+        "account_id": "discover-first-20260909.sample1",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 100000000,
+        "spent_lower_micro": 8994736,
+        "spent_upper_micro": 8994797,
+        "reserved_micro": 15912000,
+        "remaining_micro": 75093203,
+        "limit_cny": "100.000000",
+        "spent_lower_cny": "8.994736",
+        "spent_upper_cny": "8.994797",
+        "reserved_cny": "15.912000",
+        "remaining_cny": "75.093203",
+        "unknown_calls": 1,
+        "call_count": 201,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      },
+      "baseline_spent_upper_cny": "3.474208",
+      "continuation_spent_upper_cny": "5.520589",
+      "usage": {
+        "semantic_task_records": 17,
+        "logical_semantic_tasks": 16,
+        "model_requests_including_unknown": 71,
+        "model_requests_settled": 70,
+        "model_requests_unknown": 1,
+        "model_requests_not_sent": 0,
+        "tool_actions": 130,
+        "tool_actions_by_name": {
+          "search_web": 47,
+          "read_paper": 7,
+          "read_record": 44,
+          "read_web": 32
+        },
+        "settled_model_request_duration_seconds": 3839.734034,
+        "duration_missing_settled_requests": 0,
+        "run_elapsed_seconds_including_pauses": 8123.680405,
+        "first_seed_at": "2026-09-09T09:56:05.775559+00:00",
+        "first_note_at": "2026-09-09T10:59:48.041767+00:00",
+        "input_tokens": 4354321,
+        "input_tokens_missing_requests": 1,
+        "completion_tokens": 231325,
+        "completion_tokens_missing_requests": 1,
+        "continuation_request_timing": {
+          "baseline_pause_recorded_at": "2026-09-09T10:08:54.101168+00:00",
+          "first_request_started_at": "2026-09-09T10:58:27.341813+00:00",
+          "last_settled_request_completed_at": "2026-09-09T11:51:29.481172+00:00",
+          "settled_request_duration_seconds": 2535.891801,
+          "settled_requests_missing_timing": 0
+        },
+        "continuation_delta": {
+          "semantic_task_records": 13,
+          "model_requests_including_unknown": 49,
+          "tool_actions": 80,
+          "input_tokens_known": 3265713,
+          "completion_tokens_known": 159437
+        }
+      },
+      "tasks": [
+        {
+          "task_id": "discover-first-20260909.sample1.survey",
+          "logical_task": "survey",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T09:36:08.500955+00:00",
+          "updated_at": "2026-09-09T09:53:37.986854+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.sketch",
+          "logical_task": "idea1.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T09:53:38.151623+00:00",
+          "updated_at": "2026-09-09T09:56:05.733549+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.triage",
+          "logical_task": "idea1.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T09:56:05.943587+00:00",
+          "updated_at": "2026-09-09T09:56:55.854980+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.check",
+          "logical_task": "idea1.check",
+          "status": "UNKNOWN",
+          "created_at": "2026-09-09T09:56:56.024021+00:00",
+          "updated_at": "2026-09-09T10:08:54.095085+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.check.protocol_retry1",
+          "logical_task": "idea1.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T10:58:27.267363+00:00",
+          "updated_at": "2026-09-09T10:59:47.895795+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea2.sketch",
+          "logical_task": "idea2.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T10:59:48.282108+00:00",
+          "updated_at": "2026-09-09T11:01:42.933236+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea2.triage",
+          "logical_task": "idea2.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:01:44.279929+00:00",
+          "updated_at": "2026-09-09T11:02:40.543694+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea2.check",
+          "logical_task": "idea2.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:02:40.819814+00:00",
+          "updated_at": "2026-09-09T11:13:13.771508+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea3.sketch",
+          "logical_task": "idea3.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:13:14.187285+00:00",
+          "updated_at": "2026-09-09T11:15:27.180786+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea3.triage",
+          "logical_task": "idea3.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:15:27.592640+00:00",
+          "updated_at": "2026-09-09T11:16:26.382357+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea3.check",
+          "logical_task": "idea3.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:16:26.740163+00:00",
+          "updated_at": "2026-09-09T11:28:43.772144+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea4.sketch",
+          "logical_task": "idea4.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:28:44.265475+00:00",
+          "updated_at": "2026-09-09T11:29:44.739620+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea4.triage",
+          "logical_task": "idea4.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:29:45.207732+00:00",
+          "updated_at": "2026-09-09T11:31:03.009655+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea4.check",
+          "logical_task": "idea4.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:31:03.441610+00:00",
+          "updated_at": "2026-09-09T11:40:02.655903+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea5.sketch",
+          "logical_task": "idea5.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:40:03.268591+00:00",
+          "updated_at": "2026-09-09T11:41:36.638135+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea5.triage",
+          "logical_task": "idea5.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:41:37.184713+00:00",
+          "updated_at": "2026-09-09T11:42:10.713956+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample1.idea5.check",
+          "logical_task": "idea5.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:42:11.271815+00:00",
+          "updated_at": "2026-09-09T11:51:29.561736+00:00"
+        }
+      ],
+      "historical_unaccepted_tasks": [
+        {
+          "task_id": "discover-first-20260909.sample1.idea1.check",
+          "status": "UNKNOWN",
+          "created_at": "2026-09-09T09:56:56.024021+00:00",
+          "updated_at": "2026-09-09T10:08:54.095085+00:00"
+        }
+      ],
+      "preserved_first_delivery_drafts": [
+        "UNACCEPTED_CHECK_DRAFT.json",
+        "UNACCEPTED_CHECK_DRAFT.md"
+      ],
+      "unknown_calls": [
+        {
+          "call_id": "call_46ea87436dab4cb58844f0571c65d1eb",
+          "state": "UNKNOWN",
+          "reserved_cny": "15.912000",
+          "cost_status": "unknown"
+        }
+      ]
+    },
+    {
+      "run_id": "discover-first-20260909.sample2",
+      "topic": "具身智能在环境变化后如何使用和更新既有经验。",
+      "status": "COMPLETED",
+      "stop_reason": "discover_draws_finished_human_selection",
+      "created_at": "2026-09-09T10:15:09.646794+00:00",
+      "updated_at": "2026-09-09T13:59:58.229869+00:00",
+      "max_draws": 5,
+      "draws_started": 5,
+      "draw_records": [
+        {
+          "id": "discover-first-20260909.sample2.idea1",
+          "ordinal": 1,
+          "started_at": "2026-09-09T11:56:13.307782+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample2.idea2",
+          "ordinal": 2,
+          "started_at": "2026-09-09T12:10:36.472638+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample2.idea3",
+          "ordinal": 3,
+          "started_at": "2026-09-09T13:06:23.086425+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample2.idea4",
+          "ordinal": 4,
+          "started_at": "2026-09-09T13:23:06.860558+00:00"
+        },
+        {
+          "id": "discover-first-20260909.sample2.idea5",
+          "ordinal": 5,
+          "started_at": "2026-09-09T13:41:56.495151+00:00"
+        }
+      ],
+      "idea_count": 5,
+      "idea_records": [
+        {
+          "idea_id": "idea_9ac5bc4464064c5d8847b95a732be7e1",
+          "draw_id": "idea1",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T11:58:00.098500+00:00",
+          "updated_at": "2026-09-09T12:10:36.166128+00:00"
+        },
+        {
+          "idea_id": "idea_c4e85dd947df4333aca8114245d9a5fc",
+          "draw_id": "idea2",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T12:12:15.524383+00:00",
+          "updated_at": "2026-09-09T12:34:56.046489+00:00"
+        },
+        {
+          "idea_id": "idea_2acea230ec8c4cfe9f9dbc0ddf474042",
+          "draw_id": "idea3",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T13:08:07.405777+00:00",
+          "updated_at": "2026-09-09T13:23:06.317631+00:00"
+        },
+        {
+          "idea_id": "idea_e09e758666e249e09ae5c76f723736b5",
+          "draw_id": "idea4",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T13:24:12.007734+00:00",
+          "updated_at": "2026-09-09T13:41:55.880196+00:00"
+        },
+        {
+          "idea_id": "idea_aa0524cde2e742dd985973598795053a",
+          "draw_id": "idea5",
+          "status": "checked",
+          "decision": "discuss",
+          "created_at": "2026-09-09T13:44:39.566488+00:00",
+          "updated_at": "2026-09-09T13:59:57.593360+00:00"
+        }
+      ],
+      "decisions": {
+        "discuss": 5
+      },
+      "software_cards_created": 0,
+      "budget": {
+        "account_id": "discover-first-20260909.sample2",
+        "parent_id": "arc-vnext-validation-20260907",
+        "limit_micro": 100000000,
+        "spent_lower_micro": 16367699,
+        "spent_upper_micro": 16367905,
+        "reserved_micro": 0,
+        "remaining_micro": 83632095,
+        "limit_cny": "100.000000",
+        "spent_lower_cny": "16.367699",
+        "spent_upper_cny": "16.367905",
+        "reserved_cny": "0.000000",
+        "remaining_cny": "83.632095",
+        "unknown_calls": 0,
+        "call_count": 546,
+        "currency": "CNY",
+        "unsettled_lower_micro": 0,
+        "unsettled_lower_cny": "0.000000"
+      },
+      "baseline_spent_upper_cny": "1.516984",
+      "continuation_spent_upper_cny": "14.850921",
+      "usage": {
+        "semantic_task_records": 18,
+        "logical_semantic_tasks": 17,
+        "model_requests_including_unknown": 231,
+        "model_requests_settled": 231,
+        "model_requests_unknown": 0,
+        "model_requests_not_sent": 0,
+        "tool_actions": 315,
+        "tool_actions_by_name": {
+          "search_web": 56,
+          "read_paper": 23,
+          "read_record": 193,
+          "read_web": 43
+        },
+        "settled_model_request_duration_seconds": 5207.4213389999995,
+        "duration_missing_settled_requests": 0,
+        "run_elapsed_seconds_including_pauses": 13488.583075,
+        "first_seed_at": "2026-09-09T11:58:00.098500+00:00",
+        "first_note_at": "2026-09-09T12:10:36.174430+00:00",
+        "input_tokens": 38925600,
+        "input_tokens_missing_requests": 0,
+        "completion_tokens": 295744,
+        "completion_tokens_missing_requests": 0,
+        "continuation_request_timing": {
+          "baseline_pause_recorded_at": "2026-09-09T10:35:22.367753+00:00",
+          "first_request_started_at": "2026-09-09T11:53:14.234155+00:00",
+          "last_settled_request_completed_at": "2026-09-09T13:59:57.332526+00:00",
+          "settled_request_duration_seconds": 4624.950484,
+          "settled_requests_missing_timing": 0
+        },
+        "continuation_delta": {
+          "semantic_task_records": 17,
+          "model_requests_including_unknown": 220,
+          "tool_actions": 278,
+          "input_tokens_known": 38220323,
+          "completion_tokens_known": 258563
+        }
+      },
+      "tasks": [
+        {
+          "task_id": "discover-first-20260909.sample2.survey",
+          "logical_task": "survey",
+          "status": "PAUSED_PROTOCOL",
+          "created_at": "2026-09-09T10:15:11.280105+00:00",
+          "updated_at": "2026-09-09T10:35:22.362490+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.survey.protocol_retry1",
+          "logical_task": "survey",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:53:14.160377+00:00",
+          "updated_at": "2026-09-09T11:56:13.087860+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea1.sketch",
+          "logical_task": "idea1.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:56:13.279709+00:00",
+          "updated_at": "2026-09-09T11:58:00.052331+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea1.triage",
+          "logical_task": "idea1.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:58:00.271231+00:00",
+          "updated_at": "2026-09-09T11:58:47.268436+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea1.check",
+          "logical_task": "idea1.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T11:58:47.464180+00:00",
+          "updated_at": "2026-09-09T12:10:35.998482+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea2.sketch",
+          "logical_task": "idea2.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T12:10:36.441636+00:00",
+          "updated_at": "2026-09-09T12:12:15.478231+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea2.triage",
+          "logical_task": "idea2.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T12:12:15.800354+00:00",
+          "updated_at": "2026-09-09T12:13:13.208561+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea2.check",
+          "logical_task": "idea2.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T12:13:13.508521+00:00",
+          "updated_at": "2026-09-09T12:34:55.921793+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.survey.refresh",
+          "logical_task": "survey.refresh",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T12:34:56.402637+00:00",
+          "updated_at": "2026-09-09T13:06:22.891862+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea3.sketch",
+          "logical_task": "idea3.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:06:23.057584+00:00",
+          "updated_at": "2026-09-09T13:08:07.349107+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea3.triage",
+          "logical_task": "idea3.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:08:07.859096+00:00",
+          "updated_at": "2026-09-09T13:09:11.141714+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea3.check",
+          "logical_task": "idea3.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:09:12.068218+00:00",
+          "updated_at": "2026-09-09T13:23:06.186513+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea4.sketch",
+          "logical_task": "idea4.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:23:06.830400+00:00",
+          "updated_at": "2026-09-09T13:24:11.946855+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea4.triage",
+          "logical_task": "idea4.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:24:12.504489+00:00",
+          "updated_at": "2026-09-09T13:25:25.223540+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea4.check",
+          "logical_task": "idea4.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:25:25.754075+00:00",
+          "updated_at": "2026-09-09T13:41:55.767176+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea5.sketch",
+          "logical_task": "idea5.sketch",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:41:56.464406+00:00",
+          "updated_at": "2026-09-09T13:44:39.479224+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea5.triage",
+          "logical_task": "idea5.triage",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:44:40.204879+00:00",
+          "updated_at": "2026-09-09T13:45:32.572576+00:00"
+        },
+        {
+          "task_id": "discover-first-20260909.sample2.idea5.check",
+          "logical_task": "idea5.check",
+          "status": "ACCEPTED",
+          "created_at": "2026-09-09T13:45:33.191092+00:00",
+          "updated_at": "2026-09-09T13:59:57.448962+00:00"
+        }
+      ],
+      "historical_unaccepted_tasks": [
+        {
+          "task_id": "discover-first-20260909.sample2.survey",
+          "status": "PAUSED_PROTOCOL",
+          "created_at": "2026-09-09T10:15:11.280105+00:00",
+          "updated_at": "2026-09-09T10:35:22.362490+00:00",
+          "unaccepted_final_content": "history/discover-first-20260909.sample2.survey.final-content.txt"
+        }
+      ],
+      "preserved_first_delivery_drafts": [
+        "UNACCEPTED_SURVEY.json",
+        "UNACCEPTED_SURVEY.md"
+      ],
+      "unknown_calls": []
+    }
+  ],
+  "all_samples_completed": true,
+  "baseline": {
+    "sample_spent_upper_cny": {
+      "discover-first-20260909.sample1": "3.474208",
+      "discover-first-20260909.sample2": "1.516984"
+    },
+    "parent_spent_upper_cny": "185.017914",
+    "unknown_reservation_cny": "15.912000",
+    "source": "DISCOVER_FIRST_VALIDATION_RESULTS.json"
+  },
+  "continuation_spent_upper_cny": "20.371510",
+  "samples_total_spent_upper_cny": "25.362702",
+  "samples_reserved_cny": "15.912000",
+  "samples_unknown_calls": 1,
+  "parent": {
+    "account_id": "arc-vnext-validation-20260907",
+    "parent_id": null,
+    "limit_micro": 285562384,
+    "spent_lower_micro": 205239037,
+    "spent_upper_micro": 205389424,
+    "reserved_micro": 15912000,
+    "remaining_micro": 64260960,
+    "limit_cny": "285.562384",
+    "spent_lower_cny": "205.239037",
+    "spent_upper_cny": "205.389424",
+    "reserved_cny": "15.912000",
+    "remaining_cny": "64.260960",
+    "unknown_calls": 1,
+    "call_count": 3734,
+    "currency": "CNY",
+    "unsettled_lower_micro": 0,
+    "unsettled_lower_cny": "0.000000"
+  },
+  "parent_continuation_spent_upper_cny": "20.371510",
+  "interpretation": [
+    "Unknown reservations are exposure, not settled spending and not zero cost.",
+    "Run elapsed time includes old pauses; settled request duration is separate.",
+    "Task revisions are counted separately from logical research tasks.",
+    "User research taste and quality judgments are not certified by this export."
+  ],
+  "parent_increment_outside_samples_cny": "0.000000"
+}
