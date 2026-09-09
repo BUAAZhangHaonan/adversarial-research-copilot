@@ -852,3 +852,7 @@ RESULT_SCHEMAS: dict[str, type[StrictModel]] = {
 }
 
 ResearchCard.model_rebuild()
+
+from .discovery_models import DISCOVERY_RESULT_SCHEMAS, CandidateCheck
+RESULT_SCHEMAS.update(DISCOVERY_RESULT_SCHEMAS)
+RESULT_SCHEMAS.update({"scout.DEVELOP": CandidateCheck, "scout.PRESSURE": CandidateCheck})

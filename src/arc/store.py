@@ -75,6 +75,8 @@ class Store:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS campaigns(id TEXT PRIMARY KEY,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,campaign_id TEXT REFERENCES campaigns(id),data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS discovery_ideas(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),draw_id TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(run_id,draw_id));
+                CREATE VIRTUAL TABLE IF NOT EXISTS discovery_ideas_fts USING fts5(idea_id UNINDEXED,content);
                 CREATE TABLE IF NOT EXISTS draws(id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL REFERENCES campaigns(id),ordinal INTEGER NOT NULL,started_at TEXT NOT NULL,UNIQUE(campaign_id,ordinal));
                 CREATE TABLE IF NOT EXISTS cards(card_id TEXT NOT NULL,version INTEGER NOT NULL,data TEXT NOT NULL,PRIMARY KEY(card_id,version));
                 CREATE TABLE IF NOT EXISTS card_creation(creation_key TEXT PRIMARY KEY,card_id TEXT NOT NULL,version INTEGER NOT NULL,input_hash TEXT NOT NULL,FOREIGN KEY(card_id,version) REFERENCES cards(card_id,version));
@@ -197,6 +199,75 @@ class Store:
             db.execute("INSERT INTO draws VALUES (?,?,?,?)",(draw_id,campaign_id,campaign.draws_started,utc_now()))
             db.execute("UPDATE campaigns SET data=? WHERE id=?",(_dump(campaign),campaign_id))
             return campaign.draws_started
+
+    def latest_idea_prestudy(self, idea_id):
+        with self._connect() as db:
+            row = db.execute("SELECT data FROM runs WHERE json_extract(data,'$.state.idea_input.idea_id')=? "
+                "AND json_extract(data,'$.status')='COMPLETED' AND json_extract(data,'$.state.prestudy_note') IS NOT NULL "
+                "ORDER BY rowid DESC LIMIT 1", (idea_id,)).fetchone()
+        if row is None: return None
+        run = RunRecord.model_validate_json(row[0])
+        return {"run_id": run.run_id, "mode": run.mode, "note": run.state["prestudy_note"]}
+
+    def reusable_discovery_brief(self, topic, boundaries):
+        with self._connect() as db:
+            rows = db.execute("SELECT r.data FROM runs r JOIN campaigns c ON c.id=r.campaign_id "
+                "WHERE json_extract(c.data,'$.topic')=? AND json_extract(r.data,'$.status')='COMPLETED' "
+                "AND json_extract(r.data,'$.state.discover_first')=1 ORDER BY r.rowid DESC LIMIT 10", (topic,)).fetchall()
+        for row in rows:
+            run = RunRecord.model_validate_json(row[0])
+            if self.get_campaign(run.campaign_id).boundaries != (boundaries or []): continue
+            brief = run.state.get("field_brief")
+            if brief and brief.get("source_notes"):
+                self.validate_references(brief)
+                return {"run_id": run.run_id, "field_brief": brief, "brief_version": run.state.get("brief_version", 1)}
+        return None
+
+    def save_discovery_idea(self, run_id, draw_id, **updates):
+        """Persist each short proposal before paid triage/check; retain stable identity."""
+        self.validate_references(updates)
+        run = self.get_run(run_id)
+        campaign = self.get_campaign(run.campaign_id)
+        with self._transaction() as db:
+            row = db.execute("SELECT data FROM discovery_ideas WHERE run_id=? AND draw_id=?", (run_id, draw_id)).fetchone()
+            record = json.loads(row[0]) if row else {
+                "idea_id": stable_id("idea"), "run_id": run_id, "draw_id": draw_id,
+                "topic": campaign.topic, "brief_version": run.state.get("brief_version", 1),
+                "seed": None, "triage": None, "note": None, "status": "pending",
+                "created_at": utc_now()}
+            if set(updates) - {"seed", "triage", "note", "status", "sketch", "check_action_observed"}:
+                raise StateError("idea_identity_immutable")
+            record.update(updates, updated_at=utc_now())
+            db.execute("INSERT INTO discovery_ideas VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (record["idea_id"], run_id, draw_id, _dump(record)))
+            db.execute("DELETE FROM discovery_ideas_fts WHERE idea_id=?", (record["idea_id"],))
+            seed = record.get("seed") or {}
+            db.execute("INSERT INTO discovery_ideas_fts VALUES (?,?)", (record["idea_id"],
+                " ".join(_tokens(" ".join(str(seed.get(k, "")) for k in ("title", "question", "insight"))))))
+        return record
+
+    def get_discovery_idea(self, idea_id):
+        with self._connect() as db:
+            row = db.execute("SELECT data FROM discovery_ideas WHERE id=?", (idea_id,)).fetchone()
+        if row is None: raise StateError("idea_missing")
+        return json.loads(row[0])
+
+    def list_discovery_ideas(self, run_id=None):
+        with self._connect() as db:
+            rows = db.execute("SELECT data FROM discovery_ideas" + (" WHERE run_id=?" if run_id else "") + " ORDER BY rowid",
+                              (run_id,) if run_id else ()).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def lookup_discovery_ideas(self, query, exclude_run_id=None, limit=5):
+        tokens = _tokens(query)
+        if not tokens: return []
+        match = " OR ".join('"' + token.replace('"', '""') + '"' for token in tokens)
+        with self._connect() as db:
+            rows = db.execute("SELECT i.data FROM discovery_ideas_fts f JOIN discovery_ideas i ON i.id=f.idea_id "
+                "WHERE discovery_ideas_fts MATCH ? AND (? IS NULL OR i.run_id != ?) "
+                "ORDER BY bm25(discovery_ideas_fts) LIMIT ?", (match, exclude_run_id, exclude_run_id, limit)).fetchall()
+        return [{"idea_id": x["idea_id"], "seed": x["seed"], "triage": x["triage"], "status": x["status"]}
+                for x in (json.loads(row[0]) for row in rows)]
 
     def create_run(self,mode,campaign_id=None,card_id=None,card_version=None,budget_account_id=None,config=None,prompt_version="",code_version="",run_id=None,state=None):
         if (card_id is None)!=(card_version is None): raise StateError("card_version_required")
@@ -943,7 +1014,7 @@ class Store:
 
     def get_record(self,id,version=None,run_id=None):
         with self._connect() as db:
-            kind=next((table for table in ("sources","evidence","tasks","capabilities","campaigns","runs") if db.execute(f"SELECT 1 FROM {table} WHERE id=?",(id,)).fetchone()),None)
+            kind=next((table for table in ("sources","evidence","tasks","capabilities","campaigns","runs","discovery_ideas") if db.execute(f"SELECT 1 FROM {table} WHERE id=?",(id,)).fetchone()),None)
             if kind=="capabilities":
                 row=db.execute("SELECT * FROM capabilities WHERE id=?",(id,)).fetchone()
                 return {"request_id":row["id"],"run_id":row["run_id"],**json.loads(row["data"])}
@@ -959,6 +1030,7 @@ class Store:
                 else:
                     card=db.execute("SELECT 1 FROM cards WHERE card_id=? AND version=?",(id,version)).fetchone()
                 if not card: raise StateError("record_missing")
+        if kind=="discovery_ideas": return self.get_discovery_idea(id)
         if kind=="campaigns": return self.get_campaign(id).model_dump(mode="json")
         if kind=="runs":
             run=self.get_run(id)
