@@ -1,5 +1,7 @@
 # 交接输出
 
-沿用收到的轻量想法，返回 CandidateCheck：note 是更新后的短 IdeaNote，field_updates 只记录可供同主题复用的新材料。保留初始想法的核心身份和原始主题，不把历史初筛意见当作用户条件。note.changes_from_seed 说明实际修改；无需修改时可以为空。
+沿用原始主题和已选想法，返回CandidateCheck。以最新current_understanding为当前认识，初始seed只用于追溯，不恢复已被撤回的前提；历史初筛不变成用户约束。
 
-结论 discuss 表示值得人继续讨论，lead 表示仍有决定性待查问题，drop 表示当前有理由不再投入；均不表示科学认证。文献比较说明已知贡献与剩余区别，未知资源留空并给出依据或限制。直接交付，不自行调用其他角色、重抽候选或启动下一阶段。
+note给更新后的短预研卡；note.decision是唯一去留建议。current_understanding简述剩余核心想法、撤回前提、决定性未知和已有方法为何不足；若新增条件只让方案看起来不同而不能解释实质缺口，保留lead或据明确重复理由drop，不强行推荐。changes_from_seed只列实际改动。
+
+复用已读材料，补查决定性段落即可。field_updates只记录新或实质更新的资料；field_revision只替换确需改变的共享overview/research_lines/openings，其余null。未知资源留空并说明依据，不重复整份简报或论证。直接交付给人，不重抽、另开角色或自动进入下一阶段。
