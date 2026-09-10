@@ -216,13 +216,14 @@ def resume(ctx: typer.Context, run_id: str, add_budget_cny: Optional[str] = type
 
 @app.command(name='retry-task')
 def retry_task(ctx: typer.Context, run_id: str, task_key: str = typer.Option(...),
-               reason: str = typer.Option(...)):
+               reason: str = typer.Option(...),
+               defer_evidence: bool = typer.Option(False, help="保留未解证据，仅重新生成 lead/drop 有限结论。")):
     """显式重试失败的 Agent 任务；保留原记录、当前卡及预算。"""
     from .retrying import prepare_task_retry
     from .store import StateError
     store, ledger = services(ctx.obj)
     try:
-        retry = prepare_task_retry(store, ledger, run_id, task_key, reason)
+        retry = prepare_task_retry(store, ledger, run_id, task_key, reason, defer_evidence=defer_evidence)
     except StateError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(json.dumps(retry, ensure_ascii=False))

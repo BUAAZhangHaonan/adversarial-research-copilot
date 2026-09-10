@@ -408,6 +408,8 @@ class Runtime:
 
     def _validate_output_contracts(self, envelope, payload, state):
         """Collect independent read-only errors before spending JSON correction."""
+        from .retrying import validate_deferred_evidence
+        validate_deferred_evidence(envelope, payload)
         from .discovery_models import CandidateCheck, TriageResult
         from .polishing import StagePolish, validate_polish
         if isinstance(envelope.result, StagePolish):

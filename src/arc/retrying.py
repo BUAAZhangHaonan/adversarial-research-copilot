@@ -123,7 +123,59 @@ def _refreshed_reference_errors(store, errors, payload, tools):
     return refreshed if changed else None
 
 
-def prepare_task_retry(store, ledger, run_id, task_key, reason):
+def _deferred_evidence_contract(store, run, source, task_key):
+    """Authorize a new limited-conclusion task, never accept the blocked draft."""
+    from .discovery_models import CandidateCheck
+    if (run.status != 'PAUSED_EXTERNAL' or run.stop_reason != 'critical_source_unavailable'
+            or source is None or source.status != 'PAUSED_EXTERNAL'
+            or source.accepted_result is not None or task_key in run.state
+            or run.state.get('pending_task') != source.task_id.removeprefix(run.run_id + '.')
+            or not source.rendered_prompt_path or not source.response_artifact_path):
+        raise StateError('EVIDENCE_DEFERRAL_REQUIRES_PENDING_EXTERNAL_CHECK')
+    prompt = json.loads(store.read_artifact(source.rendered_prompt_path))
+    if prompt.get('prompt_id') not in {'scout.CHECK', 'scout.DEVELOP', 'scout.PRESSURE'}:
+        raise StateError('EVIDENCE_DEFERRAL_UNSUPPORTED_TASK')
+    saved = json.loads(store.read_artifact(source.response_artifact_path))
+    raw = ((saved.get('response') or {}).get('message') or {}).get('content') or ''
+    try:
+        envelope = Envelope[CandidateCheck].model_validate_json(raw)
+    except ValidationError as exc:
+        raise StateError('EVIDENCE_DEFERRAL_REQUIRES_VALID_LIMITED_DRAFT') from exc
+    if (envelope.task_id != source.task_id or envelope.subject.run_id != run.run_id
+            or envelope.result_status != 'needs_evidence' or envelope.result is None
+            or envelope.result.note.decision not in {'lead', 'drop'}):
+        raise StateError('EVIDENCE_DEFERRAL_REQUIRES_VALID_LIMITED_DRAFT')
+    limits = list(envelope.result.note.limits)
+    limits.extend(f'Unresolved evidence request [{r.request_local_id}]: {r.question}'
+                  for r in envelope.evidence_requests)
+    return {'allowed_decisions': ['lead', 'drop'], 'unresolved_limits': list(dict.fromkeys(limits)),
+        'evidence_requests': [r.model_dump(mode='json') for r in envelope.evidence_requests],
+        'capability_requests': [r.model_dump(mode='json') for r in envelope.capability_requests],
+        'instruction': 'The user explicitly defers unavailable evidence for a limited conclusion. '
+            'Reuse the original input and already retrieved material. Create a new complete result only '
+            'if justified as lead or drop; never discuss. Keep the key unavailable-evidence gaps explicit '
+            'in nonempty note.limits and explain their consequence; concise paraphrases are welcome. '
+            'Prior evidence and capability requests remain unresolved in the audit, not completed. '
+            'Retain relevant access needs as capability requests when appropriate; you may return complete '
+            'without asking again for the unavailable evidence. '
+            'Unretrieved full text remains unresolved: access failure is not evidence of absence, '
+            'novelty, or lack of coverage. Correct the draft as needed without inventing facts. '
+            'If no honest limited conclusion is possible, remain blocked.'}
+
+
+def validate_deferred_evidence(envelope, payload):
+    """Bound a completed explicit deferral without changing ordinary tasks."""
+    from .discovery_models import CandidateCheck
+    contract = (payload.get('protocol_retry') or {}).get('deferred_evidence')
+    if not contract or envelope.result_status != 'complete':
+        return
+    if not isinstance(envelope.result, CandidateCheck) or envelope.result.note.decision not in {'lead', 'drop'}:
+        raise StateError('EVIDENCE_DEFERRAL_REQUIRES_LEAD_OR_DROP')
+    if not any(item.strip() for item in envelope.result.note.limits):
+        raise StateError('EVIDENCE_DEFERRAL_MUST_RETAIN_UNRESOLVED_LIMITS')
+
+
+def prepare_task_retry(store, ledger, run_id, task_key, reason, *, defer_evidence=False):
     run = store.get_run(run_id)
     if run.status not in {'PAUSED_PROTOCOL', 'PAUSED_EXTERNAL'} or not reason.strip():
         raise StateError('TASK_RETRY_REQUIRES_PROTOCOL_PAUSE_AND_REASON')
@@ -143,7 +195,11 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
     source_key = history[-1]['replacement_key'] if history else task_key
     source = store.get_task(f'{run_id}.{source_key}')
     rejected_source = source is not None and any(item['task_id'] == source.task_id for item in rejected_calls)
-    if run.status == 'PAUSED_EXTERNAL' and not rejected_source:
+    deferral = _deferred_evidence_contract(store, run, source, task_key) if defer_evidence else None
+    if not deferral and history:
+        prior_audit = json.loads(store.read_artifact(history[-1]['audit_path']))
+        deferral = prior_audit.get('protocol_retry', {}).get('deferred_evidence')
+    if run.status == 'PAUSED_EXTERNAL' and not rejected_source and not defer_evidence:
         raise StateError('TASK_RETRY_REQUIRES_CONFIRMED_REQUEST_REJECTION')
     application_failure = None
     issue_application_retry = False
@@ -214,7 +270,7 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
                 'instruction': 'Preserve the already saved current card. Correct only issue evidence references and issue status/ruling as justified by current registered evidence; return proposed_card_revision=null. Do not change claim text, conditions, versions, or research scope.'}
         else:
             raise StateError('TASK_RETRY_REQUIRES_UNACCEPTED_TASK_KEY')
-    if (source is None or (not application_failure and ((source.status != 'PAUSED_PROTOCOL' and not rejected_source)
+    if (source is None or (not application_failure and ((source.status != 'PAUSED_PROTOCOL' and not rejected_source and not defer_evidence)
             or source.accepted_result is not None))
             or not source.response_artifact_path or not source.rendered_prompt_path):
         raise StateError('TASK_RETRY_REQUIRES_FAILED_TASK_RECORD')
@@ -269,6 +325,9 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason):
                  'previous_task_id': source.task_id, 'previous_error': source.error or run.stop_reason,
                  'validation_errors': errors, 'unaccepted_response': raw,
                  'previous_successful_tools': successful_tools}}
+    if deferral:
+        audit['protocol_retry']['deferred_evidence'] = deferral
+        audit['retry_kind'] = 'defer_evidence'
     refreshed = _refreshed_reference_errors(store, errors, original_input['payload'], successful_tools)
     if refreshed is not None:
         audit['protocol_retry']['refreshed_validation_errors'] = refreshed
