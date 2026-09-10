@@ -207,7 +207,8 @@ class Store:
                 "ORDER BY rowid DESC LIMIT 1", (idea_id,)).fetchone()
         if row is None: return None
         run = RunRecord.model_validate_json(row[0])
-        return {"run_id": run.run_id, "mode": run.mode, "note": run.state["prestudy_note"]}
+        return {"run_id": run.run_id, "mode": run.mode, "note": run.state["prestudy_note"],
+                "field_brief": run.state.get("field_brief")}
 
     def reusable_discovery_brief(self, topic, boundaries):
         with self._connect() as db:

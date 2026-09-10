@@ -12,6 +12,16 @@ def publish(engine, run_id):
     render_run(engine.store, run_id, engine.settings.data_dir.resolve() / "reports" / run_id)
 
 
+async def finish_stage(engine, run_id, reason):
+    """One cached editorial task after research; historical bundles stay historical."""
+    if 'writer.POLISH' in engine.runtime.loader.manifest['prompts']:
+        from .polishing import build_polish_payload
+        await engine.call(run_id, 'polish', 'writer', 'POLISH',
+                          payload=build_polish_payload(engine.store, run_id), tool_profile=[])
+    engine.complete(run_id, reason)
+    publish(engine, run_id)
+
+
 def check_action_observed(trace, note):
     """A registered citation is not evidence of this task actually retrieving."""
     cited = {n.source_id for n in note.source_notes} | {w.source_id for w in note.nearest_work} | set(note.seed.source_ids)
@@ -88,8 +98,7 @@ async def discover(engine, run_id):
         run = engine.store.get_run(run_id)
         if run.state.get(key + "_done"):
             if run.state.get(key + ".sketch", {}).get("action") == "stop":
-                engine.complete(run_id, "ideator_stopped")
-                publish(engine, run_id)
+                await finish_stage(engine, run_id, "ideator_stopped")
                 return
             continue
         if run.state.get("survey_refresh_used") and not run.state.get("survey_refresh_applied"):
@@ -149,11 +158,9 @@ async def discover(engine, run_id):
             completion.update(survey_refresh_used=True, survey_refresh_question=sketch.next_search)
         engine.checkpoint(run_id, **completion)
         if sketch.action == "stop":
-            engine.complete(run_id, "ideator_stopped")
-            publish(engine, run_id)
+            await finish_stage(engine, run_id, "ideator_stopped")
             return
-    engine.complete(run_id, "discover_draws_finished_human_selection")
-    publish(engine, run_id)
+    await finish_stage(engine, run_id, "discover_draws_finished_human_selection")
 
 
 async def prestudy(engine, run_id):
@@ -161,10 +168,17 @@ async def prestudy(engine, run_id):
     task = "DEVELOP" if run.mode == "develop" else "PRESSURE"
     result = await engine.call(run_id, "prestudy", "scout", task, payload={**run.state["idea_input"], "require_current_understanding": True})
     trace = engine.task_trace(run_id, "prestudy")
-    supplied = (run.state["idea_input"].get("field_brief") or {}).get("source_notes", [])
+    supplied = [*(run.state["idea_input"].get("field_brief") or {}).get("source_notes", []),
+                *(run.state["idea_input"].get("latest_note") or {}).get("source_notes", [])]
     basis = check_material_basis(trace, result.note, supplied)
     result, observed = bound_check(result, trace, supplied)
     engine.checkpoint(run_id, prestudy_note=result.note.model_dump(mode="json"), check_action_observed=observed,
                       check_material_basis=basis,
                       first_note_at=utc_now())
-    engine.complete(run_id, "prestudy_finished_human_decision")
+    if not engine.store.get_run(run_id).state.get("field_brief"):
+        inherited_brief = run.state["idea_input"].get("field_brief")
+        if inherited_brief:
+            engine.checkpoint(run_id, field_brief=inherited_brief, brief_version=1)
+    if engine.store.get_run(run_id).state.get("field_brief"):
+        merge_updates(engine, run_id, [*result.note.source_notes, *result.field_updates], result.field_revision)
+    await finish_stage(engine, run_id, "prestudy_finished_human_decision")

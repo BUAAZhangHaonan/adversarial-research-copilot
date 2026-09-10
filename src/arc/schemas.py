@@ -856,3 +856,6 @@ ResearchCard.model_rebuild()
 from .discovery_models import DISCOVERY_RESULT_SCHEMAS, CandidateCheck
 RESULT_SCHEMAS.update(DISCOVERY_RESULT_SCHEMAS)
 RESULT_SCHEMAS.update({"scout.DEVELOP": CandidateCheck, "scout.PRESSURE": CandidateCheck})
+
+from .polishing import StagePolish
+RESULT_SCHEMAS["writer.POLISH"] = StagePolish

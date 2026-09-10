@@ -15,9 +15,12 @@ from arc.workflows import WorkflowEngine
 
 class ScriptedRuntime:
     """The real WorkflowEngine caches inputs/results; this fake replaces only SDK I/O."""
-    def __init__(self, results):
+    def __init__(self, results, *, include_polish=False):
         self.results = results
         self.loader = PromptLoader()
+        # These fixtures isolate the research path; writer integration is exercised separately.
+        if not include_polish:
+            self.loader.manifest['prompts'].pop('writer.POLISH', None)
         self.tools = {name: object() for name in ('read_record', 'search_literature')}
         self.calls, self.payloads, self.profiles, self.accepted = [], {}, {}, {}
         self.before, self.after, self.traces = set(), set(), {}
@@ -360,3 +363,54 @@ def test_brief_correction_replaces_current_reading_but_keeps_old_brief(tmp_path,
     assert state['field_brief_history'][0]['field_brief'] == brief
     merge_updates(engine, run.run_id, [SourceNote.model_validate(correction)])
     assert store.get_run(run.run_id).state['brief_version'] == 2
+
+
+@pytest.mark.asyncio
+async def test_final_writer_is_once_cached_and_does_not_repeat_research_after_pause(tmp_path, monkeypatch):
+    settings, run, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch)
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed),
+        'idea1.triage': triage('drop')}, include_polish=True)
+    # Pause at writer admission so the completed candidate already exists.
+    runtime.before.add('polish')
+    engine = WorkflowEngine(store, runtime, settings)
+    with pytest.raises(InterruptedError):
+        await engine.execute(run.run_id)
+    current = store.get_run(run.run_id)
+    assert current.state['idea1_done'] and current.status != 'COMPLETED'
+    idea = store.list_discovery_ideas(run.run_id)[0]
+    runtime.results['polish'] = {'stage_summary': '本轮放下该线索。',
+        'overview': '现有材料尚不支持独立研究价值。',
+        'candidates': [{'idea_id': idea['idea_id'], 'text': '这条路线缺少清楚的差异，先不投入。',
+                        'cited_source_ids': seed['source_ids']}],
+        'cited_source_ids': seed['source_ids']}
+    final = await engine.execute(run.run_id)
+    assert final.status == 'COMPLETED' and final.state['polish']['stage_summary']
+    assert len(runtime.calls) == 4 and runtime.calls[-1][1:] == ('writer', 'POLISH')
+    assert runtime.profiles['polish'] == []
+    assert store.list_discovery_ideas(run.run_id)[0] == idea
+    await engine.execute(run.run_id)
+    assert len(runtime.calls) == 4
+
+
+@pytest.mark.asyncio
+async def test_lightweight_prestudy_also_finishes_with_one_writer(tmp_path, monkeypatch):
+    settings, discovery, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch)
+    note = checked(seed, brief['source_notes'][0])
+    note['field_revision'] = {'overview': '开发补查发现原先的空白已被覆盖。'}
+    idea = store.save_discovery_idea(discovery.run_id, 'idea1', seed=seed, note=note['note'], status='checked')
+    state = dict(discovery.state); state['field_brief'] = brief
+    store.update_run(discovery.run_id, state=state)
+    stage = new_run(settings, 'develop', idea_id=idea['idea_id'])
+    output = {'stage_summary': '补查了一个关键前提。', 'overview': '下一步先确认是否值得投入。',
+        'candidates': [{'idea_id': idea['idea_id'], 'text': '已有材料提供起点，但主要风险仍待判断。',
+                        'cited_source_ids': seed['source_ids']}], 'cited_source_ids': seed['source_ids']}
+    runtime = ScriptedRuntime({'prestudy': note, 'polish': output}, include_polish=True)
+    final = await WorkflowEngine(store, runtime, settings).execute(stage.run_id)
+    assert final.status == 'COMPLETED'
+    assert [task for _, _, task in runtime.calls] == ['DEVELOP', 'POLISH']
+    assert final.state['prestudy_note']['decision'] == 'discuss'
+
+    assert final.state['field_brief']['overview'] == note['field_revision']['overview']
+    assert store.get_run(discovery.run_id).state['field_brief']['overview'] == brief['overview']
+    followup = new_run(settings, 'run', idea_id=idea['idea_id'])
+    assert followup.state['idea_input']['field_brief']['overview'] == note['field_revision']['overview']

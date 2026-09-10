@@ -377,6 +377,11 @@ class Runtime:
     def _validate_output_contracts(self, envelope, payload, state):
         """Collect independent read-only errors before spending JSON correction."""
         from .discovery_models import CandidateCheck, TriageResult
+        from .polishing import StagePolish, validate_polish
+        if isinstance(envelope.result, StagePolish):
+            validate_polish(envelope.result, payload)
+            if envelope.evidence_requests:
+                raise ValueError('POLISH_MUST_USE_SUPPLIED_RESEARCH_ONLY')
         if (payload.get('require_current_understanding') and isinstance(envelope.result, CandidateCheck)
                 and envelope.result.note.current_understanding is None):
             raise ValueError('CURRENT_UNDERSTANDING_REQUIRED')
