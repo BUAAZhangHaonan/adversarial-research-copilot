@@ -120,6 +120,7 @@ async def discover(engine, run_id):
         if sketch.seed and not run.state.get("first_seed_at"): updates["first_seed_at"] = record["created_at"]
         engine.checkpoint(run_id, **updates)
         publish(engine, run_id)
+        shared_followup_handled = False
         if sketch.action == "submit":
             seed = sketch.seed.model_dump(mode="json")
             archive = engine.store.lookup_archive(sketch.seed.question, limit=4)
@@ -136,7 +137,14 @@ async def discover(engine, run_id):
                 checked = await engine.call(run_id, key + ".check", "scout", "CHECK", payload={
                     **context(engine, run_id, task="CHECK", exclude_draw_id=key),
                     "idea_id": record["idea_id"], "seed": seed, "require_current_understanding": True,
-                    "triage": triage.model_dump(mode="json")})
+                    "triage": triage.model_dump(mode="json"),
+                    **({"shared_followup_question": sketch.next_search} if sketch.next_search else {})})
+                # Cached and resumed tasks retain their original input; do not infer
+                # that an older CHECK received this handoff from the newly constructed payload.
+                accepted_input = engine.store.get_run(run_id).state.get("task_inputs", {}).get(
+                    key + ".check", {}).get("payload", {})
+                shared_followup_handled = bool(sketch.next_search) and (
+                    accepted_input.get("shared_followup_question") == sketch.next_search)
                 trace = engine.task_trace(run_id, key + ".check")
                 supplied = engine.store.get_run(run_id).state["field_brief"].get("source_notes", [])
                 basis = check_material_basis(trace, checked.note, supplied)
@@ -154,7 +162,8 @@ async def discover(engine, run_id):
         run = engine.store.get_run(run_id)
         history = discovery_directions(engine, run_id)
         completion = {key + "_done": True, "previous_directions": history}
-        if sketch.next_search and sketch.action != "stop" and ordinal < campaign.max_draws and not run.state.get("survey_refresh_used"):
+        if (sketch.next_search and not shared_followup_handled and sketch.action != "stop"
+                and ordinal < campaign.max_draws and not run.state.get("survey_refresh_used")):
             completion.update(survey_refresh_used=True, survey_refresh_question=sketch.next_search)
         engine.checkpoint(run_id, **completion)
         if sketch.action == "stop":

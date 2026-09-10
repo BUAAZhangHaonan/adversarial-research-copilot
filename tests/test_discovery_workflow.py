@@ -123,11 +123,14 @@ async def test_checked_updates_reach_next_sketch_with_original_task_and_relation
     review['note']['current_understanding'] = {'core_insight': 'The missing piece is a failure boundary, not a new gate.',
         'invalidated_premises': ['The gate has not been studied.'], 'decisive_unknown': 'Whether its boundary matters.',
         'why_existing_insufficient': 'Unknown until the boundary is checked.'}
-    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed), 'idea1.triage': triage('investigate'),
-        'idea1.check': review, 'idea2.sketch': sketch(action='stop')})
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed, next_search='Read the missing route.'),
+        'idea1.triage': triage('investigate'), 'idea1.check': review, 'idea2.sketch': sketch(action='stop')})
     runtime.traces['idea1.check'] = [{'name': 'read_record', 'status': 'completed',
         'source_ids': [seed['source_ids'][0]], 'result': {'source_id': seed['source_ids'][0], 'content': 'Actual cached passage.'}}]
     final = await WorkflowEngine(store, runtime, settings).execute(run.run_id)
+    assert runtime.payloads['idea1.check']['shared_followup_question'] == 'Read the missing route.'
+    assert sum(task == 'SURVEY' for _, _, task in runtime.calls) == 1
+    assert not final.state.get('survey_refresh_used')
     payload = runtime.payloads['idea2.sketch']
     assert update in payload['field_brief']['source_notes']
     assert payload['field_brief']['overview'] == review['field_revision']['overview']
@@ -187,13 +190,14 @@ async def test_five_skips_are_five_opportunities_and_stop_does_not_need_full_dra
 
 
 @pytest.mark.asyncio
-async def test_pending_refresh_finishes_before_next_sketch_on_resume(tmp_path, monkeypatch):
+@pytest.mark.parametrize('boundary', ['before', 'after'])
+async def test_pending_refresh_finishes_before_next_sketch_on_resume(tmp_path, monkeypatch, boundary):
     settings, run, store, ledger, brief, seed, publications = fixture(tmp_path, monkeypatch, draws=2)
     refreshed = deepcopy(brief)
     refreshed['openings'] = ['A newly discovered route enables a different operation.']
     runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(action='skip', next_search='Read the missing route.'),
         'survey.refresh': refreshed, 'idea2.sketch': sketch(action='stop')})
-    runtime.before.add('survey.refresh')
+    getattr(runtime, boundary).add('survey.refresh')
     engine = WorkflowEngine(store, runtime, settings)
     with pytest.raises(InterruptedError):
         await engine.execute(run.run_id)
@@ -414,3 +418,50 @@ async def test_lightweight_prestudy_also_finishes_with_one_writer(tmp_path, monk
     assert store.get_run(discovery.run_id).state['field_brief']['overview'] == brief['overview']
     followup = new_run(settings, 'run', idea_id=idea['idea_id'])
     assert followup.state['idea_input']['field_brief']['overview'] == note['field_revision']['overview']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('action', ['park', 'drop'])
+async def test_unchecked_candidate_keeps_shared_followup(tmp_path, monkeypatch, action):
+    settings, run, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch, draws=2)
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed, next_search='Read the missing route.'),
+        'idea1.triage': triage(action), 'survey.refresh': brief, 'idea2.sketch': sketch(action='stop')})
+    await WorkflowEngine(store, runtime, settings).execute(run.run_id)
+    assert runtime.payloads['survey.refresh']['refresh_question'] == 'Read the missing route.'
+    assert [key for key, _, _ in runtime.calls] == [
+        'survey', 'idea1.sketch', 'idea1.triage', 'survey.refresh', 'idea2.sketch']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('boundary', ['before', 'after'])
+async def test_check_followup_handoff_survives_interruption(tmp_path, monkeypatch, boundary):
+    settings, run, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch, draws=2)
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed, next_search='Read the missing route.'),
+        'idea1.triage': triage('investigate'), 'idea1.check': checked(seed, brief['source_notes'][0]),
+        'idea2.sketch': sketch(action='stop')})
+    getattr(runtime, boundary).add('idea1.check')
+    engine = WorkflowEngine(store, runtime, settings)
+    with pytest.raises(InterruptedError):
+        await engine.execute(run.run_id)
+    assert store.get_run(run.run_id).state['task_inputs']['idea1.check']['payload']['shared_followup_question']
+    final = await engine.execute(run.run_id)
+    assert sum(task == 'SURVEY' for _, _, task in runtime.calls) == 1
+    assert not final.state.get('survey_refresh_used')
+
+
+@pytest.mark.asyncio
+async def test_historical_check_without_followup_input_does_not_suppress_refresh(tmp_path, monkeypatch):
+    settings, run, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch, draws=2)
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed, next_search='Read the missing route.'),
+        'idea1.triage': triage('investigate'), 'idea1.check': checked(seed, brief['source_notes'][0]),
+        'survey.refresh': brief, 'idea2.sketch': sketch(action='stop')})
+    runtime.before.add('idea1.check')
+    engine = WorkflowEngine(store, runtime, settings)
+    with pytest.raises(InterruptedError):
+        await engine.execute(run.run_id)
+    state = deepcopy(store.get_run(run.run_id).state)
+    state['task_inputs']['idea1.check']['payload'].pop('shared_followup_question')
+    store.update_run(run.run_id, state=state)
+    await engine.execute(run.run_id)
+    assert 'shared_followup_question' not in runtime.payloads['idea1.check']
+    assert runtime.payloads['survey.refresh']['refresh_question'] == 'Read the missing route.'
