@@ -168,3 +168,69 @@ def test_repair_prompt_explicitly_requests_json_without_diagnostic_keyword():
     repair = loader.render_repair(snapshot, data, schema={'type': 'object'},
         previous_response={}, validation_errors=[{'type': 'extra_forbidden'}])
     assert 'json' in repair.messages[-1]['content'].lower()
+
+
+def test_checked_current_understanding_leads_report_without_reviving_old_seed(tmp_path):
+    store = Store(tmp_path)
+    updated = note()
+    updated['current_understanding'] = {
+        'core_insight': '查后只剩无法观察更新时如何判断失效',
+        'invalidated_premises': ['旧版本并非天然可见'],
+        'decisive_unknown': updated['next_question'],
+        'why_existing_insufficient': '原方法需要当前不可取得的版本信号'}
+    store.ideas[0].update(note=updated, status='checked')
+    before = copy.deepcopy(store.__dict__)
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    overview = paths['overview'].read_text()
+    detail = paths['idea:i1'].read_text()
+    assert updated['current_understanding']['core_insight'] in overview
+    assert seed()['insight'] not in overview
+    assert detail.index('当前核心想法') < detail.index('初始灵感（预研前')
+    assert updated['current_understanding']['why_existing_insufficient'] in detail
+    assert '旧版本并非天然可见' in detail
+    assert seed()['insight'] in detail.split('初始灵感（预研前', 1)[1]
+    assert detail.count(updated['next_question']) == 1
+    assert store.__dict__ == before
+
+
+@pytest.mark.parametrize('checked', [False, True])
+def test_recorded_candidate_relation_is_visible_without_inventing_a_relation(tmp_path, checked):
+    store = Store(tmp_path)
+    if checked:
+        store.ideas[0].update(note=note(), status='checked')
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    assert '候选关系：' not in paths['overview'].read_text() + paths['idea:i1'].read_text()
+    store.ideas[0]['triage']['candidate_relation'] = {
+        'kind': 'evaluation_support', 'related_draw_ids': ['r1.idea0'],
+        'explanation': '补充前一方向的评价，不是独立方法'}
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    for path in [paths['overview'], paths['idea:i1']]:
+        assert '评价支撑（r1.idea0）' in path.read_text()
+        assert '补充前一方向的评价，不是独立方法' in path.read_text()
+
+
+def test_shared_notes_basis_does_not_create_a_new_read_or_mutate_task_flag(tmp_path):
+    store = Store(tmp_path)
+    store.ideas[0].update(note=note(), status='checked', check_material_basis='shared_notes',
+                          check_action_observed=False)
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    detail = paths['idea:i1'].read_text()
+    assert '复用已读材料，不计为本次新增工具动作' in detail
+    assert '本次任务取得了相关检索' not in detail
+    assert store.ideas[0]['check_action_observed'] is False
+    assert json.loads(paths['usage'].read_text())['tool_actions'] == 0
+
+
+def test_unchanged_current_insight_and_unknown_are_not_reprinted_in_multiple_fields(tmp_path):
+    store = Store(tmp_path)
+    updated = note()
+    updated.update(reason=seed()['insight'], main_risk='同一个决定性未知', next_question='同一个决定性未知')
+    updated['current_understanding'] = {'core_insight': seed()['insight'], 'invalidated_premises': [],
+        'decisive_unknown': '同一个决定性未知', 'why_existing_insufficient': '暂无足够材料判断已有方法不足'}
+    store.ideas[0].update(note=updated, status='checked')
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    detail = paths['idea:i1'].read_text()
+    assert detail.count(seed()['insight']) == 1
+    assert detail.count('同一个决定性未知') == 1
+    assert '初始灵感（预研前' in detail and '核心认识未变' in detail
+    assert paths['overview'].read_text().count(seed()['insight']) == 1

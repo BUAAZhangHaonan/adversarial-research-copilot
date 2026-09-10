@@ -5,11 +5,15 @@
 {% for item in discuss %}
 ## {{ item.title }}
 
-{{ item.reason }}
+{% if item.current %}{{ item.insight }}
+
+{% endif %}{{ item.reason }}
 
 主要风险：{{ item.risk }}
 
-[阅读预研卡]({{ item.path }})
+{% if item.relation %}候选关系：{{ item.relation }}
+
+{% endif %}[阅读预研卡]({{ item.path }})
 {% endfor %}
 
 {% if leads %}
@@ -17,9 +21,15 @@
 {% for item in leads %}
 **{{ item.title }}**
 
-待查：{{ item.reason }}
+{% if item.current %}{{ item.insight }}
 
-[阅读线索]({{ item.path }})
+决定性未知：{{ item.risk }}
+
+{% endif %}待查：{{ item.reason }}
+
+{% if item.relation %}候选关系：{{ item.relation }}
+
+{% endif %}[阅读线索]({{ item.path }})
 {% endfor %}
 {% endif %}
 
@@ -30,14 +40,16 @@
 
 {{ item.reason }}。尚未完成预研，不能当作推荐。
 
-[查看已保存灵感]({{ item.path }})
+{% if item.relation %}候选关系：{{ item.relation }}
+
+{% endif %}[查看已保存灵感]({{ item.path }})
 {% endfor %}
 {% endif %}
 
 {% if skipped %}
 ## 本次没有继续的方向
 {% for item in skipped %}
-- {{ item.title }}：{{ item.reason }}{% if item.path %}（[查看记录]({{ item.path }})）{% endif %}
+- {{ item.title }}：{{ item.reason }}{% if item.current | default({}) %}；当前认识：{{ item.insight }}{% endif %}{% if item.relation | default('') %}；候选关系：{{ item.relation }}{% endif %}{% if item.path %}（[查看记录]({{ item.path }})）{% endif %}
 {% endfor %}
 {% endif %}
 

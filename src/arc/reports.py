@@ -419,7 +419,9 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
         original = _obj(store.get_discovery_idea(selected['idea_id']))
         # A prior discovery recommendation is not acceptance of this stage.
         ideas = [{**original, 'seed': selected['seed'], 'note': state.get('prestudy_note'),
-                  'triage': None, 'status': 'checked' if state.get('prestudy_note') else 'pending'}]
+                  'triage': None, 'status': 'checked' if state.get('prestudy_note') else 'pending',
+                  'check_material_basis': state.get('check_material_basis'),
+                  'check_action_observed': state.get('check_action_observed')}]
     tasks = [_obj(task) for task in store.list_tasks(run_id)]
     ledger = BudgetLedger(store.db_path)
     account = run.get('budget_account_id')
@@ -447,12 +449,30 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
         references = _discovery_sources(sorted(note_ids), source_notes, sources, target.parent, store)
         provenance = (f"想法 `{idea_id}`；运行 `{_safe_id(run_id)}`；抽卡机会 {idea.get('draw_id', '未记录')}；"
                       f"资料版本 {idea.get('brief_version', '未记录')}。原题：{idea.get('topic', '')}")
+        current = note.get('current_understanding') or {}
+        relation = triage.get('candidate_relation') or {}
+        relation_names = {'independent': '独立认识', 'alternative_route': '替代路线',
+                          'evaluation_support': '评价支撑', 'overlap': '核心重合', 'not_compared': '尚未比较'}
+        relation_text = ''
+        if relation:
+            related = '、'.join(_heading(draw) for draw in relation.get('related_draw_ids', []))
+            relation_text = relation_names.get(relation.get('kind'), relation.get('kind', ''))
+            if related:
+                relation_text += '（' + related + '）'
+            relation_text += '：' + relation.get('explanation', '')
+        basis_text = {'shared_notes': '资料依据：复用已读材料，不计为本次新增工具动作。',
+                      'task_read': '资料依据：本次任务取得了相关检索或读取材料。',
+                      'unverified': '资料依据：当前尚未取得足够的相关材料，查证限制仍需保留。'}.get(idea.get('check_material_basis'), '')
         context = {'title': _heading(seed['title']), 'insight': seed['insight'],
                    'why_it_matters': seed['why_it_matters'], 'sources': references,
-                   'provenance_line': provenance}
+                   'provenance_line': provenance, 'current': current, 'relation': relation_text,
+                   'material_basis': basis_text,
+                   'withdrawn_premises': _text(current.get('invalidated_premises')) if current.get('invalidated_premises') else ''}
         reason = note.get('reason') or triage.get('reason') or '已保存灵感，等待价值筛选或候选预研'
-        item = {'title': context['title'], 'insight': seed['insight'], 'reason': reason,
-                'risk': note.get('main_risk') or seed['key_unknown'], 'path': relative}
+        item = {'title': context['title'], 'insight': current.get('core_insight') or seed['insight'],
+                'reason': '' if current.get('core_insight') == reason else reason,
+                'risk': current.get('decisive_unknown') or note.get('main_risk') or seed['key_unknown'],
+                'current': current, 'relation': relation_text, 'material_basis': basis_text, 'path': relative}
         if note:
             decision = note['decision']
             nearest = '\n\n'.join(
@@ -463,17 +483,17 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
             resource_fields = {'GPU': resources.get('gpu_type'), '数量': resources.get('gpu_count'),
                                '训练时长粗估': resources.get('training_hours_estimate'),
                                '推理时长粗估': resources.get('inference_hours_estimate'), '依据与未知': resources.get('basis')}
-            context.update(status_text=DISCOVERY_DECISIONS[decision] + '：' + reason,
+            context.update(status_text=DISCOVERY_DECISIONS[decision] + ('：' + reason if reason != current.get('core_insight') else ''),
                            literature_paragraph=nearest or '尚未形成足够的近邻比较，不能据此宣称不存在重复。',
                            feasibility_paragraph=note['feasibility'], resource_paragraph=_text(resource_fields),
-                           main_risk=note['main_risk'], limits_paragraph=_text(note.get('limits', [])),
-                           next_question=note['next_question'], changes=_text(note['changes_from_seed']) if note.get('changes_from_seed') else '')
+                           main_risk='' if current.get('decisive_unknown') == note['main_risk'] else note['main_risk'], limits_paragraph=_text(note.get('limits', [])),
+                           next_question='' if current.get('decisive_unknown') == note['next_question'] else note['next_question'], changes=_text(note['changes_from_seed']) if note.get('changes_from_seed') else '')
             target.write_text(loader.render_report('discovery_idea', context), encoding='utf-8')
             {'discuss': discuss, 'lead': leads, 'drop': skipped}[decision].append(item)
         else:
             status = {'park': '暂存线索，未做定向预研', 'drop': '初筛放下，未做定向预研'}.get(idea.get('status'), '待预研')
             context.update(status_text=status, question=seed['question'], difference=seed['difference_from_known'],
-                           reason=reason, unknown=seed['key_unknown'], questions=_text(triage.get('check_questions', [])))
+                           reason=reason + ('\n\n候选关系：' + relation_text if relation_text else ''), unknown=seed['key_unknown'], questions=_text(triage.get('check_questions', [])))
             target.write_text(loader.render_report('discovery_pending', context), encoding='utf-8')
             (leads if idea.get('status') == 'park' else skipped if idea.get('status') == 'drop' else pending).append(item)
         paths['idea:' + idea_id] = target
