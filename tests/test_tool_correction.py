@@ -58,7 +58,7 @@ def restart(runtime):
     """New runtime instance reads the durable checkpoint, with the offline client."""
     return Runtime(store=runtime.store, ledger=runtime.ledger,
                    account_id=runtime.account_id, loader=runtime.loader,
-                   role_models=runtime.role_models, prices=runtime.prices,
+                   role_models=runtime.role_models, models=runtime.models, prices=runtime.prices,
                    client=runtime.client, tools=runtime.tools)
 
 
