@@ -4,7 +4,7 @@ ARC 帮助人找到有新意、有意义、值得继续讨论的研究方向。�
 
 **共享领域调查 → 一张短灵感 → 快速价值筛选 → 仅对入围想法补查文献与可行性 → 交给人选择。**
 
-事实需要准确，假设可以大胆，无法判断的部分明确留下。实验、完整论证和论文由人完成。系统不保证生成好选题，也不把模型的自评当作科研认证。当前改进见[预研认识复用](docs/CURRENT_UNDERSTANDING_20260910.md)，发现主干见 [Discover First](docs/DISCOVER_FIRST.md)。只维护 `master`，保留细粒度提交。
+事实需要准确，假设可以大胆，无法判断的部分明确留下。实验、完整论证和论文由人完成。系统不保证生成好选题，也不把模型的自评当作科研认证。整体结构见[架构与关键角色](docs/ARCHITECTURE.md)，发现主干见 [Discover First](docs/DISCOVER_FIRST.md)。只维护 `master`，保留细粒度提交。
 
 ## 安装与开始使用
 
@@ -37,7 +37,8 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run -
 
 | 输出 | 内容 |
 | --- | --- |
-| `REPORT.md` | 核心想法、意义、风险及当前去留；待预研单列 |
+| `REPORT.md` | 阶段完成后为成文总览；中途明确标为技术稿 |
+| `TECHNICAL_REPORT.md`、候选 `.technical.md` | 润色前的研究原稿，保留全部技术细节 |
 | `ideas/IDEA_ID.md` | 短灵感或已完成的预研卡，含相关来源及阅读边界 |
 | `FIELD_BRIEF.md` | 共享领域现状、路线关系、开放切入点和关键资料 |
 | `SEARCH_SOURCES.md` | 全部检索命中审计；不是正式引文清单 |
@@ -46,18 +47,19 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run -
 
 `discuss` 是值得讨论，`lead` 是有条件线索，`drop` 是本次放下；都不是永久科研判决。编辑的 `park` 保留未做定向预研的线索。`pending` 表示任务尚未完成，不能当作推荐。执行状态 `COMPLETED`、`PAUSED_BUDGET`、`PAUSED_PROTOCOL` 等与研究判断分开：预算或工具暂停不等于想法被否定。
 
-SourceNote 记录原始来源 ID、相关性、实际阅读层级和限制。检索摘要不等于全文，来源可定位不等于其推论正确；新假设不强制拥有逐主张的“verified”证据。全文按需从缓存分页读取，`read_record` 单次上限为 64000 字符。CHECK 会把修正后的核心认识、已撤回前提和决定性未知交给下一次抽卡，并按需更新共享简报。TRIAGE 比较本轮已有候选，档案召回返回当前去留与修正理由。已有相关阅读笔记足够时直接复用，报告明确区分复用与本任务新增工具动作。报告直接渲染已保存对象，不另付费重述。原始响应、历史失败与费用保留，私有 reasoning 不进入研究报告。
+SourceNote 记录原始来源 ID、相关性、实际阅读层级和限制。检索摘要不等于全文，来源可定位不等于其推论正确；新假设不强制拥有逐主张的“verified”证据。全文按需从缓存分页读取，`read_record` 单次上限为 64000 字符。CHECK 会把修正后的核心认识、已撤回前提和决定性未知交给下一次抽卡，并按需更新共享简报。TRIAGE 比较本轮已有候选，档案召回返回当前去留与修正理由。已有相关阅读笔记足够时直接复用，报告明确区分复用与本任务新增工具动作。阶段结束时，撰稿员基于已保存材料做一次最终润色：先讲核心问题、思路、近邻技术和主要风险，首次术语用中文解释，保留学术条件与不确定性。阶段小结通常400–700字、每候选600–1000字、总览1000–1800字，必要细节另留技术稿。撰稿员不重新检索，也不改数据库中的科学判断。原始响应、历史失败与费用保留，私有 reasoning 不进入研究报告。
 
 ## 模型配置与预算
 
-科研 Markdown 不绑定具体型号。`research_model` 指向配置中的模型别名，默认 `scout`、`ideator`、`editor` 共用该别名；需要时由人显式覆盖角色。当前统一使用 DeepSeek V4.1 Flash：ARC 别名为 `deepseek-v4.1-flash`，实际 API 名为 `deepseek-flash`。`max` 与完整输出上限保持不变，当前峰谷价格及历史任务边界见[型号迁移记录](docs/MODEL_MIGRATION_20260910.md)。
+科研 Markdown 不绑定具体型号。`research_model` 指向配置中的模型别名，默认 `scout`、`ideator`、`editor`、`writer` 共用该别名；需要时由人显式覆盖角色。当前所有默认角色统一使用官方名称 `deepseek-flash`，配置别名与实际 API 名一致。`max` 与完整输出上限保持不变，当前峰谷价格及历史任务边界见[型号迁移记录](docs/MODEL_MIGRATION_20260910.md)。
 
 ```yaml
-research_model: deepseek-v4.1-flash
+research_model: deepseek-flash
 roles:
-  scout: deepseek-v4.1-flash
-  ideator: deepseek-v4.1-flash
-  editor: deepseek-v4.1-flash
+  scout: deepseek-flash
+  ideator: deepseek-flash
+  editor: deepseek-flash
+  writer: deepseek-flash
 ```
 
 ```bash
@@ -65,6 +67,8 @@ arc --config runtime.yaml --env-file /path/to/existing/.env --data-dir /path/to/
 ```
 
 别名在 `models` 中配置 `provider`、实际 `model`、凭据环境变量、能力和上限；计费配置必须与实际型号及上限一致。当前适配 `deepseek` 和符合已支持 Chat Completions/JSON/工具调用/streaming usage 协议的 `openai_compatible` 端点。未知别名、缺少凭据或不支持的操作明确报错。供应商专有协议仍需独立适配，不能认为已兼容所有服务；详见 [配置边界](docs/DISCOVER_FIRST.md#模型配置边界) 和 [配置样例](configs/runtime.yaml)。不会自动降档或购买新服务。
+
+运行前会显示预计费用，并尽力查询DeepSeek余额；余额不足告警，查询失败只给估计并继续。预计范围不是费用保证或硬上限，详见[成本与余额提示](docs/PREFLIGHT_COST_AND_BALANCE.md)。
 
 每个用户阶段默认 20 元；SURVEY、SKETCH、TRIAGE、CHECK 共用本次 discover 账本。每次付费请求前按完整响应上界预留；已开始回复自然完成，余额不足暂停下一请求。预留不是实际花费，不清零历史，不把未知费用当作零。
 
