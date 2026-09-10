@@ -141,6 +141,34 @@ def web_text_representation(body: dict, arguments: dict) -> dict:
             'representation_id': f'webresearch:{extractor}:{identity}' if identity and extractor else None}
 
 
+def compact_search_diagnostics(body: dict, arguments: dict) -> dict:
+    """Keep upstream search degradation visible without forwarding error stacks."""
+    result = {}
+    query = body.get('query')
+    if isinstance(query, str):
+        result.update(query=query[:512], query_matches_input=query == arguments.get('query'))
+        if len(query) > 512: result['query_truncated'] = True
+    variants = body.get('variants')
+    if isinstance(variants, list):
+        unique = list(dict.fromkeys(v for v in variants if isinstance(v, str) and v != query))
+        result['variants'] = [v[:512] for v in unique[:3]]
+        if len(unique) > 3 or any(len(v) > 512 for v in unique):
+            result['variants_compacted'] = True
+    errors = body.get('engine_errors')
+    if isinstance(errors, dict):
+        compact = {}
+        for engine, detail in list(errors.items())[:8]:
+            # The first line retains exception type/status. URLs and following
+            # stack/help lines are already available in the raw artifact.
+            first = detail.splitlines()[0] if isinstance(detail, str) and detail else 'unstructured_error'
+            compact[str(engine)[:48]] = re.sub(r'https?://\S+', '[url omitted]', first)[:192]
+        result.update(engine_errors=compact, degraded=bool(errors))
+        if len(errors) > 8: result['engine_errors_omitted'] = len(errors) - 8
+    for key in ('count', 'spam_filtered'):
+        if type(body.get(key)) is int and body[key] >= 0: result[key] = body[key]
+    return result
+
+
 def build_tools(store, hub=None) -> dict[str, BoundTool]:
     """Bind audited operations; keep original text in the source registry."""
     from .schemas import CapabilityRequest, SourceRecord
@@ -270,10 +298,14 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     'registered_content_complete': source.content_complete,
                     'content': text if text and len(text) <= 12000 else None,
                     'content_requires_read_record': bool(text and len(text) > 12000)})
-            return {'is_error': False, 'source_ids': source_ids, 'sources': registered,
+            result = {'is_error': False, 'source_ids': source_ids, 'sources': registered,
                     'service': cap.service, 'method': cap.method, 'origin': cap.origin,
                     'raw_artifact_path': raw_path, 'errors': body.get('errors', []),
                     'status': body.get('status')}
+            if name == 'search_web':
+                diagnostics = compact_search_diagnostics(body, arguments)
+                if diagnostics: result['search_diagnostics'] = diagnostics
+            return result
         tools[name] = BoundTool(name, cap.parameters, execute, cap.cost_upper_cny, cap.cost_basis, cap.service, True)
     return tools
 
