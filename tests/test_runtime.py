@@ -9,8 +9,11 @@ from arc.budget import BudgetLedger
 from arc.store import Store
 from arc.prompting import PromptLoader
 from arc.pricing import PriceBook
+from arc.model_adapters import ModelSpec
 from arc.runtime import Runtime, RuntimePaused, BoundTool
 
+# Frozen historical pricing/models preserve the meaning of saved-response and
+# financial regression cases. Current V4.1 wiring is tested separately.
 ROOT=Path(__file__).parents[1]
 SUBJECT={'campaign_id':None,'run_id':'run_fixture','card_id':None,'card_version':None}
 
@@ -50,7 +53,9 @@ def setup_runtime(tmp_path, responses, *, amount='20', tools=None):
     client=AsyncOpenAI(api_key='offline-test-only',base_url='https://offline.invalid',max_retries=0,
                        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handle)))
     runtime=Runtime(store=store,ledger=ledger,account_id='stage',loader=PromptLoader(ROOT/'prompts'),
-        role_models={'investigator':'deepseek-v4-flash'},prices=PriceBook(ROOT/'configs/pricing.json'),client=client,tools=tools)
+        role_models={'investigator':'deepseek-v4-flash'},
+        models={name: ModelSpec(model=name) for name in ('deepseek-v4-flash', 'deepseek-v4-pro')},
+        prices=PriceBook(ROOT/'configs/pricing-2026-09-07.json'),client=client,tools=tools)
     return runtime,store,ledger,requests
 
 async def invoke(runtime, **kwargs):

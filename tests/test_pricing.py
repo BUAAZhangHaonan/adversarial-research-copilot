@@ -4,7 +4,8 @@ from pathlib import Path
 import pytest
 from arc.pricing import PriceBook
 
-PRICES = Path(__file__).parents[1] / 'configs/pricing.json'
+# Preserve the original cost expectations for historical V4 records.
+PRICES = Path(__file__).parents[1] / 'configs/pricing-2026-09-07.json'
 
 def test_tariff_boundary_and_reasoning_is_not_double_billed():
     p = PriceBook(PRICES)

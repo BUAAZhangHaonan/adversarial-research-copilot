@@ -73,8 +73,12 @@ class ModelSpec(BaseModel):
         return config
 
 
+CURRENT_RESEARCH_ALIAS = 'deepseek-v4.1-flash'
+CURRENT_API_MODEL = 'deepseek-flash'
+
+
 def default_models():
-    return {name: ModelSpec(model=name) for name in ('deepseek-v4-flash', 'deepseek-v4-pro')}
+    return {CURRENT_RESEARCH_ALIAS: ModelSpec(model=CURRENT_API_MODEL)}
 
 
 def request_parameters(config, messages, tools):

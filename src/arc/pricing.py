@@ -39,7 +39,7 @@ class PriceBook:
 
     def model(self, name: str) -> dict:
         if name not in self.snapshot['models']:
-            raise ValueError('MODEL_NOT_ALLOWED')
+            raise ValueError('MODEL_NOT_ALLOWED:' + name + ':price_snapshot=' + self.snapshot_id)
         return self.snapshot['models'][name]
 
     async def verify_online(self) -> dict:

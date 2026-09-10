@@ -41,7 +41,7 @@ packages = ["arc", "arc_prompt_assets", "arc_config_assets"]
 
 [tool.setuptools.package-data]
 arc_prompt_assets = ["manifest.json", "common/*.md", "roles/*.md", "tasks/*.md", "tools/*.md", "reports/*.md", "discover/*.md", "prestudy/*.md"]
-arc_config_assets = ["pricing.json", "runtime.yaml", "mcp.json"]
+arc_config_assets = ["pricing.json", "pricing-*.json", "runtime.yaml", "mcp.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,0 +1,25 @@
+{
+  "snapshot_id": "deepseek-cny-2026-09-07",
+  "currency": "CNY",
+  "verified_at": "2026-09-07T02:20:07.525892+00:00",
+  "source_html_sha256": "899affbdbc33d0be620d8dea59e86f5036c11b5410b14d060b8d2874c74f38e5",
+  "limits_source_url": "https://api-docs.deepseek.com/quick_start/agent_integrations/pi_mono/",
+  "source_url": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "timezone": "Asia/Shanghai",
+  "peak_schedule": "Mon-Fri 09:00-12:00,14:00-18:00",
+  "summary": "Official integration specifies contextWindow=1000000 and maxTokens=384000. Peak admission; crossed tariff intervals retained. Announced versions are not per-request weight identities.",
+  "models": {
+    "deepseek-v4-flash": {
+      "announced_version": "DeepSeek-V4-Flash-0731",
+      "context_tokens": 1000000,
+      "max_output_tokens": 384000,
+      "prices": {"off_peak": {"hit": "0.05", "miss": "1.50", "output": "4.50"}, "peak": {"hit": "0.10", "miss": "3.00", "output": "9.00"}}
+    },
+    "deepseek-v4-pro": {
+      "announced_version": "DeepSeek-V4-Pro-0813",
+      "context_tokens": 1000000,
+      "max_output_tokens": 384000,
+      "prices": {"off_peak": {"hit": "0.15", "miss": "4.50", "output": "13.50"}, "peak": {"hit": "0.30", "miss": "9.00", "output": "27.00"}}
+    }
+  }
+}

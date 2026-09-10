@@ -7,21 +7,11 @@ allow_stage_transition: false
 
 # Aliases resolve in the adapter. All discover responsibilities share this alias
 # unless the user explicitly overrides scout, ideator or editor in roles.
-research_model: deepseek-v4-pro
+research_model: deepseek-v4.1-flash
 models:
-  deepseek-v4-flash:
+  deepseek-v4.1-flash:
     provider: deepseek
-    model: deepseek-v4-flash
-    reasoning_effort: max
-    thinking: enabled
-    capabilities:
-      json_output: true
-      tools: true
-      streaming_usage: true
-      max_output_tokens: 384000
-  deepseek-v4-pro:
-    provider: deepseek
-    model: deepseek-v4-pro
+    model: deepseek-flash
     reasoning_effort: max
     thinking: enabled
     capabilities:

@@ -6,26 +6,22 @@ import os
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .model_adapters import ModelSpec, default_models
+from .model_adapters import ModelSpec, default_models, CURRENT_RESEARCH_ALIAS
 
 ModelName = str
 DISCOVER_ROLES = ('scout', 'ideator', 'editor')
-DEFAULT_ROLES = {
-    'investigator': 'deepseek-v4-flash', 'librarian': 'deepseek-v4-flash',
-    'discovery': 'deepseek-v4-pro', 'novelty_examiner': 'deepseek-v4-pro',
-    'selector': 'deepseek-v4-pro', 'developer': 'deepseek-v4-flash',
-    'proposer': 'deepseek-v4-flash', 'skeptic': 'deepseek-v4-pro',
-    'moderator': 'deepseek-v4-pro', 'reporter': 'deepseek-v4-flash',
-    'evaluator': 'deepseek-v4-pro',
-    'scientific_reviewer': 'deepseek-v4-pro',
-}
+DEFAULT_ROLES = dict.fromkeys((
+    'investigator', 'librarian', 'discovery', 'novelty_examiner', 'selector',
+    'developer', 'proposer', 'skeptic', 'moderator', 'reporter', 'evaluator',
+    'scientific_reviewer',
+), CURRENT_RESEARCH_ALIAS)
 
 
 class Settings(BaseModel):
     model_config = ConfigDict(extra='forbid')
     data_dir: Path = Field(default_factory=lambda: Path(os.environ.get('ARC_DATA_DIR', '.arc')))
     models: dict[str, ModelSpec] = Field(default_factory=default_models)
-    research_model: str = 'deepseek-v4-pro'
+    research_model: str = CURRENT_RESEARCH_ALIAS
     roles: dict[str, ModelName] = Field(default_factory=dict)
     pricing_path: Path | None = None
     reasoning_effort: Literal['max'] = 'max'
