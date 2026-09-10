@@ -128,7 +128,7 @@ async def discover(engine, run_id):
                 sketch.seed.question, exclude_run_id=run_id, limit=4)]
             triage = await engine.call(run_id, key + ".triage", "editor", "TRIAGE", payload={
                 **context(engine, run_id, task="TRIAGE", seed=seed, exclude_draw_id=key),
-                "idea_id": record["idea_id"], "seed": seed, "require_candidate_relation": True,
+                "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_candidate_relation": True,
                 "local_archive": archive, "previous_ideas": previous})
             engine.store.save_discovery_idea(run_id, key, triage=triage.model_dump(mode="json"),
                 status="pending" if triage.action == "investigate" else triage.action)
@@ -136,7 +136,7 @@ async def discover(engine, run_id):
             if triage.action == "investigate":
                 checked = await engine.call(run_id, key + ".check", "scout", "CHECK", payload={
                     **context(engine, run_id, task="CHECK", exclude_draw_id=key),
-                    "idea_id": record["idea_id"], "seed": seed, "require_current_understanding": True,
+                    "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_current_understanding": True,
                     "triage": triage.model_dump(mode="json"),
                     **({"shared_followup_question": sketch.next_search} if sketch.next_search else {})})
                 # Cached and resumed tasks retain their original input; do not infer

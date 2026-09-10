@@ -465,3 +465,47 @@ async def test_historical_check_without_followup_input_does_not_suppress_refresh
     await engine.execute(run.run_id)
     assert 'shared_followup_question' not in runtime.payloads['idea1.check']
     assert runtime.payloads['survey.refresh']['refresh_question'] == 'Read the missing route.'
+
+
+@pytest.mark.asyncio
+async def test_fifth_candidate_reviews_can_address_current_draw_without_allowing_unknown_ids(tmp_path, monkeypatch):
+    from arc.runtime import Runtime
+    from arc.schemas import Envelope
+    from arc.store import StateError
+
+    settings, run, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch, draws=5)
+    results = {'survey': brief}
+    for ordinal in range(1, 6):
+        results[f'idea{ordinal}.sketch'] = sketch(seed)
+        results[f'idea{ordinal}.triage'] = triage('investigate' if ordinal == 5 else 'park')
+    results['idea5.check'] = checked(seed, brief['source_notes'][0])
+    scripted = ScriptedRuntime(results)
+    await WorkflowEngine(store, scripted, settings).execute(run.run_id)
+    # Use the actual schema and the runtime's pure target validation on the
+    # frozen workflow payloads. No provider, tools, or ledger writes are needed.
+    validator = object.__new__(Runtime)
+    request = dict(request_local_id='check-premise', claim_id=None, issue_id=None, draw_id='idea5',
+        question='Does existing work remove this routing decision?', target_source_ids=[],
+        queries=['routing decision removal'], purpose='Resolve the candidate-specific premise.',
+        decision_if_supported='Reconsider the claimed difference.',
+        decision_if_contradicted='Retain the premise as unresolved.')
+    for task, schema in [('triage', TriageResult), ('check', CandidateCheck)]:
+        payload = store.get_run(run.run_id).state['task_inputs'][f'idea5.{task}']['payload']
+        assert payload['draw_id'] == 'idea5'
+        assert [item['draw_id'] for item in payload['previous_directions']] == [
+            'idea1', 'idea2', 'idea3', 'idea4']
+        envelope = Envelope[schema].model_validate(dict(schema_version='arc.v1',
+            task_id=f'{run.run_id}.idea5.{task}',
+            subject=dict(run_id=run.run_id, campaign_id=run.campaign_id, card_id=None, card_version=None),
+            result_status='needs_evidence', result=None, evidence_requests=[request],
+            capability_requests=[], note='The current candidate requires a premise check.'))
+        validator._validate_evidence_request_targets(envelope, payload)
+        # Reproduce the previous omission: previous candidates alone cannot
+        # authorize a request for the current candidate.
+        with pytest.raises(StateError, match='evidence_request_draw_id_not_supplied_to_task'):
+            validator._validate_evidence_request_targets(envelope, {
+                name: value for name, value in payload.items() if name != 'draw_id'})
+        envelope.evidence_requests[0].draw_id = 'idea6'
+        with pytest.raises(StateError, match='evidence_request_draw_id_not_supplied_to_task'):
+            validator._validate_evidence_request_targets(envelope, payload)
+    assert ledger.summary(run.run_id)['call_count'] == 0
