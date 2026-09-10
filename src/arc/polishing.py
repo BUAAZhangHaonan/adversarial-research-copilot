@@ -9,6 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from .research_context import SOURCE_KEYS, reference_ids
 
 
+WRITING_LIMITS = {
+    'stage_summary_max_chars': 450,
+    'overview_max_chars': 1100,
+    'candidate_text_max_chars': 1300,
+    'paragraph_max_chars': 260,
+    'max_cited_sources': 5,
+}
+
+
 class PolishedCandidate(BaseModel):
     model_config = ConfigDict(extra='forbid')
     idea_id: str = Field(min_length=1)
@@ -80,7 +89,7 @@ def build_polish_payload(store, run_id):
             'original_question': campaign.get('topic') or selected.get('original_question', ''),
             'user_boundaries': campaign.get('boundaries') or selected.get('user_boundaries', []),
             'field_brief': brief, 'candidates': candidates, 'skipped_directions': skipped,
-            'source_directory': directory})
+            'source_directory': directory, 'writing_limits': dict(WRITING_LIMITS)})
 
 
 def compact_polish_payload(payload):
@@ -120,4 +129,34 @@ def validate_polish(result, payload):
     # URLs belong to the immutable source directory and renderer, not writer prose.
     if any(re.search(r'https?://|www\.', text, re.I) for text in texts):
         raise ValueError('POLISH_INLINE_URL_NOT_ALLOWED_USE_SOURCE_IDS')
+    if payload.get('writing_limits'):
+        validate_writing_limits(result, payload['writing_limits'])
     return result
+
+
+def validate_writing_limits(result, limits):
+    """Explain all size violations together; the runtime gives one JSON correction."""
+    violations = []
+    sections = [
+        ('stage_summary', result.stage_summary, limits['stage_summary_max_chars']),
+        ('overview', result.overview, limits['overview_max_chars']),
+        *[(f'candidates[{item.idea_id}].text', item.text, limits['candidate_text_max_chars'])
+          for item in result.candidates],
+    ]
+    for path, text, maximum in sections:
+        count = len(text.strip())
+        if count > maximum:
+            violations.append(f'{path}: {count} characters; maximum {maximum}')
+        paragraphs = [part.strip() for part in re.split(r'\n\s*\n', text.strip()) if part.strip()]
+        for index, paragraph in enumerate(paragraphs, 1):
+            if len(paragraph) > limits['paragraph_max_chars']:
+                violations.append(f'{path}.paragraph[{index}]: {len(paragraph)} characters; '
+                                  f"maximum {limits['paragraph_max_chars']}")
+    for path, citations in [('cited_source_ids', result.cited_source_ids),
+                            *[(f'candidates[{item.idea_id}].cited_source_ids', item.cited_source_ids)
+                              for item in result.candidates]]:
+        if len(citations) > limits['max_cited_sources']:
+            violations.append(f'{path}: {len(citations)} references; maximum {limits["max_cited_sources"]}')
+    if violations:
+        raise ValueError('POLISH_WRITING_LIMITS_EXCEEDED\n' + '\n'.join(violations)
+                         + '\n请精简重复内容、选择关键引用并用空行分段；保留决定性适用条件，不截断句子或改写科学判断。')

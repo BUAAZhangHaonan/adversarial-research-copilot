@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from arc.polishing import StagePolish, build_polish_payload, compact_polish_payload, validate_polish
+from arc.polishing import WRITING_LIMITS, StagePolish, build_polish_payload, compact_polish_payload, validate_polish
 from arc.prompting import PromptLoader, render_repair
 from arc.reports import render_run
 from .test_discovery_reports import Store, note, ASSETS
@@ -253,3 +253,71 @@ def test_workflow_publish_passes_its_runtime_loader(tmp_path, monkeypatch):
     monkeypatch.setattr('arc.reports.render_run', lambda *args: seen.append(args))
     publish(engine, 'r1')
     assert seen[0][3] is loader
+
+
+@pytest.mark.parametrize('field,value,diagnostic', [
+    ('stage_summary', '甲' * 451, 'stage_summary: 451 characters; maximum 450'),
+    ('overview', ('甲' * 220 + '\n\n') * 5, 'overview:'),
+    ('candidate', ('甲' * 220 + '\n\n') * 6, 'candidates[i1].text:'),
+    ('candidate', '甲' * 261, 'candidates[i1].text.paragraph[1]: 261 characters; maximum 260'),
+])
+def test_marked_writing_payload_rejects_oversize_with_actionable_diagnostics(tmp_path, field, value, diagnostic):
+    payload = build_polish_payload(prepared_store(tmp_path), 'r1')
+    assert payload['writing_limits'] == WRITING_LIMITS
+    result = written()
+    if field == 'candidate':
+        result['candidates'][0]['text'] = value
+    else:
+        result[field] = value
+    with pytest.raises(ValueError, match='POLISH_WRITING_LIMITS_EXCEEDED') as error:
+        validate_polish(result, payload)
+    assert diagnostic in str(error.value)
+    assert '保留决定性适用条件' in str(error.value)
+    # A frozen historical payload does not acquire today's writing constraints.
+    payload.pop('writing_limits')
+    assert validate_polish(result, payload)
+
+
+def test_writing_reference_limit_keeps_short_or_unreferenced_results_valid(tmp_path):
+    payload = build_polish_payload(prepared_store(tmp_path), 'r1')
+    result = written()
+    extra = ['s3', 's4', 's5', 's6']
+    payload['source_directory'].extend({'source_id': sid, 'title': sid, 'url': None, 'notes': []} for sid in extra)
+    payload['candidates'][0]['source_ids'].extend(extra)
+    result['candidates'][0]['cited_source_ids'].extend(extra)
+    with pytest.raises(ValueError, match='6 references; maximum 5'):
+        validate_polish(result, payload)
+    result['candidates'][0]['cited_source_ids'] = []
+    assert validate_polish(result, payload)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('corrected', [True, False])
+async def test_writer_size_diagnostics_use_existing_single_json_correction(tmp_path, corrected):
+    from .test_runtime import setup_runtime, answer, sse, SUBJECT
+    from arc.runtime import RuntimePaused
+    payload = {'candidates': [], 'source_directory': [], 'writing_limits': dict(WRITING_LIMITS)}
+    oversized = {'stage_summary': '甲' * 451, 'overview': '保留适用条件。', 'candidates': [], 'cited_source_ids': []}
+    fixed = dict(oversized, stage_summary='当前结论只在给定条件下成立，条件是否适用仍待确认。')
+    first = answer()
+    first['result'] = oversized
+    second = answer()
+    second['result'] = fixed if corrected else oversized
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [sse(json.dumps(first)), sse(json.dumps(second))])
+    runtime.role_models['writer'] = 'deepseek-v4-flash'
+    try:
+        if corrected:
+            result = await runtime.invoke('writer', 'POLISH', payload, StagePolish, SUBJECT, 'task_fixture')
+            assert result.result.stage_summary == fixed['stage_summary']
+        else:
+            with pytest.raises(RuntimePaused):
+                await runtime.invoke('writer', 'POLISH', payload, StagePolish, SUBJECT, 'task_fixture')
+        assert len(requests) == 2
+        task = store.get_task('task_fixture')
+        state = json.loads(store.read_artifact(task.response_artifact_path))
+        assert state['repair_counts'] == {'tool_arguments': 0, 'output_json': 1}
+        assert 'POLISH_WRITING_LIMITS_EXCEEDED' in json.dumps(state['repair_validation_errors'])
+        assert 'stage_summary: 451 characters; maximum 450' in requests[1]['messages'][1]['content']
+        assert (task.accepted_result is not None) == corrected
+    finally:
+        await runtime.close()
