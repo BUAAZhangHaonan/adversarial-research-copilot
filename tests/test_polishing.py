@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from arc.polishing import StagePolish, build_polish_payload, validate_polish
+from arc.polishing import StagePolish, build_polish_payload, compact_polish_payload, validate_polish
 from arc.prompting import PromptLoader, render_repair
 from arc.reports import render_run
 from .test_discovery_reports import Store, note, ASSETS
@@ -93,6 +93,9 @@ def test_final_polished_report_preserves_technical_draft_and_authoritative_decis
     assert '本次实质调整' in paths['technical_idea:i1'].read_text()
     assert 'ideas/i1.technical.md' in technical
     assert '查看原始技术报告' in report and 'i1.technical.md' in detail
+    assert 'COMPLETED' not in report and 'human_selection' not in report
+    assert '（s2）' not in report
+    assert '本阶段已完成，是否继续由人决定' in report
     assert store.__dict__ == before
     # A rebuild must not accidentally archive polished prose as the original technical view.
     again = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
@@ -145,7 +148,64 @@ def test_writer_and_json_correction_are_registered_no_tool_markdown():
     assert loader.manifest['prompts']['writer.POLISH']['tools'] == []
     assert not any(path.startswith('common/') or path.startswith('roles/') for path in prompt.dependencies)
     assert '首次出现时给出简短中文解释' in prompt.messages[0]['content']
-    assert '400–700' in prompt.messages[0]['content'] and '600–1000' in prompt.messages[0]['content']
+    assert '200–350' in prompt.messages[0]['content'] and '500–800' in prompt.messages[0]['content']
+    assert '80–160' in prompt.messages[0]['content'] and '3–5篇' in prompt.messages[0]['content']
     repaired = render_repair(prompt, data, schema=StagePolish.model_json_schema(), previous_response={}, validation_errors=['missing'])
     assert '原始范围' in repaired.messages[1]['content'] and '不开展检索或科学复审' in repaired.messages[1]['content']
     assert 'json' in repaired.messages[1]['content'].lower()
+
+
+def test_compact_prestudy_preserves_current_limits_and_excludes_history_and_field_survey(tmp_path):
+    store = prepared_store(tmp_path)
+    payload = build_polish_payload(store, 'r1')
+    payload['stage'] = 'develop'
+    current = {'core_insight': '只能讨论群体关系，不能确定每个样本的原因。',
+               'invalidated_premises': ['逐样本确定归因已撤回。'],
+               'decisive_unknown': '校准是否可迁移仍不清楚。',
+               'why_existing_insufficient': '现有结果没有回答迁移条件。'}
+    payload['candidates'][0]['note']['current_understanding'] = current
+    payload['source_directory'].append({'source_id': 'field-only', 'title': '广泛背景', 'url': None, 'notes': []})
+    original = copy.deepcopy(payload)
+    compact = compact_polish_payload(payload)
+    assert payload == original
+    assert 'field_brief' not in compact
+    assert len(compact['source_directory']) == 2
+    actual = compact['candidates'][0]['note']
+    assert 'seed' not in actual and 'changes_from_seed' not in actual
+    assert actual['current_understanding'] == current
+    for key in ('reason', 'feasibility', 'main_risk', 'limits', 'resources', 'nearest_work'):
+        assert actual[key] == original['candidates'][0]['note'][key]
+
+
+def test_revision_render_changes_display_title_without_mutating_source_run_or_reports(tmp_path):
+    store = prepared_store(tmp_path)
+    store.run['state']['polish'] = written()
+    old_paths = render_run(store, 'r1', tmp_path / 'original', PromptLoader(ASSETS))
+    original_files = {key: path.read_bytes() for key, path in old_paths.items()}
+    before = copy.deepcopy(store.__dict__)
+    revision = written()
+    revision['candidates'][0]['presentation_title'] = '信息何时影响决策'
+    revision['candidates'][0]['text'] = '修订后的第一短段。\n\n关键未知仍未解决。'
+    paths = render_run(store, 'r1', tmp_path / 'revision', PromptLoader(ASSETS),
+                       polish_override=revision, polish_payload=build_polish_payload(store, 'r1'))
+    detail = paths['idea:i1'].read_text()
+    assert detail.startswith('# 信息何时影响决策')
+    assert '原研究标题（历史）：时机改变信息作用' in detail
+    assert '信息何时影响决策' in paths['overview'].read_text()
+    assert revision['candidates'][0]['text'] in detail
+    assert paths['technical_idea:i1'].read_bytes() == original_files['technical_idea:i1']
+    assert all(path.read_bytes() == original_files[key] for key, path in old_paths.items())
+    assert store.__dict__ == before
+
+
+def test_old_writer_uses_frozen_source_directory_even_if_new_prestudy_payload_is_smaller(tmp_path):
+    store = prepared_store(tmp_path)
+    old_input = build_polish_payload(store, 'r1')
+    old_input['source_directory'].append({'source_id': 'field-only', 'title': '原总览引用', 'url': None, 'notes': []})
+    result = written()
+    result['cited_source_ids'].append('field-only')
+    store.run['state'].update(polish=result, task_inputs={'polish': {'payload': old_input}})
+    paths = render_run(store, 'r1', tmp_path / 'legacy', PromptLoader(ASSETS))
+    assert '原总览引用' in paths['overview'].read_text()
+    assert paths['idea:i1'].read_text().startswith('# 时机改变信息作用')
+    assert StagePolish.model_validate(result).candidates[0].presentation_title is None

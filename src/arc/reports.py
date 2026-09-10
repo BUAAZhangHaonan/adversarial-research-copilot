@@ -160,14 +160,16 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
 
 
 def render_run(store: Any, run_id: str, output_dir: str | Path,
-               prompt_loader: PromptLoader | None = None) -> dict[str, Path]:
+               prompt_loader: PromptLoader | None = None, *,
+               polish_override=None, polish_payload=None) -> dict[str, Path]:
     from arc.budget import BudgetLedger
     loader = prompt_loader or PromptLoader()
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     run = _obj(store.get_run(run_id))
     if run.get('state', {}).get('discover_first'):
-        return render_discovery_run(store, run_id, output_dir, loader)
+        return render_discovery_run(store, run_id, output_dir, loader,
+                                    polish_override=polish_override, polish_payload=polish_payload)
     cards = [_obj(item) for item in store.list_cards(run_id=run_id)]
     focused_stage = run['mode'] in {'develop', 'run'}
     if focused_stage and run.get('card_id'):
@@ -403,7 +405,8 @@ def _discovery_usage(store, tasks, calls):
 
 
 def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
-                         prompt_loader: PromptLoader | None = None) -> dict[str, Path]:
+                         prompt_loader: PromptLoader | None = None, *,
+                         polish_override=None, polish_payload=None) -> dict[str, Path]:
     """Publish saved lightweight objects; never construct a card or invoke a model."""
     from arc.budget import BudgetLedger
     loader = prompt_loader or PromptLoader()
@@ -559,11 +562,12 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
         paths['capabilities'].write_text(loader.render_report('capabilities', {'run_id': run_id,
             'requests': [{'blocked_question': _heading(item['blocked_question']),
                           'details': render_capability_handoff(item, loader)} for item in capabilities]}), encoding='utf-8')
-    return render_discovery_polish(store, run, paths, loader)
+    return render_discovery_polish(store, run, paths, loader,
+                                   polish_override=polish_override, polish_payload=polish_payload)
 
 
 
-def render_discovery_polish(store, run, paths, loader):
+def render_discovery_polish(store, run, paths, loader, *, polish_override=None, polish_payload=None):
     """Keep the deterministic technical view and present accepted final writing."""
     from .polishing import build_polish_payload, validate_polish
     output_dir = paths['overview'].parent
@@ -579,13 +583,20 @@ def render_discovery_polish(store, run, paths, loader):
             '(' + technical_path.relative_to(output_dir).as_posix() + ')')
     paths['technical_overview'] = output_dir / 'TECHNICAL_REPORT.md'
     paths['technical_overview'].write_text(technical_report, encoding='utf-8')
-    polished = run.get('state', {}).get('polish')
+    state = run.get('state', {})
+    polished = polish_override if polish_override is not None else state.get('polish')
     if polished is None:
         text = paths['overview'].read_text(encoding='utf-8')
         first, rest = text.split('\n', 1)
         paths['overview'].write_text(first + '\n\n> 当前为技术稿，尚无已接受的最终润色。研究记录与来源仍可直接查看。\n' + rest, encoding='utf-8')
         return paths
-    payload = build_polish_payload(store, run['run_id'])
+    payload = polish_payload
+    if payload is None and polish_override is None:
+        # Historical writing must retain its original allowed source directory.
+        task_key = state.get('polish_task_key', 'polish')
+        payload = state.get('task_inputs', {}).get(task_key, {}).get('payload')
+    if payload is None:
+        payload = build_polish_payload(store, run['run_id'])
     polished = validate_polish(polished, payload)
     candidates = {item['idea_id']: item for item in payload['candidates']}
     directory = payload['source_directory']
@@ -597,18 +608,26 @@ def render_discovery_polish(store, run, paths, loader):
         original = candidates[item.idea_id]
         path = paths['idea:' + item.idea_id]
         decision = decision_names.get(original['decision'], original['decision'])
+        title = item.presentation_title or original['title']
         path.write_text(loader.render_report('polished_idea', {
-            'title': _heading(original['title']), 'decision': decision, 'text': item.text,
+            'title': _heading(title), 'decision': decision, 'text': item.text,
+            'original_title': _heading(original['title']) if title != original['title'] else None,
             'technical_path': paths['technical_idea:' + item.idea_id].name,
             'sources': _discovery_sources(item.cited_source_ids, notes, directory, path.parent, store),
-            'provenance': f"想法 `{_safe_id(item.idea_id)}`；运行 `{_safe_id(run['run_id'])}`。此页只整理表达，原始研究对象没有被改写。",
+            'provenance': '此页只整理表达，原始研究对象没有被改写。',
         }), encoding='utf-8')
-        summaries.append({'title': _heading(original['title']), 'decision': decision,
+        summaries.append({'title': _heading(title), 'decision': decision,
                           'path': path.relative_to(output_dir).as_posix()})
     paths['overview'].write_text(loader.render_report('polished_overview', {
         'title': {'discover': '本次研究发现', 'develop': '已选想法的预研展开', 'run': '已选想法的压力讨论'}[run['mode']],
         'stage_summary': polished.stage_summary, 'overview': polished.overview, 'candidates': summaries,
         'sources': _discovery_sources(polished.cited_source_ids, notes, directory, output_dir, store),
-        'execution_status': f"执行状态：{run['status']}；停止原因：{_text(run.get('stop_reason'))}。",
+        'execution_status': {
+            'COMPLETED': '本阶段已完成，是否继续由人决定。',
+            'PAUSED_BUDGET': '本阶段因预算暂停，已完成的内容保留，可在调整预算后继续。',
+            'PAUSED_PROTOCOL': '本阶段因响应格式或协议问题暂停，具体原因见任务记录。',
+            'PAUSED_EXTERNAL': '本阶段正在等待外部材料或条件，具体缺口见任务记录。',
+            'RUNNING': '本阶段尚在进行，当前内容仍可能更新。',
+        }.get(run['status'], '本阶段尚未完成，具体状态见任务记录。'),
     }), encoding='utf-8')
     return paths

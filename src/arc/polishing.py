@@ -12,6 +12,7 @@ from .research_context import SOURCE_KEYS, reference_ids
 class PolishedCandidate(BaseModel):
     model_config = ConfigDict(extra='forbid')
     idea_id: str = Field(min_length=1)
+    presentation_title: str | None = Field(default=None, min_length=1)
     text: str = Field(min_length=1)
     cited_source_ids: list[str]
 
@@ -75,11 +76,29 @@ def build_polish_payload(store, run_id):
                 if value not in notes:
                     notes.append(value)
         directory.append({key: source.get(key) for key in ('source_id', 'title', 'url')} | {'notes': notes})
-    return {'run_id': run_id, 'stage': run['mode'],
+    return compact_polish_payload({'run_id': run_id, 'stage': run['mode'],
             'original_question': campaign.get('topic') or selected.get('original_question', ''),
             'user_boundaries': campaign.get('boundaries') or selected.get('user_boundaries', []),
             'field_brief': brief, 'candidates': candidates, 'skipped_directions': skipped,
-            'source_directory': directory}
+            'source_directory': directory})
+
+
+def compact_polish_payload(payload):
+    """Select current writing material without rewriting any scientific statements."""
+    payload = deepcopy(payload)
+    for candidate in payload['candidates']:
+        note = candidate.get('note') or {}
+        if note.get('current_understanding'):
+            # Current understanding includes withdrawn premises; the seed and edit
+            # chronology remain available in the separately retained technical draft.
+            note.pop('seed', None)
+            note.pop('changes_from_seed', None)
+    if payload['stage'] in {'develop', 'run'}:
+        payload.pop('field_brief', None)
+        relevant = {source_id for candidate in payload['candidates'] for source_id in candidate['source_ids']}
+        payload['source_directory'] = [source for source in payload['source_directory']
+                                       if source['source_id'] in relevant]
+    return payload
 
 
 def validate_polish(result, payload):
@@ -97,7 +116,7 @@ def validate_polish(result, payload):
         permitted = set(expected[item.idea_id]['source_ids']) & allowed
         if len(item.cited_source_ids) != len(set(item.cited_source_ids)) or set(item.cited_source_ids) - permitted:
             raise ValueError('POLISH_CANDIDATE_SOURCE_OUTSIDE_DIRECTORY:' + item.idea_id)
-        texts.append(item.text)
+        texts.extend([item.text, item.presentation_title or ''])
     # URLs belong to the immutable source directory and renderer, not writer prose.
     if any(re.search(r'https?://|www\.', text, re.I) for text in texts):
         raise ValueError('POLISH_INLINE_URL_NOT_ALLOWED_USE_SOURCE_IDS')

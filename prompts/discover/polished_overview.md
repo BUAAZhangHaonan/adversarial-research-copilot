@@ -17,13 +17,13 @@
 本阶段没有已保存的候选灵感。
 {% endif %}
 
-## 引用来源
+## 关键来源
 
 {% for source in sources %}
-- {% if source.url %}[{{ source.title }}]({{ source.url }}){% else %}{{ source.title }}{% endif %}（{{ source.id }}）。
+- {% if source.url %}[{{ source.title }}]({{ source.url }}){% else %}{{ source.title }}{% endif %}。
 {% endfor %}
 
-## 执行与原稿
+## 后续与原稿
 
 {{ execution_status }}
 

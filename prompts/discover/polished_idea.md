@@ -4,11 +4,15 @@
 
 {{ text }}
 
-## 引用来源
+## 关键来源
 
 {% for source in sources %}
-- {% if source.url %}[{{ source.title }}]({{ source.url }}){% else %}{{ source.title }}{% endif %}：{{ source.relevance }}（{{ source.access_text }}）。
+- {% if source.url %}[{{ source.title }}]({{ source.url }}){% else %}{{ source.title }}{% endif %}（{{ source.access_text }}）。
 {% endfor %}
+
+{% if original_title %}
+原研究标题（历史）：{{ original_title }}。
+{% endif %}
 
 [查看本候选原始技术稿]({{ technical_path }}) · [返回阶段总览](../REPORT.md)
 
