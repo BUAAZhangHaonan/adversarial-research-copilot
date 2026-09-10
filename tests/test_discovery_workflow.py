@@ -114,14 +114,24 @@ async def test_checked_updates_reach_next_sketch_with_original_task_and_relation
         source_type='paper', access_status='retrieved', content_origin='original'), content='An existing method removes the gate.')
     update = dict(source_id=extra.source_id, finding='A neighbor removes the gate.',
         relevance='The next idea must offer a distinct operation.', access='passage', limits='Limited setup.')
+    review = checked(seed, brief['source_notes'][0], [update])
+    review['field_revision'] = {'overview': 'The gate already exists; the question is its failure boundary.',
+        'research_lines': ['Existing routing eliminates the extra gate.'], 'openings': ['When does the existing gate fail?']}
+    review['note']['current_understanding'] = {'core_insight': 'The missing piece is a failure boundary, not a new gate.',
+        'invalidated_premises': ['The gate has not been studied.'], 'decisive_unknown': 'Whether its boundary matters.',
+        'why_existing_insufficient': 'Unknown until the boundary is checked.'}
     runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed), 'idea1.triage': triage('investigate'),
-        'idea1.check': checked(seed, brief['source_notes'][0], [update]), 'idea2.sketch': sketch(action='stop')})
+        'idea1.check': review, 'idea2.sketch': sketch(action='stop')})
     runtime.traces['idea1.check'] = [{'name': 'read_record', 'status': 'completed',
         'source_ids': [seed['source_ids'][0]], 'result': {'source_id': seed['source_ids'][0], 'content': 'Actual cached passage.'}}]
     final = await WorkflowEngine(store, runtime, settings).execute(run.run_id)
     payload = runtime.payloads['idea2.sketch']
     assert update in payload['field_brief']['source_notes']
-    assert payload['field_brief']['overview'] == brief['overview'] and payload['field_brief']['research_lines'] == brief['research_lines']
+    assert payload['field_brief']['overview'] == review['field_revision']['overview']
+    assert payload['field_brief']['research_lines'] == review['field_revision']['research_lines']
+    assert final.state['field_brief_history'][0]['field_brief'] == brief
+    assert payload['previous_directions'][0]['current_understanding'] == review['note']['current_understanding']
+    assert 'content_path' not in payload['sources'][0] and 'content_sha256' not in payload['sources'][0]
     assert payload['brief_version'] == 2
     assert payload['original_question'] == store.get_campaign(run.campaign_id).topic
     assert payload['user_boundaries'] == ['No large model training']
@@ -133,14 +143,15 @@ async def test_checked_updates_reach_next_sketch_with_original_task_and_relation
 
 
 @pytest.mark.asyncio
-async def test_no_actual_check_action_keeps_useful_note_limited_not_recommended(tmp_path, monkeypatch):
+async def test_reusing_supplied_read_notes_does_not_require_a_redundant_tool_call(tmp_path, monkeypatch):
     settings, run, store, ledger, brief, seed, publications = fixture(tmp_path, monkeypatch)
     runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed), 'idea1.triage': triage('investigate'),
         'idea1.check': checked(seed, brief['source_notes'][0])})
     await WorkflowEngine(store, runtime, settings).execute(run.run_id)
     result = store.list_discovery_ideas(run.run_id)[0]
-    assert not result['check_action_observed'] and result['note']['decision'] == 'lead'
-    assert len(result['note']['limits']) == 2
+    assert not result['check_action_observed'] and result['note']['decision'] == 'discuss'
+    assert result['check_material_basis'] == 'shared_notes'
+    assert len(result['note']['limits']) == 1
 
 
 @pytest.mark.asyncio
@@ -255,8 +266,10 @@ async def test_next_direction_sees_actual_check_rejection_and_core_insight(tmp_p
         'idea1.check': check, 'idea2.sketch': sketch(action='stop')})
     await WorkflowEngine(store, runtime, settings).execute(run.run_id)
     previous = runtime.payloads['idea2.sketch']['previous_directions'][0]
-    assert previous['question'] == seed['question'] and previous['insight'] == seed['insight']
-    assert check['note']['reason'] in previous['reason']
+    assert previous['decision'] == 'drop'
+    assert previous['current_understanding']['core_insight'] == check['note']['reason']
+    assert 'seed' not in previous and 'triage' not in previous
+    assert store.list_discovery_ideas(run.run_id)[0]['seed'] == seed
 
 
 @pytest.mark.asyncio
@@ -296,3 +309,54 @@ async def test_completed_same_scope_survey_is_reused_as_material_without_old_ver
     # Completed current material remains reusable, but an unfinished unrelated
     # same-topic run cannot displace it merely by being newer.
     assert store.get_run(changed.run_id).state.get('field_brief') is None
+
+
+@pytest.mark.asyncio
+async def test_editor_compares_current_run_latest_verdict_and_excludes_self(tmp_path, monkeypatch):
+    settings, run, store, ledger, brief, seed, publications = fixture(tmp_path, monkeypatch, draws=2)
+    review = checked(seed, brief['source_notes'][0])
+    review['note'].update(decision='drop', reason='The required user preference fields are absent.',
+        changes_from_seed=['The proposed dataset has no user preferences.'])
+    second = deepcopy(seed);second.update(title='An evaluation route', insight='Test a different observable error.')
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed), 'idea1.triage': triage('investigate'),
+        'idea1.check': review, 'idea2.sketch': sketch(second), 'idea2.triage': triage('park')})
+    await WorkflowEngine(store, runtime, settings).execute(run.run_id)
+    payload = runtime.payloads['idea2.triage']
+    assert payload['require_candidate_relation']
+    assert [x['draw_id'] for x in payload['previous_directions']] == ['idea1']
+    previous = payload['previous_directions'][0]
+    assert previous['decision'] == 'drop'
+    assert previous['current_understanding']['invalidated_premises'] == review['note']['changes_from_seed']
+    assert previous['current_understanding']['core_insight'] == review['note']['reason']
+    assert payload['seed'] == second and payload['original_question'] == store.get_campaign(run.campaign_id).topic
+    assert 'idea2.check' not in runtime.payloads
+
+
+@pytest.mark.asyncio
+async def test_metadata_only_input_cannot_count_as_reused_reading(tmp_path, monkeypatch):
+    settings, run, store, ledger, brief, seed, publications = fixture(tmp_path, monkeypatch)
+    brief['source_notes'][0]['access'] = 'metadata'
+    runtime = ScriptedRuntime({'survey': brief, 'idea1.sketch': sketch(seed), 'idea1.triage': triage('investigate'),
+        'idea1.check': checked(seed, brief['source_notes'][0])})
+    await WorkflowEngine(store, runtime, settings).execute(run.run_id)
+    result = store.list_discovery_ideas(run.run_id)[0]
+    assert result['note']['decision'] == 'lead' and result['check_material_basis'] == 'unverified'
+    assert not result['check_action_observed']
+
+
+def test_brief_correction_replaces_current_reading_but_keeps_old_brief(tmp_path, monkeypatch):
+    from arc.discovery_models import SourceNote, FieldRevision
+    from arc.discovery_workflow import merge_updates
+    settings, run, store, ledger, brief, seed, _ = fixture(tmp_path, monkeypatch)
+    store.update_run(run.run_id, state={**run.state, 'field_brief': brief, 'brief_version': 1})
+    engine = WorkflowEngine(store, None, settings)
+    correction = {**brief['source_notes'][0], 'finding': 'The earlier source interpretation was wrong.'}
+    merge_updates(engine, run.run_id, [SourceNote.model_validate(correction)],
+        FieldRevision(overview='The current interpretation is narrower.', openings=[]))
+    state = store.get_run(run.run_id).state
+    assert state['field_brief']['source_notes'] == [correction]
+    assert state['field_brief']['openings'] == []
+    assert state['field_brief']['research_lines'] == brief['research_lines']
+    assert state['field_brief_history'][0]['field_brief'] == brief
+    merge_updates(engine, run.run_id, [SourceNote.model_validate(correction)])
+    assert store.get_run(run.run_id).state['brief_version'] == 2

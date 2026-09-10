@@ -106,11 +106,67 @@ def build_research_context(store, run) -> dict:
     }
 
 
-def build_discovery_context(engine, run_id):
+def compact_idea_view(view):
+    """Bound working excerpts; the full current note remains available by idea_id."""
+    from copy import deepcopy
+    value = deepcopy(view)
+    shortened = False
+    def excerpt(text, limit=900):
+        nonlocal shortened
+        if isinstance(text, str) and len(text) > limit:
+            shortened = True
+            return text[:limit] + "…"
+        return text
+    knowledge = value.get("current_understanding") or {}
+    for key in ("core_insight", "decisive_unknown", "why_existing_insufficient"):
+        if key in knowledge: knowledge[key] = excerpt(knowledge[key])
+    # Do not drop individual corrected premises; long explanations are marked excerpts.
+    if "invalidated_premises" in knowledge:
+        knowledge["invalidated_premises"] = [excerpt(x, 360) for x in knowledge["invalidated_premises"]]
+    if shortened:
+        value["excerpted"] = True
+        value["full_record"] = {"tool": "read_record", "record_id": value["idea_id"]}
+    return value
+
+
+def discovery_directions(engine, run_id, exclude_draw_id=None):
+    from .discovery_memory import current_idea_view
+    directions = []
+    for idea in engine.store.list_discovery_ideas(run_id):
+        if idea.get("draw_id") == exclude_draw_id:
+            continue
+        if idea.get("seed"):
+            directions.append(compact_idea_view(current_idea_view(idea)))
+        elif idea.get("status") in {"skip", "stop"}:
+            directions.append({"idea_id": idea["idea_id"], "run_id": run_id,
+                "draw_id": idea["draw_id"], "decision": idea["status"],
+                "reason": (idea.get("sketch") or {}).get("reason", "")})
+    return directions
+
+
+def build_discovery_context(engine, run_id, *, task="SURVEY", seed=None, exclude_draw_id=None):
     run = engine.store.get_run(run_id)
     campaign = engine.store.get_campaign(run.campaign_id)
-    brief = run.state.get("field_brief") or run.state.get("reusable_survey", {}).get("field_brief")
+    reusable = run.state.get("reusable_survey", {})
+    brief = run.state.get("field_brief") or reusable.get("field_brief")
+    # Explicit notes carry the readings; source metadata supplies lookup identity only.
+    # The editor needs the current proposal's notes, not every previous search result.
+    if brief:
+        brief = {**brief, "source_notes": list(brief.get("source_notes", []))}
+        if task == "TRIAGE" and seed:
+            relevant = set(seed.get("source_ids", []))
+            brief["source_notes"] = [n for n in brief["source_notes"] if n["source_id"] in relevant]
     ids = sorted({n["source_id"] for n in (brief or {}).get("source_notes", [])})
-    return {"original_question": campaign.topic, "user_boundaries": campaign.boundaries,
-            "field_brief": brief, "brief_version": run.state.get("brief_version", 0),
-            "sources": [s.model_dump(mode="json") for s in engine.store.list_sources(ids=ids)] if ids else []}
+    sources = []
+    for source in engine.store.list_sources(ids=ids) if ids else []:
+        raw = source.model_dump(mode="json")
+        sources.append({k: raw[k] for k in ("source_id", "title", "url", "doi", "arxiv_id",
+            "version", "access_status", "content_origin", "content_complete", "content_total_chars")
+            if raw.get(k) is not None})
+    context = {"original_question": campaign.topic, "user_boundaries": campaign.boundaries,
+               "field_brief": brief, "brief_version": run.state.get("brief_version", 0),
+               "sources": sources,
+               "previous_directions": discovery_directions(engine, run_id, exclude_draw_id)}
+    if not run.state.get("field_brief") and reusable.get("run_id"):
+        context["reused_survey_current_ideas"] = discovery_directions(engine, reusable["run_id"])
+    return context
