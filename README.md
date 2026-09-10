@@ -81,6 +81,8 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data resum
 
 ## 开发验证记录
 
+当前用户主题的五卡任务、最终成文实测与费用见[9月10日交付记录](docs/HALLUCINATION_STUDY_DELIVERY_20260910.md)。
+
 ```bash
 uv run pytest tests/test_discovery_workflow.py tests/test_discovery_reports.py tests/test_model_adapters.py -q
 ```
