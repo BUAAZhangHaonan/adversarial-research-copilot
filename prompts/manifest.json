@@ -503,6 +503,17 @@
         "request_capability"
       ],
       "tool_repair_template": "tasks/correct_tool_arguments.md"
+    },
+    "writer.POLISH": {
+      "role": "writer",
+      "task": "POLISH",
+      "system": [
+        "discover/writer.md"
+      ],
+      "task_template": "discover/writer_invoke.md",
+      "repair_template": "discover/writer_repair.md",
+      "tool_repair_template": "tasks/correct_tool_arguments.md",
+      "tools": []
     }
   },
   "tools": {
@@ -526,7 +537,9 @@
     "discovery_overview": "discover/overview.md",
     "discovery_pending": "discover/pending.md",
     "discovery_field": "discover/field_brief.md",
-    "discovery_search": "discover/search_sources.md"
+    "discovery_search": "discover/search_sources.md",
+    "polished_overview": "discover/polished_overview.md",
+    "polished_idea": "discover/polished_idea.md"
   },
   "read_progress_template": "tasks/source_read_no_progress.md"
 }

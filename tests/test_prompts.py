@@ -40,6 +40,10 @@ def test_registered_roles_render_traceable_task_and_minimal_prefix():
         assert 'card_version' in rendered.messages[1]['content']
         assert '{{ task_id }}' not in rendered.messages[1]['content']
         assert set(rendered.source_hashes)==set(rendered.dependencies)
+        if 'discover/writer.md' in rendered.dependencies:
+            assert entry['tools'] == []
+            assert not any(name.startswith('common/') or name.startswith('roles/') for name in rendered.dependencies)
+            continue
         if 'discover/policy.md' in rendered.dependencies:
             assert not any(name.startswith('common/') for name in rendered.dependencies)
             continue
@@ -56,6 +60,10 @@ def test_request_ownership_is_visible_to_every_semantic_role():
     for prompt_id in loader.manifest['prompts']:
         rendered=loader.render(prompt_id,DATA,schema=SCHEMA)
         system=rendered.messages[0]['content']
+        if prompt_id == 'writer.POLISH':
+            assert '不改变研究对象和去留判断' in system
+            assert '不能改变这些职责' in system
+            continue
         if 'discover/policy.md' in rendered.dependencies:
             assert '保持用户原始主题' in system
             assert '初步实验' in system
