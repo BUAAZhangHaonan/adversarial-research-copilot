@@ -4,7 +4,7 @@ ARC 帮助人找到有新意、有意义、值得继续讨论的研究方向。�
 
 **共享领域调查 → 一张短灵感 → 快速价值筛选 → 仅对入围想法补查文献与可行性 → 交给人选择。**
 
-事实需要准确，假设可以大胆，无法判断的部分明确留下。实验、完整论证和论文由人完成。系统不保证生成好选题，也不把模型的自评当作科研认证。本轮接线与验收状态见 [Discover First](docs/DISCOVER_FIRST.md)。只维护 `master`，保留细粒度提交。
+事实需要准确，假设可以大胆，无法判断的部分明确留下。实验、完整论证和论文由人完成。系统不保证生成好选题，也不把模型的自评当作科研认证。当前改进见[预研认识复用](docs/CURRENT_UNDERSTANDING_20260910.md)，发现主干见 [Discover First](docs/DISCOVER_FIRST.md)。只维护 `master`，保留细粒度提交。
 
 ## 安装与开始使用
 
@@ -46,18 +46,18 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run -
 
 `discuss` 是值得讨论，`lead` 是有条件线索，`drop` 是本次放下；都不是永久科研判决。编辑的 `park` 保留未做定向预研的线索。`pending` 表示任务尚未完成，不能当作推荐。执行状态 `COMPLETED`、`PAUSED_BUDGET`、`PAUSED_PROTOCOL` 等与研究判断分开：预算或工具暂停不等于想法被否定。
 
-SourceNote 记录原始来源 ID、相关性、实际阅读层级和限制。检索摘要不等于全文，来源可定位不等于其推论正确；新假设不强制拥有逐主张的“verified”证据。全文按需从缓存分页读取，`read_record` 单次上限为 64000 字符。报告直接渲染已保存对象，不另付费重述。原始响应、历史失败与费用保留，私有 reasoning 不进入研究报告。
+SourceNote 记录原始来源 ID、相关性、实际阅读层级和限制。检索摘要不等于全文，来源可定位不等于其推论正确；新假设不强制拥有逐主张的“verified”证据。全文按需从缓存分页读取，`read_record` 单次上限为 64000 字符。CHECK 会把修正后的核心认识、已撤回前提和决定性未知交给下一次抽卡，并按需更新共享简报。TRIAGE 比较本轮已有候选，档案召回返回当前去留与修正理由。已有相关阅读笔记足够时直接复用，报告明确区分复用与本任务新增工具动作。报告直接渲染已保存对象，不另付费重述。原始响应、历史失败与费用保留，私有 reasoning 不进入研究报告。
 
 ## 模型配置与预算
 
-科研 Markdown 不绑定具体型号。`research_model` 指向配置中的模型别名，默认 `scout`、`ideator`、`editor` 共用该别名；需要时由人显式覆盖角色。当前接入仍为 DeepSeek V4 Flash/Pro，默认主模型为 Pro，当前 DeepSeek 的 `max` 与完整输出上限保持不变。
+科研 Markdown 不绑定具体型号。`research_model` 指向配置中的模型别名，默认 `scout`、`ideator`、`editor` 共用该别名；需要时由人显式覆盖角色。当前统一使用 DeepSeek V4.1 Flash：ARC 别名为 `deepseek-v4.1-flash`，实际 API 名为 `deepseek-flash`。`max` 与完整输出上限保持不变，当前峰谷价格及历史任务边界见[型号迁移记录](docs/MODEL_MIGRATION_20260910.md)。
 
 ```yaml
-research_model: deepseek-v4-pro
+research_model: deepseek-v4.1-flash
 roles:
-  scout: deepseek-v4-pro
-  ideator: deepseek-v4-pro
-  editor: deepseek-v4-pro
+  scout: deepseek-v4.1-flash
+  ideator: deepseek-v4.1-flash
+  editor: deepseek-v4.1-flash
 ```
 
 ```bash
@@ -83,8 +83,8 @@ uv run pytest tests/test_discovery_workflow.py tests/test_discovery_reports.py t
 
 检查默认轻量对象、早筛停止、共享材料更新、五次机会与恢复、人工交接、型号别名与已安装 Markdown 资源，再进行必要整体回归和正常打包。
 
-本轮真实验证限于两个 discover。首轮采用每例20元、累计40元上限；用户随后明确授权使用现有不足100元余额完成这两个暂停任务，继续受同一个父账本剩余额度约束。续跑授权、结果与费用见 [续跑记录](docs/DISCOVER_FIRST_CONTINUATION.md)。使用开发样例“多模态模型在真实任务中何时需要主动获取额外信息”和“具身智能在环境变化后如何使用和更新既有经验”；不预填答案、数据集或方法。具体完成情况与花费以 [本轮记录](docs/DISCOVER_FIRST.md#验证记录) 为准。
+2026-09-10 的改进验证覆盖：新模型配置与计价、当前认识回写、同轮候选比较、档案召回和报告呈现；少量真实调用复用已审阅材料，不重跑整个五卡样例，不作模型质量排行榜。开发费用由用户授权按需分配，不因上一轮40元限制停止；生产阶段默认20元仍由使用者显式调整。结果、输入缩减口径及真实费用见[本轮记录](docs/CURRENT_UNDERSTANDING_20260910.md)。
 
-人工阅读判断想法是否有意义、是否只是改名重复、背景是否有依据和阅读成本是否合理。最多针对一个主要问题调整一轮；若额外真实复核仍共用累计 40 元。允许没有推荐结果，不宣布科学质量通过或超过单模型。此次不运行 Flash/Pro、A–E 对照，也不为形式上的全链成功付费串联 develop/run；后续交接可离线验证。
+9月9日两个开发样例已经完成，原产物、失败与费用见[续跑记录](docs/DISCOVER_FIRST_CONTINUATION.md)。人工阅读判断想法是否有意义、是否只是改名重复、背景是否有依据和阅读成本是否合理。执行完成不代表科学质量通过，也不证明超过单模型。
 
 旧 `test-e2e`、`test-compare`、`test-ablation` 保留为显式历史开发工具，不是安装步骤、默认产品路径或本轮必跑验收。以前的结果与费用不回写为本轮通过，参见 [历史功能验收](docs/FUNCTIONAL_VALIDATION_RESULTS.md)、[历史收尾](docs/FINAL_CLOSEOUT.md)。

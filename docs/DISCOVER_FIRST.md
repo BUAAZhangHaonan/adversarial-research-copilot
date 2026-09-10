@@ -16,7 +16,7 @@
 | 共享领域理解 | 首次 `scout.SURVEY` 生成 `FieldBrief`，包含 overview、research_lines、openings、source_notes、search_limits。`research_context.build_discovery_context` 在每项语义任务带入原题、明确限制和共享资料 |
 | 短灵感先落地 | `ideator.SKETCH` 输出一个 `IdeaSeed` 或 skip/stop；完成后立即保存稳定 idea ID 并更新报告，不等待完整五次抽卡 |
 | 先筛价值再花钱 | `editor.TRIAGE` 不开放外部工具。investigate 才调用 CHECK；park/drop 当次终止候选，不追加科学修订、付费报告员或裁判 |
-| 有限候选预研 | `scout.CHECK` 直接返回 `CandidateCheck(note, field_updates)`。检查近邻、关键背景和实施通路，允许明确限制和未知；实际工具 trace 用于确认取得相关检索/读取，不靠模型声明“已查新” |
+| 有限候选预研 | `scout.CHECK` 返回 `CandidateCheck(note, field_updates, field_revision)`。当前认识回写共享简报和后续方向；实际工具 trace 与已有阅读笔记分开记录，缺少两类材料时不推荐。详见[9月10日改进](CURRENT_UNDERSTANDING_20260910.md) |
 | 材料复用 | CHECK 的 SourceNote 更新并入当前 FieldBrief，之后任务可见；保留来源身份及阅读层级。SKETCH 的具体 next_search 最多触发一次共享补查，checkpoint 保留跨暂停状态 |
 | 紧凑历史 | 同主题传递 previous_directions；本地 FTS 召回少量历史卡和轻量 idea 给编辑比较。无检索命中不代表不存在相似工作，词面相似不自动否决 |
 | 独立轻量存储 | `discovery_models.py` 提供 FieldBrief/IdeaSeed/TriageResult/IdeaNote；`Store.save/get/list_discovery_ideas` 使用专用轻量表，关联原 run、draw、主题、简报版本和时间，不构造逐句 claims 账本 |
@@ -70,7 +70,7 @@
 
 `pricing_path` 指向经过核对的价格配置。不能只写一个新型号名字便假定其价格、工具或输出能力与已有型号相同。兼容性以模拟配置检查，不购买或比较新模型。未知别名、缺少凭据、未支持操作和价格上限不一致均明确报错。
 
-当前 DeepSeek 保留 max 与384000完整输出上限。科研提示词不包含型号绑定，默认不会自动降低核心步骤模型。单次预算不足时暂停下一请求，不截断已开始回复。
+当前默认别名 `deepseek-v4.1-flash` 对应官方 API `deepseek-flash`，见[型号与计价](MODEL_MIGRATION_20260910.md)。DeepSeek 保留 max 与384000完整输出上限。科研提示词不包含型号绑定，默认不会自动降低核心步骤模型。单次预算不足时暂停下一请求，不截断已开始回复。
 
 ## 验证记录
 

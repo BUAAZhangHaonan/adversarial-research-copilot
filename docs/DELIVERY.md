@@ -1,5 +1,8 @@
 # 当前功能与软件交付
 
+> 2026-09-10 当前版本：所有默认角色统一 V4.1 Flash（API `deepseek-flash`）；预研认识回写、同轮候选比较、最终判断召回与报告已接通。全套833项通过；两项真实定向任务完成，新增0.736622–0.736630元，0预留/未知调用。具体软件包、前后对象及科学边界见[本轮交付](CURRENT_UNDERSTANDING_20260910.md)。下面9月9日及更早的模型、预算、包与科研结论均为历史快照，不代表当前默认配置。
+
+
 > 2026-09-09 Discover First：两个原暂停样例均已续跑完成，各5次构思和5份预研结果；新增已结算上界20.371510元。见[续跑结果与限制](DISCOVER_FIRST_CONTINUATION.md)及[机器可读费用记录](DISCOVER_FIRST_CONTINUATION_RESULTS.json)。这表示发现流程完成，科研品味仍交由人判断。以下上一轮历史结论与费用保留。
 
 **55a134c：707 passed，0 failed/error/skipped**，2026-09-08 21:08:02 UTC完成全套、sdist→wheel、仓库外隔离安装、38提示词/18任务/3配置、4CLI及依赖检查。唯一两包和SOFTWARE_VALIDATION.json已于21:08:53 UTC同步Windows，原件`work/software-validation-20260908T210458748151Z/`，回执`work/FINAL_PACKAGE_DELIVERY_RECEIPT.json`。
