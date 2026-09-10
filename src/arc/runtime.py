@@ -376,6 +376,13 @@ class Runtime:
 
     def _validate_output_contracts(self, envelope, payload, state):
         """Collect independent read-only errors before spending JSON correction."""
+        from .discovery_models import CandidateCheck, TriageResult
+        if (payload.get('require_current_understanding') and isinstance(envelope.result, CandidateCheck)
+                and envelope.result.note.current_understanding is None):
+            raise ValueError('CURRENT_UNDERSTANDING_REQUIRED')
+        if (payload.get('require_candidate_relation') and isinstance(envelope.result, TriageResult)
+                and envelope.result.candidate_relation is None):
+            raise ValueError('CANDIDATE_RELATION_REQUIRED')
         from .store import StateError
         from .scientific import validate_scientific_output_contract
         from .schemas import LibrarianResult, EvaluatorResult, SelectorResult, ResearchCard, NoveltyResult

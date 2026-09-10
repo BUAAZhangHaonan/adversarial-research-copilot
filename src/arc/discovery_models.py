@@ -48,11 +48,18 @@ class SketchResult(DiscoveryModel):
         return self
 
 
+class CandidateRelation(DiscoveryModel):
+    kind: Literal["independent", "alternative_route", "evaluation_support", "overlap", "not_compared"]
+    related_draw_ids: list[str]
+    explanation: str = Field(min_length=1)
+
+
 class TriageResult(DiscoveryModel):
     action: Literal["investigate", "park", "drop"]
     reason: str = Field(min_length=1)
     strongest_objection: str = Field(min_length=1)
     check_questions: list[str]
+    candidate_relation: CandidateRelation | None = None
 
     @model_validator(mode="after")
     def check_dispatch_shape(self):
@@ -76,6 +83,19 @@ class ResourceHint(DiscoveryModel):
     basis: str = Field(min_length=1)
 
 
+class CurrentUnderstanding(DiscoveryModel):
+    core_insight: str = Field(min_length=1)
+    invalidated_premises: list[str]
+    decisive_unknown: str = Field(min_length=1)
+    why_existing_insufficient: str = Field(min_length=1)
+
+
+class FieldRevision(DiscoveryModel):
+    overview: str | None = Field(default=None, min_length=1)
+    research_lines: list[str] | None = None
+    openings: list[str] | None = None
+
+
 class IdeaNote(DiscoveryModel):
     seed: IdeaSeed
     decision: Literal["discuss", "lead", "drop"]
@@ -88,11 +108,13 @@ class IdeaNote(DiscoveryModel):
     source_notes: list[SourceNote]
     limits: list[str]
     changes_from_seed: list[str]
+    current_understanding: CurrentUnderstanding | None = None
 
 
 class CandidateCheck(DiscoveryModel):
     note: IdeaNote
     field_updates: list[SourceNote] = Field(default_factory=list)
+    field_revision: FieldRevision | None = None
 
 
 DISCOVERY_RESULT_SCHEMAS = {
