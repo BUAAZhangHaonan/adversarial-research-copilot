@@ -234,3 +234,31 @@ def test_unchanged_current_insight_and_unknown_are_not_reprinted_in_multiple_fie
     assert detail.count('同一个决定性未知') == 1
     assert '初始灵感（预研前' in detail and '核心认识未变' in detail
     assert paths['overview'].read_text().count(seed()['insight']) == 1
+
+
+@pytest.mark.parametrize('updates,is_updated', [
+    ({'brief_version': 1}, False),
+    ({'brief_version': 2}, True),
+    ({'field_brief_history': [{'version': 1}]}, True),
+])
+def test_overview_distinguishes_updated_shared_brief_from_original_survey(tmp_path, updates, is_updated):
+    store = Store(tmp_path)
+    store.run['state'].update(updates)
+    before = copy.deepcopy(store.__dict__)
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    text = paths['overview'].read_text()
+    assert ('已纳入后续资料更新的当前共享概览' in text) is is_updated
+    assert ('以下概览形成于调研阶段' in text) is not is_updated
+    assert store.run['state']['field_brief']['overview'] in text
+    assert store.__dict__ == before
+
+
+@pytest.mark.parametrize('reason', ['需要进一步明确路线。', '需要进一步明确路线'])
+def test_pending_reason_is_separate_from_status_without_doubled_punctuation(tmp_path, reason):
+    store = Store(tmp_path)
+    store.ideas[0]['triage']['reason'] = reason
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    text = paths['overview'].read_text()
+    assert reason + '\n\n尚未完成预研' in text
+    assert '。。' not in text
+    assert store.ideas[0]['triage']['reason'] == reason

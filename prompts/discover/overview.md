@@ -38,7 +38,9 @@
 {% for item in pending %}
 **{{ item.title }}**：{{ item.insight }}
 
-{{ item.reason }}。尚未完成预研，不能当作推荐。
+{{ item.reason }}
+
+尚未完成预研，不能当作推荐。
 
 {% if item.relation %}候选关系：{{ item.relation }}
 
@@ -55,7 +57,11 @@
 
 ## 共享调研概览
 
+{% if landscape_updated %}
+以下是已纳入后续资料更新的当前共享概览（资料版本 {{ brief_version }}）；具体背景、剩余缺口与限制仍以各卡当前预研判断为准，不代表科学认证。
+{% else %}
 以下概览形成于调研阶段，后续候选预研可能修正其中的背景与缺口判断；以各卡当前预研判断和实质调整为准。
+{% endif %}
 
 {{ landscape_summary }}
 

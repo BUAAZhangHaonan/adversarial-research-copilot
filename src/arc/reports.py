@@ -520,7 +520,9 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     paths['overview'].write_text(loader.render_report('discovery_overview', {
         'report_title': {'develop': '已选想法的预研展开', 'run': '已选想法的压力讨论'}.get(run['mode'], '本次发现'),
         'conclusion': f"已保存 {sum(idea.get('seed') is not None for idea in ideas)} 个想法：{len(discuss)} 个值得讨论，{len(leads)} 条线索，{len(pending)} 个待预研。建议由人选择，不代表科学认证。",
-        'landscape_summary': brief.get('overview', '领域调查尚未完成。'), 'discuss': discuss, 'leads': leads,
+        'landscape_summary': brief.get('overview', '领域调查尚未完成。'),
+        'landscape_updated': bool(state.get('field_brief_history')) or state.get('brief_version', 1) > 1,
+        'brief_version': state.get('brief_version', 1), 'discuss': discuss, 'leads': leads,
         'skipped': skipped, 'pending': pending,
         'investigation_scope': ('[本阶段收到的想法和此前预研](INPUT_IDEA.json)；' if selected else '') + '[共享领域调查与阅读边界](FIELD_BRIEF.md)；[全部检索命中](SEARCH_SOURCES.md)；[原始任务索引](PROMPT_TRACE_INDEX.md)。',
         'cost_summary': cost_text + f"\n\n语义任务 {usage['semantic_tasks']} 项；实际模型请求 {usage['model_requests']} 次；工具动作 {usage['tool_actions']} 次。"
