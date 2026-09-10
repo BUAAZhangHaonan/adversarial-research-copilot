@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .model_adapters import ModelSpec, default_models, CURRENT_RESEARCH_ALIAS
 
 ModelName = str
-DISCOVER_ROLES = ('scout', 'ideator', 'editor')
+DISCOVER_ROLES = ('scout', 'ideator', 'editor', 'writer')
 DEFAULT_ROLES = dict.fromkeys((
     'investigator', 'librarian', 'discovery', 'novelty_examiner', 'selector',
     'developer', 'proposer', 'skeptic', 'moderator', 'reporter', 'evaluator',

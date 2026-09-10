@@ -94,6 +94,8 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
         latest = store.latest_idea_prestudy(idea_id)
         if latest:
             idea_input.update(latest_note=latest['note'], latest_note_origin={'run_id': latest['run_id'], 'mode': latest['mode']})
+            if latest.get('field_brief'):
+                idea_input['field_brief'] = latest['field_brief']
     if mode in ('develop', 'run'):
         if not card_id and not input_text and not idea_id:
             raise typer.BadParameter('--card is required')
@@ -136,8 +138,16 @@ async def execute(settings, run_id):
     frozen = Settings.model_validate(run.config)
     runtime = None
     try:
-        runtime = await make_runtime(store, ledger, run, frozen)
-        await WorkflowEngine(store, runtime, frozen).execute(run_id)
+        if run.status not in {'COMPLETED', 'CANCELLED', 'PAUSED_SCOPE_CHANGE'}:
+            from .preflight import prepare_run_preflight, display_preflight
+            preflight = await prepare_run_preflight(store, ledger, run, frozen)
+            typer.echo(json.dumps(display_preflight(preflight), ensure_ascii=False))
+            if preflight['wallet_exhausted']:
+                from .runtime import RuntimePaused
+                raise RuntimePaused('PAUSED_BUDGET', 'provider_wallet_unavailable')
+        if run.status not in {'COMPLETED', 'CANCELLED', 'PAUSED_SCOPE_CHANGE'}:
+            runtime = await make_runtime(store, ledger, run, frozen)
+            await WorkflowEngine(store, runtime, frozen).execute(run_id)
     except Exception as exc:
         status, reason = getattr(exc, 'status', None), getattr(exc, 'reason', None)
         if status in {'PAUSED_BUDGET', 'PAUSED_EXTERNAL', 'PAUSED_PROTOCOL'}:
