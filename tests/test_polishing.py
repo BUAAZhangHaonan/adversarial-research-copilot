@@ -209,3 +209,47 @@ def test_old_writer_uses_frozen_source_directory_even_if_new_prestudy_payload_is
     assert '原总览引用' in paths['overview'].read_text()
     assert paths['idea:i1'].read_text().startswith('# 时机改变信息作用')
     assert StagePolish.model_validate(result).candidates[0].presentation_title is None
+
+
+def test_saved_writer_output_renders_with_its_frozen_bundle_not_new_disk_templates(tmp_path, monkeypatch):
+    import shutil
+    import arc.reports as reports
+    store = prepared_store(tmp_path)
+    # Historical accepted output has no presentation_title or new template fields.
+    store.run['state']['polish'] = written()
+    frozen = store.artifact_root / 'runs' / 'r1' / 'prompt-resources'
+    current = tmp_path / 'current-assets'
+    shutil.copytree(ASSETS, frozen)
+    shutil.copytree(ASSETS, current)
+    (frozen / 'discover/polished_idea.md').write_text('# 历史模板\n\n{{ text }}\n')
+    (current / 'discover/polished_idea.md').write_text('# 新模板\n{{ unavailable_to_old_renderer }}\n')
+    loader_type = PromptLoader
+    monkeypatch.setattr(reports, 'PromptLoader', lambda root=None: loader_type(root or current))
+    paths = render_run(store, 'r1', tmp_path / 'frozen-report')
+    assert paths['idea:i1'].read_text().startswith('# 历史模板')
+    assert written()['candidates'][0]['text'] in paths['idea:i1'].read_text()
+    # Writer-only revisions deliberately pass their new bundle; the original run
+    # snapshot must not override that explicit choice.
+    (current / 'discover/polished_idea.md').write_text('# 独立成文版本\n\n{{ text }}\n')
+    paths = render_run(store, 'r1', tmp_path / 'explicit-revision', loader_type(current),
+                       polish_override=written(), polish_payload=build_polish_payload(store, 'r1'))
+    assert paths['idea:i1'].read_text().startswith('# 独立成文版本')
+
+
+def test_historical_run_without_resource_snapshot_still_renders(tmp_path):
+    store = prepared_store(tmp_path)
+    store.run['state']['polish'] = written()
+    paths = render_run(store, 'r1', tmp_path / 'no-snapshot')
+    assert written()['stage_summary'] in paths['overview'].read_text()
+
+
+def test_workflow_publish_passes_its_runtime_loader(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from arc.discovery_workflow import publish
+    loader = PromptLoader(ASSETS)
+    engine = SimpleNamespace(store=object(), runtime=SimpleNamespace(loader=loader),
+                             settings=SimpleNamespace(data_dir=tmp_path))
+    seen = []
+    monkeypatch.setattr('arc.reports.render_run', lambda *args: seen.append(args))
+    publish(engine, 'r1')
+    assert seen[0][3] is loader

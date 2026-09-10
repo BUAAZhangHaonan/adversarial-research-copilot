@@ -159,11 +159,22 @@ def _card_context(card: dict, sources: list[dict], issues: list[dict], *, focuse
     }
 
 
+def _report_loader(store, run_id, explicit_loader=None):
+    if explicit_loader is not None:
+        return explicit_loader
+    artifact_root = getattr(store, 'artifact_root', None)
+    if artifact_root is not None:
+        resources = Path(artifact_root) / 'runs' / run_id / 'prompt-resources'
+        if (resources / 'manifest.json').is_file():
+            return PromptLoader(resources)
+    return PromptLoader()
+
+
 def render_run(store: Any, run_id: str, output_dir: str | Path,
                prompt_loader: PromptLoader | None = None, *,
                polish_override=None, polish_payload=None) -> dict[str, Path]:
     from arc.budget import BudgetLedger
-    loader = prompt_loader or PromptLoader()
+    loader = _report_loader(store, run_id, prompt_loader)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     run = _obj(store.get_run(run_id))
@@ -409,7 +420,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
                          polish_override=None, polish_payload=None) -> dict[str, Path]:
     """Publish saved lightweight objects; never construct a card or invoke a model."""
     from arc.budget import BudgetLedger
-    loader = prompt_loader or PromptLoader()
+    loader = _report_loader(store, run_id, prompt_loader)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     run = _obj(store.get_run(run_id))

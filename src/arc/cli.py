@@ -156,7 +156,8 @@ async def execute(settings, run_id):
             store.update_run(run_id, status='ERROR', stop_reason=type(exc).__name__)
             raise
     finally:
-        render_run(store, run_id, settings.data_dir.resolve() / 'reports' / run_id)
+        render_run(store, run_id, settings.data_dir.resolve() / 'reports' / run_id,
+                   getattr(runtime, 'loader', None))
         close = getattr(runtime, 'close', None)
         if close:
             await close()

@@ -9,7 +9,8 @@ from .research_context import build_discovery_context as context, compact_idea_v
 
 def publish(engine, run_id):
     from .reports import render_run
-    render_run(engine.store, run_id, engine.settings.data_dir.resolve() / "reports" / run_id)
+    render_run(engine.store, run_id, engine.settings.data_dir.resolve() / "reports" / run_id,
+               engine.runtime.loader)
 
 
 async def finish_stage(engine, run_id, reason):
