@@ -16,7 +16,7 @@ source .venv/bin/activate
 arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data discover "研究主题" --draws 5 --budget-cny 20
 ```
 
-一次主题最多五次构思机会，共享调查与预算，不要求用满。每次先保存 `IdeaSeed`，编辑决定是否继续投入；普通或重复想法尽早放下，有启发但暂时无法核查的想法可以暂存。只有入围候选继续 `CHECK`，形成短 `IdeaNote`。默认 discover 不先生成完整 `CardDraft`，不串联全面审查、修订、复核、付费报告员或排序裁判。
+一次主题最多五次构思机会，共享调查与预算，不要求用满。每次先保存 `IdeaSeed`，编辑决定是否继续投入；普通或重复想法尽早放下，有启发但暂时无法核查的想法可以暂存。只有入围候选继续 `CHECK`，形成短 `IdeaNote`。默认 discover 不先生成完整 `CardDraft`，不串联全面审查、修订、复核或排序裁判。
 
 每完成一项调查或候选记录就更新本地 Markdown。输出位于 `DATA_DIR/reports/RUN_ID/`；预算暂停时，已经保存但未完成预研的灵感仍可查看。
 
@@ -37,7 +37,7 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data run -
 
 | 输出 | 内容 |
 | --- | --- |
-| `REPORT.md` | 阶段完成后为成文总览；中途明确标为技术稿 |
+| `REPORT.md` | 阶段完成后含阶段摘要与研究总览；中途明确标为技术稿 |
 | `TECHNICAL_REPORT.md`、候选 `.technical.md` | 润色前的研究原稿，保留全部技术细节 |
 | `ideas/IDEA_ID.md` | 短灵感或已完成的预研卡，含相关来源及阅读边界 |
 | `FIELD_BRIEF.md` | 共享领域现状、路线关系、开放切入点和关键资料 |
@@ -79,7 +79,7 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data resum
 
 恢复沿用已保存任务、原 draw 与预算。工具参数错误和最终 JSON 错误每项 Agent 任务各有一次纠正机会；开发中的显式修复不等于自动增加任务纠错额度。协议与显式重试见 [协议纠正](docs/PROTOCOL_CORRECTION.md)。能力需求交给用户评估和实施，正式服务不依赖 CodeX；见 [改进需求](docs/CAPABILITY_REQUESTS.md)。
 
-## 本轮开发验收
+## 开发验证记录
 
 ```bash
 uv run pytest tests/test_discovery_workflow.py tests/test_discovery_reports.py tests/test_model_adapters.py -q
@@ -87,7 +87,7 @@ uv run pytest tests/test_discovery_workflow.py tests/test_discovery_reports.py t
 
 检查默认轻量对象、早筛停止、共享材料更新、五次机会与恢复、人工交接、型号别名与已安装 Markdown 资源，再进行必要整体回归和正常打包。
 
-2026-09-10 的改进验证覆盖：新模型配置与计价、当前认识回写、同轮候选比较、档案召回和报告呈现；少量真实调用复用已审阅材料，不重跑整个五卡样例，不作模型质量排行榜。开发费用由用户授权按需分配，不因上一轮40元限制停止；生产阶段默认20元仍由使用者显式调整。结果、输入缩减口径及真实费用见[本轮记录](docs/CURRENT_UNDERSTANDING_20260910.md)。
+2026-09-10 较早一轮“当前认识复用”的改进验证覆盖：新模型配置与计价、当前认识回写、同轮候选比较、档案召回和报告呈现；少量真实调用复用已审阅材料，不重跑整个五卡样例，不作模型质量排行榜。开发费用由用户授权按需分配，不因上一轮40元限制停止；生产阶段默认20元仍由使用者显式调整。结果、输入缩减口径及真实费用见[该轮记录](docs/CURRENT_UNDERSTANDING_20260910.md)。其“不重跑五卡”边界只适用于当时的校准任务；后续用户授权的幻觉与能力边界研究另行运行五次抽卡。
 
 9月9日两个开发样例已经完成，原产物、失败与费用见[续跑记录](docs/DISCOVER_FIRST_CONTINUATION.md)。人工阅读判断想法是否有意义、是否只是改名重复、背景是否有依据和阅读成本是否合理。执行完成不代表科学质量通过，也不证明超过单模型。
 
