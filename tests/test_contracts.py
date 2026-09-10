@@ -27,7 +27,7 @@ def selection_payload():
         "selection_checks":{k:dict(check) for k in ["motivation","knowledge_delta","test_identifiability","resource_path","stitching"]},"stitching_type":"routine_components","meaningful_gain_basis":None,"interaction_prediction":None,"matched_budget_test":None}
 
 def test_registered_semantic_contracts_are_closed():
-    assert set(RESULT_SCHEMAS)=={"investigator","librarian","discovery.FRAME","discovery.NEXT_DRAW","discovery.COMPOSE","novelty_examiner","selector","developer","proposer","skeptic","moderator","reporter","evaluator","discovery.CONCEIVE","discovery.REVISE","scientific_reviewer","scout.SURVEY","ideator.SKETCH","editor.TRIAGE","scout.CHECK","scout.DEVELOP","scout.PRESSURE"}
+    assert set(RESULT_SCHEMAS)=={"investigator","librarian","discovery.FRAME","discovery.NEXT_DRAW","discovery.COMPOSE","novelty_examiner","selector","developer","proposer","skeptic","moderator","reporter","evaluator","discovery.CONCEIVE","discovery.REVISE","scientific_reviewer","scout.SURVEY","ideator.SKETCH","editor.TRIAGE","scout.CHECK","scout.DEVELOP","scout.PRESSURE","writer.POLISH"}
     for schema in RESULT_SCHEMAS.values():
         assert schema.model_json_schema()["additionalProperties"] is False
         with pytest.raises(ValidationError): schema.model_validate({})
