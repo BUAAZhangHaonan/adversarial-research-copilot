@@ -16,7 +16,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_every_new_role_uses_one_current_alias_and_correct_api_id():
     for settings in (Settings(), load_settings(ROOT / 'configs/runtime.yaml')):
-        assert settings.research_model == CURRENT_RESEARCH_ALIAS == 'deepseek-v4.1-flash'
+        assert settings.research_model == CURRENT_RESEARCH_ALIAS == 'deepseek-flash'
         assert set(settings.models) == {CURRENT_RESEARCH_ALIAS}
         assert set(settings.roles.values()) == {CURRENT_RESEARCH_ALIAS}
         model = settings.models[CURRENT_RESEARCH_ALIAS]
@@ -71,7 +71,7 @@ async def test_current_actual_sdk_model_alias_accounting_and_cached_resume(tmp_p
     assert request['max_tokens'] == 384000
     call = ledger.list_calls('stage')[0]
     assert call['state'] == 'SETTLED'
-    assert call['metadata']['model_alias'] == 'deepseek-v4.1-flash'
+    assert call['metadata']['model_alias'] == 'deepseek-flash'
     assert call['metadata']['model_requested'] == 'deepseek-flash'
     assert call['metadata']['announced_version'] == 'DeepSeek-V4.1-Flash'
     assert store.get_task('task_fixture').model_id == 'deepseek-flash'

@@ -2,7 +2,9 @@
 
 本次只迁移当前调用配置与计价。历史科研结果、逐调用模型标识、价格快照和累计费用不改写，也不据此声称抽卡质量已经改善。
 
-## 当前模型和官方依据
+后续配置名称已按用户要求统一为官方 `deepseek-flash`；下文 `deepseek-v4.1-flash` 是本次最初迁移时的历史配置别名记录，实际 API 名称一直为 `deepseek-flash`。运行前费用与余额功能见 [PREFLIGHT_COST_AND_BALANCE.md](PREFLIGHT_COST_AND_BALANCE.md)。
+
+## 迁移时模型和官方依据
 
 - ARC 配置别名：`deepseek-v4.1-flash`。
 - 实际 API 请求模型：`deepseek-flash`；官方对应版本为 `DeepSeek-V4.1-Flash`。

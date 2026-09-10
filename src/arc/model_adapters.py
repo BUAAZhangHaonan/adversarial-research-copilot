@@ -73,7 +73,7 @@ class ModelSpec(BaseModel):
         return config
 
 
-CURRENT_RESEARCH_ALIAS = 'deepseek-v4.1-flash'
+CURRENT_RESEARCH_ALIAS = 'deepseek-flash'
 CURRENT_API_MODEL = 'deepseek-flash'
 
 

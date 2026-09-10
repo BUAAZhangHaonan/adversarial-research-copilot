@@ -32,13 +32,13 @@ def install_compatible(runtime):
 
 def test_discover_roles_follow_research_alias_with_explicit_override(tmp_path):
     path = tmp_path / 'config.yaml'
-    path.write_text("research_model: shared\nmodels:\n  shared:\n    provider: openai_compatible\n    model: compatible-research-v1\n    base_url: https://compatible.invalid/v1\n    api_key_env: ARC_COMPATIBLE_KEY\n    capabilities:\n      max_output_tokens: 4096\nroles:\n  editor: deepseek-v4.1-flash\n")
+    path.write_text("research_model: shared\nmodels:\n  shared:\n    provider: openai_compatible\n    model: compatible-research-v1\n    base_url: https://compatible.invalid/v1\n    api_key_env: ARC_COMPATIBLE_KEY\n    capabilities:\n      max_output_tokens: 4096\nroles:\n  editor: deepseek-flash\n")
     settings = load_settings(path)
     assert settings.roles['scout'] == settings.roles['ideator'] == 'shared'
-    assert settings.roles['editor'] == 'deepseek-v4.1-flash'
+    assert settings.roles['editor'] == 'deepseek-flash'
     assert settings.models['shared'].reasoning_effort is None
     assert settings.models['shared'].base_url_env is None
-    assert {Settings().roles[r] for r in ('scout', 'ideator', 'editor')} == {'deepseek-v4.1-flash'}
+    assert {Settings().roles[r] for r in ('scout', 'ideator', 'editor')} == {'deepseek-flash'}
 
 
 @pytest.mark.parametrize('values, error', [
