@@ -230,9 +230,7 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
                            json.dumps(report, ensure_ascii=False, indent=2, default=str))
 
     for condition in 'ABCDE':
-        config = settings.model_copy(update={'roles': {role: 'deepseek-v4-pro' for role in settings.roles}})
-        if condition == 'C':
-            config.roles['discovery'] = 'deepseek-v4-flash'
+        config = settings.model_copy(update={'roles': {role: settings.research_model for role in settings.roles}})
         run = get_run(condition, config)
         engine = FrozenEngine(store, ledger, config, material, factory)
         try:
@@ -324,8 +322,8 @@ async def run_ablation(settings, source_run_id, *, experiment_id, parent_id, bud
 
     if any(value['status'] != 'COMPLETED' for value in report['conditions'].values()):
         return report
-    run = get_run('judge', settings.model_copy(update={'roles': {r: 'deepseek-v4-pro' for r in settings.roles}}))
-    engine = FrozenEngine(store, ledger, settings.model_copy(update={'roles': {r: 'deepseek-v4-pro' for r in settings.roles}}), material, factory)
+    run = get_run('judge', settings.model_copy(update={'roles': {r: settings.research_model for r in settings.roles}}))
+    engine = FrozenEngine(store, ledger, settings.model_copy(update={'roles': {r: settings.research_model for r in settings.roles}}), material, factory)
     candidates, identity = anonymous_candidates(list(report['conditions'].values()), seed=seed)
     try:
         for order, ordered in [('forward', candidates), ('swapped', list(reversed(candidates)))]:

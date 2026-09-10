@@ -159,7 +159,7 @@ async def run_comparison(settings, source_run_id, *, seed=20260907, include_swap
     candidates = []
     for system in ('ARC', 'direct-Pro'):
         config = settings if system == 'ARC' else settings.model_copy(update={
-            'roles': {role: 'deepseek-v4-pro' for role in settings.roles}})
+            'roles': {role: settings.research_model for role in settings.roles}})
         run_id = source_run_id + '.comparison.' + system
         try:
             run = store.get_run(run_id)

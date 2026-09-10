@@ -108,9 +108,9 @@ async def test_ablation_controls_models_prompts_materials_and_reuses_candidate_a
         condition = item['task_id'].split('.')[1]
         assert item['payload']['original_task']['topic'] == 'Separate distance and interference.'
         if condition in 'BC' and item['role'] == 'discovery':
-            assert item['model'] == ('deepseek-v4-flash' if condition == 'C' else 'deepseek-v4-pro')
+            assert item['model'] == 'deepseek-v4.1-flash'
         else:
-            assert item['model'] == 'deepseek-v4-pro'
+            assert item['model'] == 'deepseek-v4.1-flash'
         if item['role'] in {'novelty_examiner', 'selector'}:
             assert condition in 'ABC' and item['phase'] == 'legacy'
         else:
