@@ -235,15 +235,15 @@ class Store:
                 "topic": campaign.topic, "brief_version": run.state.get("brief_version", 1),
                 "seed": None, "triage": None, "note": None, "status": "pending",
                 "created_at": utc_now()}
-            if set(updates) - {"seed", "triage", "note", "status", "sketch", "check_action_observed"}:
+            if set(updates) - {"seed", "triage", "note", "status", "sketch", "check_action_observed", "check_material_basis"}:
                 raise StateError("idea_identity_immutable")
             record.update(updates, updated_at=utc_now())
             db.execute("INSERT INTO discovery_ideas VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
                 (record["idea_id"], run_id, draw_id, _dump(record)))
             db.execute("DELETE FROM discovery_ideas_fts WHERE idea_id=?", (record["idea_id"],))
-            seed = record.get("seed") or {}
+            from .discovery_memory import discovery_idea_index_text
             db.execute("INSERT INTO discovery_ideas_fts VALUES (?,?)", (record["idea_id"],
-                " ".join(_tokens(" ".join(str(seed.get(k, "")) for k in ("title", "question", "insight"))))))
+                " ".join(_tokens(discovery_idea_index_text(record)))))
         return record
 
     def get_discovery_idea(self, idea_id):
@@ -258,6 +258,18 @@ class Store:
                               (run_id,) if run_id else ()).fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    def reindex_discovery_ideas(self):
+        """Explicitly refresh this derived index; stored ideas/history stay unchanged."""
+        from .discovery_memory import discovery_idea_index_text
+        with self._transaction() as db:
+            rows = db.execute("SELECT id,data FROM discovery_ideas ORDER BY rowid").fetchall()
+            db.execute("DELETE FROM discovery_ideas_fts")
+            for row in rows:
+                record = json.loads(row["data"])
+                db.execute("INSERT INTO discovery_ideas_fts VALUES (?,?)", (row["id"],
+                    " ".join(_tokens(discovery_idea_index_text(record)))))
+        return {"indexed_ideas": len(rows)}
+
     def lookup_discovery_ideas(self, query, exclude_run_id=None, limit=5):
         tokens = _tokens(query)
         if not tokens: return []
@@ -266,8 +278,8 @@ class Store:
             rows = db.execute("SELECT i.data FROM discovery_ideas_fts f JOIN discovery_ideas i ON i.id=f.idea_id "
                 "WHERE discovery_ideas_fts MATCH ? AND (? IS NULL OR i.run_id != ?) "
                 "ORDER BY bm25(discovery_ideas_fts) LIMIT ?", (match, exclude_run_id, exclude_run_id, limit)).fetchall()
-        return [{"idea_id": x["idea_id"], "seed": x["seed"], "triage": x["triage"], "status": x["status"]}
-                for x in (json.loads(row[0]) for row in rows)]
+        from .discovery_memory import current_idea_view
+        return [current_idea_view(json.loads(row[0])) for row in rows]
 
     def create_run(self,mode,campaign_id=None,card_id=None,card_version=None,budget_account_id=None,config=None,prompt_version="",code_version="",run_id=None,state=None):
         if (card_id is None)!=(card_version is None): raise StateError("card_version_required")
