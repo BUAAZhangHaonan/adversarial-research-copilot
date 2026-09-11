@@ -97,6 +97,7 @@ class BudgetLedger:
               COALESCE(SUM(reserved_micro),0) AS reserved,
               COALESCE(SUM(CASE WHEN state='UNKNOWN' THEN lower_micro ELSE 0 END),0) AS unsettled_lower,
               COALESCE(SUM(CASE WHEN state='UNKNOWN' THEN 1 ELSE 0 END),0) AS unknown,
+              COALESCE(SUM(CASE WHEN cost_status='unmetered' AND state!='NOT_SENT' THEN 1 ELSE 0 END),0) AS unmetered,
               COUNT(*) AS calls FROM budget_calls WHERE account_id IN (SELECT id FROM descendants)
         """, (account_id,)).fetchone()
         lower, upper, reserved = aggregate["lower"], aggregate["upper"], aggregate["reserved"]
@@ -109,6 +110,9 @@ class BudgetLedger:
             "spent_upper_cny": as_cny(upper), "reserved_cny": as_cny(reserved),
             "remaining_cny": as_cny(remaining), "unknown_calls": aggregate["unknown"],
             "call_count": aggregate["calls"], "currency": "CNY",
+            "unmetered_calls": aggregate["unmetered"],
+            "total_cost_complete": not bool(aggregate["unmetered"] or aggregate["unknown"] or reserved),
+            "cost_scope": "metered_costs_only" if aggregate["unmetered"] else "recorded_costs",
             "unsettled_lower_micro": aggregate["unsettled_lower"],
             "unsettled_lower_cny": as_cny(aggregate["unsettled_lower"]),
         }
@@ -141,6 +145,14 @@ class BudgetLedger:
         result["cost_actual_if_available"]=metadata.get("cost_actual_if_available")
         if result["cost_status"]=="measured_invoice" and result["lower_micro"]==result["upper_micro"]:
             result["cost_actual_if_available"]=as_cny(result["upper_micro"])
+        if result['cost_status'] == 'unmetered':
+            # Integer admission columns are unused for authorized external costs;
+            # never expose their storage placeholders as a zero-price claim.
+            for name in ('reserved_micro', 'admitted_micro', 'lower_micro', 'upper_micro',
+                         'reserved_cny', 'reserved_amount', 'cost_estimate_lower', 'cost_estimate_upper'):
+                result[name] = None
+            result['external_cost_status'] = 'unmetered'
+            result['outcome_status'] = metadata.get('outcome_status', 'pending')
         return result
 
     def get_call(self, call_id):
@@ -168,6 +180,42 @@ class BudgetLedger:
             db.execute("""INSERT INTO budget_calls
                 (call_id,account_id,reserved_micro,admitted_micro,state,metadata,created_at)
                 VALUES (?,?,?,?,?,?,?)""", (call_id, account_id, maximum, maximum, "RESERVED", json.dumps(metadata, ensure_ascii=False), utc_now()))
+        return self.get_call(call_id)
+
+    def register_unmetered(self, account_id, call_id, **metadata):
+        """Record authorized external execution without asserting a price bound."""
+        if not (metadata.get('allow_unmetered') is True
+                and metadata.get('service') == 'scholartrace' and metadata.get('method') == 'search_literature'):
+            raise BudgetError('unmetered_tool_not_authorized')
+        with self._transaction() as db:
+            if db.execute('SELECT 1 FROM budget_accounts WHERE account_id=?', (account_id,)).fetchone() is None:
+                raise BudgetError('account_missing')
+            old = db.execute('SELECT * FROM budget_calls WHERE call_id=?', (call_id,)).fetchone()
+            if old:
+                if (old['account_id'] != account_id or old['cost_status'] != 'unmetered'
+                        or json.loads(old['metadata']) != metadata):
+                    raise BudgetError('call_id_reused_with_different_request_metadata')
+                return self._call(old)
+            # This table's nonnullable numeric columns are not used for this row.
+            # Public views return null and summary explicitly excludes external cost.
+            db.execute("""INSERT INTO budget_calls
+                (call_id,account_id,reserved_micro,admitted_micro,state,cost_status,metadata,created_at)
+                VALUES (?,?,0,0,'RESERVED','unmetered',?,?)""",
+                (call_id, account_id, json.dumps(metadata, ensure_ascii=False), utc_now()))
+        return self.get_call(call_id)
+
+    def finish_unmetered(self, call_id, *, outcome_unknown=False, **metadata):
+        """SETTLED closes the action record, not an assertion of measured cost."""
+        with self._transaction() as db:
+            old = db.execute('SELECT * FROM budget_calls WHERE call_id=?', (call_id,)).fetchone()
+            if old is None or old['cost_status'] != 'unmetered' or old['state'] == 'NOT_SENT':
+                raise BudgetError('unmetered_call_not_registered')
+            payload = json.loads(old['metadata'])
+            if any(key in payload and payload[key] != value for key, value in metadata.items()):
+                raise BudgetError('unmetered_completion_cannot_rewrite_identity')
+            payload.update(metadata, outcome_status='unmetered_outcome_unknown' if outcome_unknown else 'response_received')
+            db.execute("UPDATE budget_calls SET state='SETTLED',upper_micro=NULL,metadata=?,completed_at=? WHERE call_id=?",
+                       (json.dumps(payload, ensure_ascii=False), utc_now(), call_id))
         return self.get_call(call_id)
 
     def mark_started(self, call_id):
