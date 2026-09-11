@@ -1,6 +1,7 @@
 """Discover short ideas first; preserve paid task boundaries and human handoff."""
 from __future__ import annotations
-from .discovery_models import FieldBrief, CandidateCheck
+from .discovery_models import FieldBrief, CandidateCheck, SketchResult
+from .evidence_continuation import call_with_evidence_limits, unavailable_brief, LIMIT_MESSAGE
 from .schemas import utc_now
 
 
@@ -19,6 +20,8 @@ async def finish_stage(engine, run_id, reason):
         from .polishing import build_polish_payload
         await engine.call(run_id, 'polish', 'writer', 'POLISH',
                           payload=build_polish_payload(engine.store, run_id), tool_profile=[])
+    if engine.store.get_run(run_id).state.get("evidence_limits"):
+        reason = "finished_with_evidence_limits_human_decision"
     engine.complete(run_id, reason)
     publish(engine, run_id)
 
@@ -89,7 +92,9 @@ def merge_updates(engine, run_id, updates, revision=None):
 async def discover(engine, run_id):
     run = engine.store.get_run(run_id)
     if not run.state.get("field_brief"):
-        brief = await engine.call(run_id, "survey", "scout", "SURVEY", payload=context(engine, run_id))
+        brief = await call_with_evidence_limits(engine, run_id, "survey", "scout", "SURVEY", payload=context(engine, run_id))
+        if brief is None:
+            brief = unavailable_brief()
         engine.checkpoint(run_id, field_brief=brief.model_dump(mode="json"), brief_version=1)
         publish(engine, run_id)
     campaign = engine.store.get_campaign(run.campaign_id)
@@ -103,15 +108,19 @@ async def discover(engine, run_id):
                 return
             continue
         if run.state.get("survey_refresh_used") and not run.state.get("survey_refresh_applied"):
-            brief = await engine.call(run_id, "survey.refresh", "scout", "SURVEY", payload={
+            brief = await call_with_evidence_limits(engine, run_id, "survey.refresh", "scout", "SURVEY", payload={
                 **context(engine, run_id), "refresh_question": run.state["survey_refresh_question"]})
+            if brief is None:
+                brief = unavailable_brief(run.state.get("field_brief"))
             engine.checkpoint(run_id, field_brief=brief.model_dump(mode="json"),
                               brief_version=run.state.get("brief_version", 1) + 1, survey_refresh_applied=True)
             run = engine.store.get_run(run_id)
         payload = {**context(engine, run_id, task="SKETCH", exclude_draw_id=key), "draw_id": key,
                    "remaining_draws": campaign.max_draws - ordinal + 1}
-        sketch = await engine.call(run_id, key + ".sketch", "ideator", "SKETCH", payload=payload,
+        sketch = await call_with_evidence_limits(engine, run_id, key + ".sketch", "ideator", "SKETCH", payload=payload,
             on_admitted=lambda k=key: engine.store.claim_draw(campaign.campaign_id, run_id + "." + k))
+        if sketch is None:
+            sketch = SketchResult(action="skip", seed=None, reason=LIMIT_MESSAGE)
         record = engine.store.save_discovery_idea(run_id, key,
             seed=sketch.seed.model_dump(mode="json") if sketch.seed else None, sketch=sketch.model_dump(mode="json"))
         run = engine.store.get_run(run_id)
@@ -127,19 +136,31 @@ async def discover(engine, run_id):
             archive = engine.store.lookup_archive(sketch.seed.question, limit=4)
             previous = [compact_idea_view(x) for x in engine.store.lookup_discovery_ideas(
                 sketch.seed.question, exclude_run_id=run_id, limit=4)]
-            triage = await engine.call(run_id, key + ".triage", "editor", "TRIAGE", payload={
+            triage = await call_with_evidence_limits(engine, run_id, key + ".triage", "editor", "TRIAGE", payload={
                 **context(engine, run_id, task="TRIAGE", seed=seed, exclude_draw_id=key),
                 "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_candidate_relation": True,
                 "local_archive": archive, "previous_ideas": previous})
+            if triage is None:
+                engine.store.save_discovery_idea(run_id, key, status="evidence_limited")
+                engine.checkpoint(run_id, **{key + "_done": True})
+                publish(engine, run_id)
+                continue
             engine.store.save_discovery_idea(run_id, key, triage=triage.model_dump(mode="json"),
                 status="pending" if triage.action == "investigate" else triage.action)
             publish(engine, run_id)
             if triage.action == "investigate":
-                checked = await engine.call(run_id, key + ".check", "scout", "CHECK", payload={
+                checked = await call_with_evidence_limits(engine, run_id, key + ".check", "scout", "CHECK", payload={
                     **context(engine, run_id, task="CHECK", exclude_draw_id=key),
                     "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_current_understanding": True,
                     "triage": triage.model_dump(mode="json"),
                     **({"shared_followup_question": sketch.next_search} if sketch.next_search else {})})
+                if checked is None:
+                    engine.store.save_discovery_idea(run_id, key, status="evidence_limited", note=None,
+                        check_action_observed=False, check_material_basis="unverified")
+                    engine.checkpoint(run_id, **{key + "_done": True,
+                        "previous_directions": discovery_directions(engine, run_id)})
+                    publish(engine, run_id)
+                    continue
                 # Cached and resumed tasks retain their original input; do not infer
                 # that an older CHECK received this handoff from the newly constructed payload.
                 accepted_input = engine.store.get_run(run_id).state.get("task_inputs", {}).get(
@@ -176,7 +197,11 @@ async def discover(engine, run_id):
 async def prestudy(engine, run_id):
     run = engine.store.get_run(run_id)
     task = "DEVELOP" if run.mode == "develop" else "PRESSURE"
-    result = await engine.call(run_id, "prestudy", "scout", task, payload={**run.state["idea_input"], "require_current_understanding": True})
+    result = await call_with_evidence_limits(engine, run_id, "prestudy", "scout", task, payload={**run.state["idea_input"], "require_current_understanding": True})
+    if result is None:
+        engine.checkpoint(run_id, prestudy_evidence_limited=True, check_material_basis="unverified")
+        await finish_stage(engine, run_id, "prestudy_finished_with_evidence_limits")
+        return
     trace = engine.task_trace(run_id, "prestudy")
     supplied = [*(run.state["idea_input"].get("field_brief") or {}).get("source_notes", []),
                 *(run.state["idea_input"].get("latest_note") or {}).get("source_notes", [])]

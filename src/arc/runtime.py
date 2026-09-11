@@ -420,6 +420,8 @@ class Runtime:
         """Collect independent read-only errors before spending JSON correction."""
         from .retrying import validate_deferred_evidence
         validate_deferred_evidence(envelope, payload)
+        from .evidence_continuation import validate_evidence_limit_result
+        validate_evidence_limit_result(envelope, payload)
         from .discovery_models import CandidateCheck, TriageResult
         from .polishing import StagePolish, validate_polish
         if isinstance(envelope.result, StagePolish):

@@ -146,7 +146,8 @@ class WorkflowEngine:
             role=role, task=task, payload=payload or {},
             result_schema=RESULT_SCHEMAS[schema_key], subject=subject,
             task_id=task_id,
-            tool_profile=[name for name in dict.fromkeys((*(RESEARCH_TOOLS if tool_profile is None else tool_profile), 'request_capability'))
+            tool_profile=[name for name in dict.fromkeys((*(RESEARCH_TOOLS if tool_profile is None else tool_profile),
+                           *(() if payload.get('evidence_limit_handoff') else ('request_capability',))))
                           if name in self.runtime.tools and name in allowed_tools],
             on_admitted=on_admitted,
         )
