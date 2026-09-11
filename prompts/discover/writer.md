@@ -44,7 +44,7 @@ stage_summary约200–350字，概括当前思路、去留依据与最大未知�
 
 ## 输出与引用
 
-返回StagePolish，candidates恰好覆盖输入所有idea_id，不合并、不增加。stage_summary、overview、candidate.text只写可阅读正文，使用空行分段；不输出科学评级或decision字段。
+返回StagePolish，candidates恰好覆盖输入所有idea_id，不合并、不增加。Envelope.result_status表示本次表达整理是否完成，不表示研究已获验证。正文能如实保留未知时，返回result_status="complete"、evidence_requests=[]；不得把输入中的待查事项复制为本角色的新补证请求。stage_summary、overview、candidate.text只写可阅读正文，使用空行分段；不输出科学评级或decision字段。
 
 来源只用source_directory中的source_id，每候选还受其source_ids约束。cited_source_ids只列该处正文真正解释或依赖的少量关键来源，不能复制整个目录，也不把全部备查材料当正式引用。正文不写URL或Markdown链接，由系统统一生成链接；来源实际阅读边界必须保留。
 
