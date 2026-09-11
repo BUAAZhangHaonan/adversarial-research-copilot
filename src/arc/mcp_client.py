@@ -50,6 +50,7 @@ class Capability:
     origin: str
     cost_upper_cny: Decimal | None
     cost_basis: str
+    allow_unmetered: bool = False
 
 
 def model_schema(schema: dict) -> dict:
@@ -192,11 +193,14 @@ class MCPHub:
             Draft202012Validator.check_schema(schema)
             upper = mapping.get('cost_upper_cny')
             basis = mapping.get('cost_basis', '')
+            unmetered = mapping.get('allow_unmetered', False)
+            if type(unmetered) is not bool or (unmetered and (wrapper, mapping['service'], mapping['method']) != ('search_literature', 'scholartrace', 'query')):
+                raise MCPFailure('UNMETERED_TOOL_NOT_AUTHORIZED')
             if upper is not None and (Decimal(str(upper)) < 0 or not basis):
                 raise MCPFailure('MCP_COST_BASIS_REQUIRED')
             self.capabilities[wrapper] = Capability(wrapper, mapping['service'], mapping['method'],
                                                    schema, mapping['origin'],
-                                                   None if upper is None else Decimal(str(upper)), basis)
+                                                   None if upper is None else Decimal(str(upper)), basis, unmetered)
         return self.capabilities
 
     async def call(self, name: str, arguments: dict) -> dict:
@@ -205,8 +209,9 @@ class MCPHub:
         cap = self.capabilities[name]
         validate_arguments(cap.parameters, arguments)
         # Runtime performs financial admission before this method; unknown costs
-        # are blocked here as well so no alternate caller can bypass the boundary.
-        if cap.cost_upper_cny is None:
+        # require explicit scoped authorization here too, including direct callers.
+        if cap.cost_upper_cny is None and not (cap.allow_unmetered and
+                (cap.name, cap.service, cap.method) == ('search_literature', 'scholartrace', 'query')):
             raise MCPFailure('COST_UNOBSERVABLE')
         async with self._client(self.services[cap.service]) as client:
             result = await client.call_tool(cap.method, arguments,

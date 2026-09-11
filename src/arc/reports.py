@@ -31,6 +31,8 @@ LABELS = {
     'spent_upper_cny':'已结算上界（元）','reserved_cny':'预留（元）','remaining_cny':'剩余额度（元）',
     'limit_cny':'授权上限（元）','cost_status':'费用可信度','account_id':'预算账户','parent_id':'父级账户',
     'recorded_run_id':'证据登记运行',
+    'unmetered_calls':'外部费用未计量的工具动作数', 'total_cost_complete':'总费用是否完整',
+    'cost_scope':'费用统计范围', 'external_cost_status':'外部费用状态', 'outcome_status':'外部动作结果',
     'remaining_uncertainty':'仍未解决的科学问题','decisive_findings':'决定性审查发现',
     'location':'卡片位置','quoted_text':'被审查原句','reason':'依据','consequence':'对结论的影响',
     'required_change':'必要修改','acceptance_test':'复核条件','value_reason':'研究价值判断',
@@ -293,6 +295,8 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
             pending_cards.append({'title':context['title'],'decision':context['decision_paragraph'],'path':relative})
     status = str(run['status'])
     cost_text = _text({key:value for key,value in budget.items() if not key.endswith('_micro')}) if budget else '费用账本未登记，费用未知。'
+    if budget and budget.get('unmetered_calls'):
+        cost_text += '\n\n包含已授权但费用未计量的外部工具调用；以上金额仅覆盖可计量部分，不能视为总费用或总费用上界。'
     superseded = {item['source_task_id'] for attempts in state.get('task_retries', {}).values()
                   for item in attempts}
     accepted = {task['task_id'] for task in tasks if task.get('status') == 'ACCEPTED'}
@@ -361,7 +365,7 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     paths['search_sources'].write_text('\n'.join(search_lines) + '\n', encoding='utf-8')
     paths['cost']=output_dir/'COST_REPORT.md'
     cost_entries='\n\n'.join(_text({key:(call.get('state', call.get('status')) if key == 'status' else call.get(key))
-        for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper']}) for call in calls)
+        for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper','external_cost_status','outcome_status']}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost',{'run_id':run_id,'summary':cost_text,'entries':cost_entries}),encoding='utf-8')
     if capabilities:
         paths['capabilities']=output_dir/'MCP_REQUIREMENTS.md'
@@ -446,6 +450,8 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     calls = ledger.list_calls(account) if account else []
     cost_text = (_text({key: value for key, value in budget.items() if not key.endswith('_micro')})
                  if budget else '费用账本未登记，费用未知。')
+    if budget and budget.get('unmetered_calls'):
+        cost_text += '\n\n包含已授权但费用未计量的外部工具调用；以上金额仅覆盖可计量部分，不能视为总费用或总费用上界。'
     all_ids = set(state.get('source_ids', [])) | _reference_ids([brief, ideas], SOURCE_KEYS)
     sources = [_obj(source) for source in store.list_sources(ids=sorted(all_ids))]
     paths: dict[str, Path] = {}
@@ -583,7 +589,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     paths['trace'] = output_dir / 'PROMPT_TRACE_INDEX.md'
     paths['trace'].write_text(loader.render_report('trace', {'run_id': run_id, 'tasks': trace_tasks, 'evidence_records': []}), encoding='utf-8')
     paths['cost'] = output_dir / 'COST_REPORT.md'
-    entries = '\n\n'.join(_text({key: call.get(key) for key in ['call_id', 'state', 'cost_status', 'reserved_cny', 'cost_estimate_lower', 'cost_estimate_upper']}) for call in calls)
+    entries = '\n\n'.join(_text({key: call.get(key) for key in ['call_id', 'state', 'cost_status', 'reserved_cny', 'cost_estimate_lower', 'cost_estimate_upper', 'external_cost_status', 'outcome_status']}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost', {'run_id': run_id, 'summary': cost_text, 'entries': entries}), encoding='utf-8')
     capabilities = store.list_capability_requests(run_id)
     if capabilities:

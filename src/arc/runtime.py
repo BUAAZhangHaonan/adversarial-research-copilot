@@ -120,6 +120,7 @@ class BoundTool:
     cost_basis: str
     service: str = 'local'
     persists_raw_response: bool = False
+    allow_unmetered: bool = False
 
 
 def web_text_representation(body: dict, arguments: dict) -> dict:
@@ -246,7 +247,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     return {'is_error': True, 'error': 'MCP_RESULT_NOT_JSON', 'content': body}
             if not isinstance(body, dict) or body.get('error') or body.get('status') in {'failed', 'error'}:
                 return {'is_error': True, 'error': 'MCP_OPERATION_FAILED', 'data': body}
-            source_ids, registered = [], []
+            source_ids, registered, unregistered = [], [], []
             if name == 'read_paper':
                 paper = dict(body.get('paper') or {})
                 text = body.get('markdown')
@@ -277,6 +278,12 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                         return {'is_error': True, 'error': 'MCP_SOURCE_METADATA_INCOMPLETE',
                                 'missing': ['source_identity' if not url else 'title'],
                                 'raw_artifact_path': raw_path}
+                    if name == 'search_literature' and item.get('title'):
+                        unregistered.append({**{key: item[key] for key in
+                            ('paper_id', 'title', 'authors', 'year', 'venue', 'abstract', 'rationale', 'fulltext_status') if key in item},
+                            'content_origin': 'metadata', 'rationale_origin': 'secondary_analysis',
+                            'identity_status': 'identity_unresolved',
+                            'citation_eligible': False})
                     continue
                 origin = item['origin']
                 text = item.get('content')
@@ -302,11 +309,14 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     'service': cap.service, 'method': cap.method, 'origin': cap.origin,
                     'raw_artifact_path': raw_path, 'errors': body.get('errors', []),
                     'status': body.get('status')}
+            if unregistered:
+                result['unregistered_candidates'] = unregistered
+                result['candidate_limit'] = 'Provider IDs are search handles, not registered source IDs. Locate a DOI, arXiv ID, or original URL before citing or reading.'
             if name == 'search_web':
                 diagnostics = compact_search_diagnostics(body, arguments)
                 if diagnostics: result['search_diagnostics'] = diagnostics
             return result
-        tools[name] = BoundTool(name, cap.parameters, execute, cap.cost_upper_cny, cap.cost_basis, cap.service, True)
+        tools[name] = BoundTool(name, cap.parameters, execute, cap.cost_upper_cny, cap.cost_basis, cap.service, True, cap.allow_unmetered)
     return tools
 
 
@@ -1053,10 +1063,13 @@ class Runtime:
             validate_arguments(tool.parameters, arguments)
         except (ValueError, RuntimeError) as exc:
             raise RuntimePaused('PAUSED_PROTOCOL', 'TOOL_ARGUMENTS_INVALID') from exc
-        if tool.cost_upper_cny is None or not tool.cost_basis:
+        unmetered = (tool.cost_upper_cny is None and tool.allow_unmetered
+                     and name == 'search_literature' and tool.service == 'scholartrace')
+        if (tool.cost_upper_cny is None and not unmetered) or not tool.cost_basis:
             raise RuntimePaused('PAUSED_EXTERNAL', 'COST_UNOBSERVABLE')
         local_read = (tool.service == 'local' and name in {'read_record', 'lookup_archive', 'request_capability'}
                       and tool.cost_upper_cny == 0)
+        pending_unmetered_unknown = False
         if state.get('pending_tool'):
             call_id = state['pending_tool']
             metadata = self.ledger.get_call(call_id)['metadata']
@@ -1066,11 +1079,13 @@ class Runtime:
             raw_path = metadata.get('raw_response_artifact_path')
             if not local_read:
                 if not tool.persists_raw_response or not raw_path:
-                    raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN')
+                    if unmetered: pending_unmetered_unknown = True
+                    else: raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN')
                 try:
-                    self.store.read_artifact(raw_path)
+                    if raw_path: self.store.read_artifact(raw_path)
                 except FileNotFoundError as exc:
-                    raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN') from exc
+                    if unmetered: pending_unmetered_unknown = True
+                    else: raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN') from exc
         else:
             call_id = 'tool_' + uuid4().hex
             metadata = {'run_id': record.run_id, 'task_id': record.task_id, 'tool_call_id': call['id'],
@@ -1078,14 +1093,22 @@ class Runtime:
                         'cost_basis': tool.cost_basis, 'arguments': arguments, 'started_at': datetime.now(UTC).isoformat()}
             if tool.persists_raw_response:
                 metadata['raw_response_artifact_path'] = f'runs/{record.run_id}/tools/{call_id}.raw.json'
-            self.ledger.reserve(self.account_id, call_id, tool.cost_upper_cny, **metadata)
+            if unmetered:
+                metadata['allow_unmetered'] = True
+                self.ledger.register_unmetered(self.account_id, call_id, **metadata)
+            else:
+                self.ledger.reserve(self.account_id, call_id, tool.cost_upper_cny, **metadata)
             self._progress(record, 'TOOL_RESERVED')
             state['pending_tool'] = call_id
             self._checkpoint(record, state)
             self.ledger.mark_started(call_id)
         try:
+            if pending_unmetered_unknown:
+                raise RuntimeError('UNMETERED_PREVIOUS_OUTCOME_UNKNOWN')
             result = await tool.handler(arguments, metadata)
             result = {**result, 'trace_id': call_id}
+            if unmetered:
+                result['external_cost'] = {'status': 'unmetered', 'upper_cny': None}
             trace = {**metadata, 'name': name, 'status': 'error' if result.get('is_error') else 'completed',
                      'call_id': call_id, 'result': result, 'source_ids': result.get('source_ids', []),
                      'evidence_ids': result.get('evidence_ids', []), 'completed_at': datetime.now(UTC).isoformat()}
@@ -1093,8 +1116,11 @@ class Runtime:
             state['messages'].append({'role': 'tool', 'tool_call_id': call['id'], 'content': encoded(result)})
             state['pending_tool'] = None
             self._checkpoint(record, state, 'RESPONSE_SAVED')
-            self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'bounded_estimate',
-                               completed_at=trace['completed_at'], response_artifact_path=record.response_artifact_path)
+            completion = dict(completed_at=trace['completed_at'], response_artifact_path=record.response_artifact_path)
+            if unmetered:
+                self.ledger.finish_unmetered(call_id, **completion)
+            else:
+                self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'bounded_estimate', **completion)
         except BaseException as exc:
             raw_path = metadata.get('raw_response_artifact_path')
             raw_saved = False
@@ -1108,12 +1134,32 @@ class Runtime:
                 error = {'call_id': call_id, 'error_type': type(exc).__name__, 'error': str(exc),
                          'raw_response_artifact_path': raw_path, 'recorded_at': datetime.now(UTC).isoformat()}
                 state.setdefault('tool_processing_errors', []).append(error)
-                self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'bounded_estimate',
-                    error=type(exc).__name__, error_detail=str(exc), raw_response_artifact_path=raw_path)
+                failure = dict(error=type(exc).__name__, error_detail=str(exc), raw_response_artifact_path=raw_path)
+                if unmetered:
+                    self.ledger.finish_unmetered(call_id, **failure)
+                else:
+                    self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'bounded_estimate', **failure)
                 record.error = 'TOOL_LOCAL_PROCESSING_FAILED:' + type(exc).__name__
                 self._checkpoint(record, state, 'PAUSED_PROTOCOL')
                 raise RuntimePaused('PAUSED_PROTOCOL', record.error) from exc
-            self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'unknown', error=type(exc).__name__)
+            if unmetered:
+                # An authorized unmetered service timeout is a tool limitation,
+                # not an unknown model bill. Do not repeat the remote action.
+                self.ledger.finish_unmetered(call_id, outcome_unknown=True, error=type(exc).__name__)
+                result = {'is_error': True, 'error': 'UNMETERED_TOOL_OUTCOME_UNKNOWN',
+                          'error_type': type(exc).__name__, 'trace_id': call_id,
+                          'external_cost': {'status': 'unmetered', 'upper_cny': None},
+                          'source_ids': [], 'raw_artifact_path': raw_path}
+                state['tool_trace'].append({**metadata, 'name': name, 'status': 'error',
+                    'call_id': call_id, 'outcome_status': 'unmetered_outcome_unknown', 'result': result})
+                state['messages'].append({'role': 'tool', 'tool_call_id': call['id'], 'content': encoded(result)})
+                state['pending_tool'] = None
+                self._checkpoint(record, state, 'RESPONSE_SAVED')
+                if not isinstance(exc, Exception): raise
+                self._progress(record, 'TOOL_SETTLED')
+                return
+            else:
+                self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'unknown', error=type(exc).__name__)
             self._checkpoint(record, state)
             raise RuntimePaused('PAUSED_EXTERNAL', 'TOOL_REMOTE_RESULT_UNKNOWN') from exc
         self._progress(record, 'TOOL_SETTLED')

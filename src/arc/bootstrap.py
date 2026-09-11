@@ -35,10 +35,11 @@ async def make_runtime(store, ledger, run, settings):
     all_tools = build_tools(store, hub)
     # Financially unavailable operations remain in the inventory/requirements record,
     # but are not advertised as executable research tools in this run.
-    tools = {name: tool for name, tool in all_tools.items() if tool.cost_upper_cny is not None}
-    blocked = {name: tool.cost_basis for name, tool in all_tools.items() if tool.cost_upper_cny is None}
+    tools = {name: tool for name, tool in all_tools.items() if tool.cost_upper_cny is not None or tool.allow_unmetered}
+    blocked = {name: tool.cost_basis for name, tool in all_tools.items() if tool.cost_upper_cny is None and not tool.allow_unmetered}
     state = dict(store.get_run(run.run_id).state)
-    state.update(available_tools=list(tools), blocked_capabilities=blocked)
+    state.update(available_tools=list(tools), blocked_capabilities=blocked,
+        unmetered_capabilities=[name for name, tool in tools.items() if tool.cost_upper_cny is None])
     manifest_hash = hashlib.sha256((resource_root / 'manifest.json').read_bytes()).hexdigest()
     state['prompt_manifest_hash'] = manifest_hash
     state['prompt_bundle_hash'] = loader.bundle_hash
