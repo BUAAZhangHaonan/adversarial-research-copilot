@@ -204,18 +204,35 @@ class BudgetLedger:
                 (call_id, account_id, json.dumps(metadata, ensure_ascii=False), utc_now()))
         return self.get_call(call_id)
 
-    def finish_unmetered(self, call_id, *, outcome_unknown=False, **metadata):
+    def finish_unmetered(self, call_id, *, outcome_unknown=False, reported_cost=None, **metadata):
         """SETTLED closes the action record, not an assertion of measured cost."""
         with self._transaction() as db:
             old = db.execute('SELECT * FROM budget_calls WHERE call_id=?', (call_id,)).fetchone()
-            if old is None or old['cost_status'] != 'unmetered' or old['state'] == 'NOT_SENT':
+            if old is None or old['cost_status'] not in {'unmetered', 'service_reported_usage'} or old['state'] == 'NOT_SENT':
                 raise BudgetError('unmetered_call_not_registered')
             payload = json.loads(old['metadata'])
+            if old['cost_status'] == 'service_reported_usage':
+                if (outcome_unknown or payload.get('reported_cost') != reported_cost
+                        or any(payload.get(key) != value for key, value in metadata.items())):
+                    raise BudgetError('unmetered_completion_cannot_rewrite_identity')
+                return self._call(old)
             if any(key in payload and payload[key] != value for key, value in metadata.items()):
                 raise BudgetError('unmetered_completion_cannot_rewrite_identity')
             payload.update(metadata, outcome_status='unmetered_outcome_unknown' if outcome_unknown else 'response_received')
-            db.execute("UPDATE budget_calls SET state='SETTLED',upper_micro=NULL,metadata=?,completed_at=? WHERE call_id=?",
-                       (json.dumps(payload, ensure_ascii=False), utc_now(), call_id))
+            from .external_cost import service_cost
+            cost = service_cost(reported_cost)
+            if reported_cost is not None:
+                payload['reported_cost'] = reported_cost
+                payload['reported_cost_valid'] = cost is not None
+            if cost and cost['complete'] and not outcome_unknown:
+                # Scoped authorization admitted the unbounded operation. Its received
+                # estimate can now be counted; it is still not a measured invoice.
+                db.execute("UPDATE budget_calls SET state='SETTLED',cost_status='service_reported_usage',lower_micro=?,upper_micro=?,metadata=?,completed_at=? WHERE call_id=?",
+                    (to_micro(cost['lower_cny'], upper=False), to_micro(cost['upper_cny']),
+                     json.dumps(payload, ensure_ascii=False), utc_now(), call_id))
+            else:
+                db.execute("UPDATE budget_calls SET state='SETTLED',upper_micro=NULL,metadata=?,completed_at=? WHERE call_id=?",
+                           (json.dumps(payload, ensure_ascii=False), utc_now(), call_id))
         return self.get_call(call_id)
 
     def mark_started(self, call_id):

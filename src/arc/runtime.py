@@ -235,7 +235,6 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                 # Persist the remote result before any JSON decoding or registry
                 # work. A local processing failure must not repeat this call.
                 store.save_artifact(raw_path, encoded(response))
-            if response['is_error']: return response
             body = response.get('structured_content')
             if isinstance(body, dict) and set(body) == {'result'}: body = body['result']
             if body is None:
@@ -245,8 +244,13 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                 try: body = json.loads(body)
                 except ValueError:
                     return {'is_error': True, 'error': 'MCP_RESULT_NOT_JSON', 'content': body}
-            if not isinstance(body, dict) or body.get('error') or body.get('status') in {'failed', 'error'}:
-                return {'is_error': True, 'error': 'MCP_OPERATION_FAILED', 'data': body}
+            from .external_cost import service_cost
+            reported_cost = body.get('cost') if isinstance(body, dict) else None
+            cost = service_cost(reported_cost)
+            cost_fields = ({'cost': cost} if cost is not None else
+                           {'cost_error': 'MCP_COST_INVALID'} if reported_cost is not None else {})
+            if response['is_error'] or not isinstance(body, dict) or body.get('error') or body.get('status') in {'failed', 'error'}:
+                return {'is_error': True, 'error': 'MCP_OPERATION_FAILED', 'data': body, **cost_fields}
             source_ids, registered, unregistered = [], [], []
             if name == 'read_paper':
                 paper = dict(body.get('paper') or {})
@@ -308,7 +312,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             result = {'is_error': False, 'source_ids': source_ids, 'sources': registered,
                     'service': cap.service, 'method': cap.method, 'origin': cap.origin,
                     'raw_artifact_path': raw_path, 'errors': body.get('errors', []),
-                    'status': body.get('status')}
+                    'status': body.get('status'), **cost_fields}
             if unregistered:
                 result['unregistered_candidates'] = unregistered
                 result['candidate_limit'] = 'Provider IDs are search handles, not registered source IDs. Locate a DOI, arXiv ID, or original URL before citing or reading.'
@@ -1110,17 +1114,21 @@ class Runtime:
             result = await tool.handler(arguments, metadata)
             result = {**result, 'trace_id': call_id}
             if unmetered:
-                result['external_cost'] = {'status': 'unmetered', 'upper_cny': None}
+                received_cost = result.get('cost') or {}
+                result['external_cost'] = ({'status': 'service_reported_usage',
+                    'lower_cny': received_cost['lower_cny'], 'upper_cny': received_cost['upper_cny']}
+                    if received_cost.get('complete') else {'status': 'unmetered', 'upper_cny': None})
             trace = {**metadata, 'name': name, 'status': 'error' if result.get('is_error') else 'completed',
                      'call_id': call_id, 'result': result, 'source_ids': result.get('source_ids', []),
                      'evidence_ids': result.get('evidence_ids', []), 'completed_at': datetime.now(UTC).isoformat()}
             state['tool_trace'].append(trace)
-            state['messages'].append({'role': 'tool', 'tool_call_id': call['id'], 'content': encoded(result)})
+            from .external_cost import cost_for_model
+            state['messages'].append({'role': 'tool', 'tool_call_id': call['id'], 'content': encoded(cost_for_model(result))})
             state['pending_tool'] = None
             self._checkpoint(record, state, 'RESPONSE_SAVED')
             completion = dict(completed_at=trace['completed_at'], response_artifact_path=record.response_artifact_path)
             if unmetered:
-                self.ledger.finish_unmetered(call_id, **completion)
+                self.ledger.finish_unmetered(call_id, reported_cost=result.get('cost'), **completion)
             else:
                 self.ledger.settle(call_id, '0', tool.cost_upper_cny, 'bounded_estimate', **completion)
         except BaseException as exc:
