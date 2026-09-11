@@ -36,3 +36,19 @@ async def test_nonarxiv_title_and_web_pages(tmp_path):
             title='Page', next_offset=None if start else 6, eof=bool(start)),
             'read_web', {'url': 'https://example.org/article'})
     assert store.get_source(result['source_ids'][0]).content_complete
+
+
+@pytest.mark.asyncio
+async def test_paper_search_miss_is_not_registered_as_evidence(tmp_path):
+    store = Store(tmp_path / 'db.sqlite')
+    first = await replay(store, page('abcdef'))
+    before = store.get_source(first['source_ids'][0]).model_dump()
+    result = await replay(store, dict(status='success', match_status='no_match', no_match=True,
+        document_id='paper1', document_revision='r1', markdown='', matches=[],
+        range={'start': 0, 'end': 0}, search_range={'start': 0, 'end': 12},
+        total_chars=12, coverage='no_text_returned', next_offset=None))
+    assert not result['is_error'] and not result['source_ids']
+    assert result['match_status'] == 'no_match'
+    assert result['search_range'] == {'start': 0, 'end': 12}
+    assert len(store.list_sources()) == 1
+    assert store.get_source(first['source_ids'][0]).model_dump() == before

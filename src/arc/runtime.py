@@ -273,6 +273,15 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             source_ids, registered, unregistered = [], [], []
             from .mcp_content import decoded_page, extend_cached_page, paper_title
             if name == 'read_paper':
+                if body.get('match_status') == 'no_match' and body.get('markdown') == '' and body.get('matches') == []:
+                    return {'is_error': False, 'source_ids': [], 'sources': [],
+                            'match_status': 'no_match', 'no_match': True,
+                            'document_id': body.get('document_id'),
+                            'document_revision': body.get('document_revision'),
+                            'search_range': body.get('search_range'), 'matches': [],
+                            'coverage': 'no_text_returned', 'next_offset': None,
+                            'message': 'No text matched in the searched range. This is not evidence that the paper lacks the concept.',
+                            'raw_artifact_path': raw_path, **cost_fields}
                 paper = dict(body.get('paper') or {})
                 text = body.get('markdown')
                 identity = paper.get('versioned_id') or paper.get('arxiv_id')
