@@ -365,7 +365,8 @@ def render_run(store: Any, run_id: str, output_dir: str | Path,
     paths['search_sources'].write_text('\n'.join(search_lines) + '\n', encoding='utf-8')
     paths['cost']=output_dir/'COST_REPORT.md'
     cost_entries='\n\n'.join(_text({key:(call.get('state', call.get('status')) if key == 'status' else call.get(key))
-        for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper','external_cost_status','outcome_status']}) for call in calls)
+        for key in ['call_id','account_id','status','cost_status','reserved_cny','cost_estimate_lower','cost_estimate_upper','external_cost_status','outcome_status']
+        if key not in {'external_cost_status', 'outcome_status'} or call.get('cost_status') == 'unmetered'}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost',{'run_id':run_id,'summary':cost_text,'entries':cost_entries}),encoding='utf-8')
     if capabilities:
         paths['capabilities']=output_dir/'MCP_REQUIREMENTS.md'
@@ -589,7 +590,8 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     paths['trace'] = output_dir / 'PROMPT_TRACE_INDEX.md'
     paths['trace'].write_text(loader.render_report('trace', {'run_id': run_id, 'tasks': trace_tasks, 'evidence_records': []}), encoding='utf-8')
     paths['cost'] = output_dir / 'COST_REPORT.md'
-    entries = '\n\n'.join(_text({key: call.get(key) for key in ['call_id', 'state', 'cost_status', 'reserved_cny', 'cost_estimate_lower', 'cost_estimate_upper', 'external_cost_status', 'outcome_status']}) for call in calls)
+    entries = '\n\n'.join(_text({key: call.get(key) for key in ['call_id', 'state', 'cost_status', 'reserved_cny', 'cost_estimate_lower', 'cost_estimate_upper', 'external_cost_status', 'outcome_status']
+        if key not in {'external_cost_status', 'outcome_status'} or call.get('cost_status') == 'unmetered'}) for call in calls)
     paths['cost'].write_text(loader.render_report('cost', {'run_id': run_id, 'summary': cost_text, 'entries': entries}), encoding='utf-8')
     capabilities = store.list_capability_requests(run_id)
     if capabilities:
