@@ -420,6 +420,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
                          polish_override=None, polish_payload=None) -> dict[str, Path]:
     """Publish saved lightweight objects; never construct a card or invoke a model."""
     from arc.budget import BudgetLedger
+    from .discovery_memory import EVIDENCE_LIMITED_LABEL, evidence_limit_summaries
     loader = _report_loader(store, run_id, prompt_loader)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -432,8 +433,10 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     if selected:
         original = _obj(store.get_discovery_idea(selected['idea_id']))
         # A prior discovery recommendation is not acceptance of this stage.
-        ideas = [{**original, 'seed': selected['seed'], 'note': state.get('prestudy_note'),
-                  'triage': None, 'status': 'checked' if state.get('prestudy_note') else 'pending',
+        ideas = [{**original, 'seed': selected['seed'],
+                  'note': None if state.get('prestudy_evidence_limited') else state.get('prestudy_note'),
+                  'triage': None, 'status': ('evidence_limited' if state.get('prestudy_evidence_limited') else
+                                           'checked' if state.get('prestudy_note') else 'pending'),
                   'check_material_basis': state.get('check_material_basis'),
                   'check_action_observed': state.get('check_action_observed')}]
     tasks = [_obj(task) for task in store.list_tasks(run_id)]
@@ -449,7 +452,17 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     discuss, leads, skipped, pending = [], [], [], []
     field_notes = brief.get('source_notes', [])
     for idea in ideas:
-        note, triage = idea.get('note') or {}, idea.get('triage') or {}
+        limited = idea.get('status') == 'evidence_limited'
+        note, triage = ({} if limited else idea.get('note') or {}), idea.get('triage') or {}
+        prefix = 'prestudy' if selected else str(idea.get('draw_id', ''))
+        if prefix.isdigit():
+            prefix = 'idea' + prefix
+        evidence_limits = evidence_limit_summaries(state, prefix) if prefix else []
+        missing_questions = list(dict.fromkeys(question for limit in evidence_limits
+                                               for question in limit['unresolved_questions']))
+        limited_reason = EVIDENCE_LIMITED_LABEL + '。已尝试核查，当前没有可接受的预研结论。'
+        if missing_questions:
+            limited_reason += '\n\n待查问题：' + '；'.join(missing_questions)
         seed = note.get('seed') or idea.get('seed')
         if seed is None:
             skipped.append({'title': '未提交候选', 'reason': idea.get('reason') or (idea.get('sketch') or {}).get('reason') or triage.get('reason') or idea.get('status', '未记录'), 'path': None})
@@ -482,7 +495,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
                    'provenance_line': provenance, 'current': current, 'relation': relation_text,
                    'material_basis': basis_text,
                    'withdrawn_premises': _text(current.get('invalidated_premises')) if current.get('invalidated_premises') else ''}
-        reason = note.get('reason') or triage.get('reason') or '已保存灵感，等待价值筛选或候选预研'
+        reason = limited_reason if limited else note.get('reason') or triage.get('reason') or '已保存灵感，等待价值筛选或候选预研'
         item = {'title': context['title'], 'insight': current.get('core_insight') or seed['insight'],
                 'reason': '' if current.get('core_insight') == reason else reason,
                 'risk': current.get('decisive_unknown') or note.get('main_risk') or seed['key_unknown'],
@@ -505,11 +518,12 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
             target.write_text(loader.render_report('discovery_idea', context), encoding='utf-8')
             {'discuss': discuss, 'lead': leads, 'drop': skipped}[decision].append(item)
         else:
-            status = {'park': '暂存线索，未做定向预研', 'drop': '初筛放下，未做定向预研'}.get(idea.get('status'), '待预研')
-            context.update(status_text=status, question=seed['question'], difference=seed['difference_from_known'],
+            status = {'park': '暂存线索，未做定向预研', 'drop': '初筛放下，未做定向预研',
+                      'evidence_limited': EVIDENCE_LIMITED_LABEL}.get(idea.get('status'), '待预研')
+            context.update(status_text=status, evidence_limited=limited, question=seed['question'], difference=seed['difference_from_known'],
                            reason=reason + ('\n\n候选关系：' + relation_text if relation_text else ''), unknown=seed['key_unknown'], questions=_text(triage.get('check_questions', [])))
             target.write_text(loader.render_report('discovery_pending', context), encoding='utf-8')
-            (leads if idea.get('status') == 'park' else skipped if idea.get('status') == 'drop' else pending).append(item)
+            (leads if idea.get('status') in {'park', 'evidence_limited'} else skipped if idea.get('status') == 'drop' else pending).append(item)
         paths['idea:' + idea_id] = target
     # Non-submissions consume a draw but do not invent an IdeaSeed.
     for direction in state.get('previous_directions', []):
@@ -519,7 +533,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     paths['field_brief'] = output_dir / 'FIELD_BRIEF.md'
     paths['field_brief'].write_text(loader.render_report('discovery_field', {
         'original_topic': topic or (ideas[0].get('topic', '') if ideas else state.get('original_task', '')),
-        'overview': brief.get('overview', '领域调查尚未完成。'), 'research_lines': _text(brief.get('research_lines', [])),
+        'overview': (brief.get('overview') or '领域调查尚未形成可接受结论；已有材料与待查限制如下。'), 'research_lines': _text(brief.get('research_lines', [])),
         'openings': _text(brief.get('openings', [])), 'search_limits': _text(brief.get('search_limits', [])),
         'sources': _discovery_sources([note['source_id'] for note in field_notes], field_notes, sources, output_dir, store),
     }), encoding='utf-8')
@@ -531,14 +545,18 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
         paths['input_idea'] = output_dir / 'INPUT_IDEA.json'
         paths['input_idea'].write_text(json.dumps(selected, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     paths['overview'] = output_dir / 'REPORT.md'
+    stage_limits = evidence_limit_summaries(state)
+    limit_text = '\n\n文献受限记录：' + '；'.join(
+        '、'.join(item['unresolved_questions']) or '部分材料无法取得，相关结论保留待查。'
+        for item in stage_limits) if stage_limits else ''
     paths['overview'].write_text(loader.render_report('discovery_overview', {
         'report_title': {'develop': '已选想法的预研展开', 'run': '已选想法的压力讨论'}.get(run['mode'], '本次发现'),
         'conclusion': f"已保存 {sum(idea.get('seed') is not None for idea in ideas)} 个想法：{len(discuss)} 个值得讨论，{len(leads)} 条线索，{len(pending)} 个待预研。建议由人选择，不代表科学认证。",
-        'landscape_summary': brief.get('overview', '领域调查尚未完成。'),
+        'landscape_summary': (brief.get('overview') or '领域调查尚未形成可接受结论；已有材料与待查限制如下。'),
         'landscape_updated': bool(state.get('field_brief_history')) or state.get('brief_version', 1) > 1,
         'brief_version': state.get('brief_version', 1), 'discuss': discuss, 'leads': leads,
         'skipped': skipped, 'pending': pending,
-        'investigation_scope': ('[本阶段收到的想法和此前预研](INPUT_IDEA.json)；' if selected else '') + '[共享领域调查与阅读边界](FIELD_BRIEF.md)；[全部检索命中](SEARCH_SOURCES.md)；[原始任务索引](PROMPT_TRACE_INDEX.md)。',
+        'investigation_scope': ('[本阶段收到的想法和此前预研](INPUT_IDEA.json)；' if selected else '') + '[共享领域调查与阅读边界](FIELD_BRIEF.md)；[全部检索命中](SEARCH_SOURCES.md)；[原始任务索引](PROMPT_TRACE_INDEX.md)。' + limit_text,
         'cost_summary': cost_text + f"\n\n语义任务 {usage['semantic_tasks']} 项；实际模型请求 {usage['model_requests']} 次；工具动作 {usage['tool_actions']} 次。"
                         + '\n\n[调用、token 与首个产物时间](DISCOVERY_USAGE.json)。',
         'stop_reason': f"执行状态：{run['status']}；停止原因：{_text(run.get('stop_reason'))}。预算或工具暂停不等于否定想法。",
@@ -613,7 +631,8 @@ def render_discovery_polish(store, run, paths, loader, *, polish_override=None, 
     directory = payload['source_directory']
     notes = [dict(note, source_id=source['source_id']) for source in directory for note in source['notes']]
     decision_names = {**DISCOVERY_DECISIONS, 'pending': '待预研', 'investigate': '待预研',
-                      'park': '暂存线索，未做定向预研', 'checked': '已保存预研'}
+                      'park': '暂存线索，未做定向预研', 'checked': '已保存预研',
+                      'evidence_limited': '文献受限，保留待查'}
     summaries = []
     for item in polished.candidates:
         original = candidates[item.idea_id]
@@ -622,6 +641,7 @@ def render_discovery_polish(store, run, paths, loader, *, polish_override=None, 
         title = item.presentation_title or original['title']
         path.write_text(loader.render_report('polished_idea', {
             'title': _heading(title), 'decision': decision, 'text': item.text,
+            'evidence_limited': original['decision'] == 'evidence_limited',
             'original_title': _heading(original['title']) if title != original['title'] else None,
             'technical_path': paths['technical_idea:' + item.idea_id].name,
             'sources': _discovery_sources(item.cited_source_ids, notes, directory, path.parent, store),

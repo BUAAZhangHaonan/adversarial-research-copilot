@@ -95,3 +95,17 @@ def test_explicit_reindex_is_idempotent_and_does_not_rewrite_records(tmp_path):
     assert store.get_record(saved['idea_id'])==before
     with store._connect() as db:
         assert db.execute('SELECT COUNT(*) FROM discovery_ideas_fts').fetchone()[0]==1
+
+
+def test_evidence_limited_view_does_not_reuse_old_recommendation_or_index():
+    from arc.discovery_memory import discovery_idea_index_text
+    record = dict(idea_id='idea', seed=seed(), note=note(True), status='evidence_limited',
+                  triage={'action': 'investigate', 'reason': 'Initially promising'})
+    record['note']['decision'] = 'discuss'
+    before = deepcopy(record)
+    view = current_idea_view(record)
+    assert view['decision'] == 'evidence_limited' and view['origin'] == 'evidence_limited_seed'
+    assert view['current_understanding']['core_insight'] == seed()['insight']
+    assert '文献核查受限' in view['current_understanding']['why_existing_insufficient']
+    assert 'Zebracorrection' not in discovery_idea_index_text(record)
+    assert record == before

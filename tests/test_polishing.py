@@ -321,3 +321,82 @@ async def test_writer_size_diagnostics_use_existing_single_json_correction(tmp_p
         assert (task.accepted_result is not None) == corrected
     finally:
         await runtime.close()
+
+
+def limited_entry():
+    return {'reason': 'critical_source_unavailable', 'closure_key': 'idea1.check.close',
+            'status': 'parked', 'unresolved_evidence_requests': [
+                {'question': '关键近邻是否已经覆盖这个操作？', 'rationale': 'Full original request not needed by writer',
+                 'source_ids': ['s2']}]}
+
+
+def test_limited_check_writer_and_report_keep_missing_material_not_prior_recommendation(tmp_path):
+    store = prepared_store(tmp_path)
+    store.ideas[0]['status'] = 'evidence_limited'
+    # Defensively refuse even a stale older note when the current status is limited.
+    store.run['state']['evidence_limits'] = {'idea1.check': limited_entry()}
+    before = copy.deepcopy(store.__dict__)
+    payload = build_polish_payload(store, 'r1')
+    candidate = payload['candidates'][0]
+    assert candidate['decision'] == 'evidence_limited' and 'note' not in candidate
+    assert candidate['evidence_limits'][0]['unresolved_questions'] == ['关键近邻是否已经覆盖这个操作？']
+    assert 'closure_key' not in json.dumps(payload) and 'Full original request' not in json.dumps(payload)
+    result = written()
+    result['candidates'][0]['cited_source_ids'] = ['s1']
+    result['cited_source_ids'] = ['s1']
+    result['stage_summary'] = '文献核查受限，当前保留原问题及待查事项。'
+    result['candidates'][0]['text'] = '已尝试核查关键近邻，但相关材料仍无法取得。原始思路保留待查，不构成推荐。'
+    paths = render_run(store, 'r1', tmp_path / 'limited', PromptLoader(ASSETS),
+                       polish_override=result, polish_payload=payload)
+    technical = paths['technical_idea:i1'].read_text()
+    assert '文献受限，保留待查' in paths['overview'].read_text() + technical
+    assert '已经尝试文献核查' in technical and '关键近邻是否已经覆盖这个操作' in technical
+    assert '未做定向预研' not in technical and '值得讨论' not in paths['idea:i1'].read_text()
+    assert '没有可接受的预研结论' in paths['idea:i1'].read_text()
+    assert '0 个值得讨论' in paths['technical_overview'].read_text()
+    assert store.__dict__ == before
+
+
+@pytest.mark.parametrize('mode', ['develop', 'run'])
+def test_failed_limited_prestudy_does_not_display_inherited_discovery_note(tmp_path, mode):
+    store = prepared_store(tmp_path)
+    store.original_idea = copy.deepcopy(store.ideas[0])
+    store.ideas = []
+    store.run['mode'] = mode
+    store.run['state'].update(idea_input={'idea_id': 'i1', 'seed': store.original_idea['seed'],
+                             'latest_note': note(), 'field_brief': store.run['state']['field_brief']},
+                             prestudy_evidence_limited=True,
+                             evidence_limits={'prestudy': limited_entry()})
+    payload = build_polish_payload(store, 'r1')
+    assert payload['candidates'][0]['decision'] == 'evidence_limited'
+    assert 'note' not in payload['candidates'][0]
+    assert payload['candidates'][0]['evidence_limits']
+    paths = render_run(store, 'r1', tmp_path / mode, PromptLoader(ASSETS))
+    assert '文献受限，保留待查' in paths['idea:i1'].read_text()
+    assert '未做定向预研' not in paths['idea:i1'].read_text()
+    assert '0 个值得讨论' in paths['overview'].read_text()
+    assert store.original_idea['note']['decision'] == 'discuss'
+
+
+def test_failed_survey_without_conclusions_is_explicit_and_does_not_invent_research(tmp_path):
+    store = prepared_store(tmp_path)
+    store.ideas = []
+    store.run['state']['field_brief'] = {'overview': '', 'research_lines': [], 'openings': [],
+        'source_notes': [], 'search_limits': ['未取得关键文献，领域结论暂缺。']}
+    store.run['state']['evidence_limits'] = {'survey': limited_entry()}
+    paths = render_run(store, 'r1', tmp_path / 'survey', PromptLoader(ASSETS))
+    assert '尚未形成可接受结论' in paths['field_brief'].read_text()
+    assert '未取得关键文献' in paths['field_brief'].read_text()
+    payload = build_polish_payload(store, 'r1')
+    assert payload['field_brief']['overview'] == '' and payload['candidates'] == []
+    assert payload['evidence_limits'][0]['task'] == 'survey'
+
+
+def test_accepted_limited_closure_keeps_its_actual_lead_and_unresolved_questions(tmp_path):
+    store = prepared_store(tmp_path)
+    store.ideas[0]['note']['decision'] = 'lead'
+    store.run['state']['evidence_limits'] = {'idea1.check': dict(limited_entry(), status='limited')}
+    payload = build_polish_payload(store, 'r1')
+    assert payload['candidates'][0]['decision'] == 'lead'
+    assert payload['candidates'][0]['note']['limits'] == note()['limits']
+    assert payload['candidates'][0]['evidence_limits'][0]['unresolved_questions']

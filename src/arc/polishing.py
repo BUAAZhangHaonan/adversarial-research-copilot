@@ -7,6 +7,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field
 
 from .research_context import SOURCE_KEYS, reference_ids
+from .discovery_memory import evidence_limit_summaries
 
 
 WRITING_LIMITS = {
@@ -48,14 +49,16 @@ def build_polish_payload(store, run_id):
     if selected:
         original = as_data(store.get_discovery_idea(selected['idea_id']))
         records = [{**original, 'seed': selected['seed'], 'triage': None,
-                    'note': state.get('prestudy_note'),
+                    'note': None if state.get('prestudy_evidence_limited') else state.get('prestudy_note'),
                     'check_material_basis': state.get('check_material_basis'),
-                    'status': 'checked' if state.get('prestudy_note') else 'pending'}]
+                    'status': ('evidence_limited' if state.get('prestudy_evidence_limited') else
+                               'checked' if state.get('prestudy_note') else 'pending')}]
     campaign = as_data(store.get_campaign(run['campaign_id'])) if run.get('campaign_id') else {}
     source_notes = list(brief.pop('source_notes', []))
     candidates, skipped = [], []
     for record in records:
-        note, seed = deepcopy(record.get('note')), deepcopy(record.get('seed'))
+        limited = record.get('status') == 'evidence_limited'
+        note, seed = (None if limited else deepcopy(record.get('note'))), deepcopy(record.get('seed'))
         if not seed:
             skipped.append({'draw_id': record.get('draw_id'),
                             'reason': (record.get('sketch') or {}).get('reason'), 'status': record.get('status')})
@@ -65,7 +68,7 @@ def build_polish_payload(store, run_id):
         if note:
             source_notes.extend(note.pop('source_notes', []))
         candidate = {'idea_id': record['idea_id'], 'title': (note or {}).get('seed', seed)['title'],
-                     'status': record['status'], 'decision': (note or {}).get('decision') or triage.get('action') or record['status'],
+                     'status': record['status'], 'decision': ('evidence_limited' if limited else (note or {}).get('decision') or triage.get('action') or record['status']),
                      'source_ids': ids, 'check_material_basis': record.get('check_material_basis')}
         if note:
             candidate['note'] = note
@@ -73,6 +76,12 @@ def build_polish_payload(store, run_id):
                 candidate['candidate_relation'] = deepcopy(triage['candidate_relation'])
         else:
             candidate.update(seed=seed, triage=deepcopy(triage))
+        prefix = 'prestudy' if selected else str(record.get('draw_id', ''))
+        if prefix.isdigit():
+            prefix = 'idea' + prefix
+        limits = evidence_limit_summaries(state, prefix) if prefix else []
+        if limits:
+            candidate['evidence_limits'] = limits
         candidates.append(candidate)
     source_ids = set(reference_ids([candidates, source_notes], SOURCE_KEYS))
     directory = []
@@ -89,7 +98,8 @@ def build_polish_payload(store, run_id):
             'original_question': campaign.get('topic') or selected.get('original_question', ''),
             'user_boundaries': campaign.get('boundaries') or selected.get('user_boundaries', []),
             'field_brief': brief, 'candidates': candidates, 'skipped_directions': skipped,
-            'source_directory': directory, 'writing_limits': dict(WRITING_LIMITS)})
+            'source_directory': directory, 'writing_limits': dict(WRITING_LIMITS),
+            'evidence_limits': evidence_limit_summaries(state)})
 
 
 def compact_polish_payload(payload):

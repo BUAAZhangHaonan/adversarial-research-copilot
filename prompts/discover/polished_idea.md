@@ -1,6 +1,10 @@
 # {{ title }}
 
+{% if evidence_limited | default(false) %}
+{{ decision }}。已经尝试核查，但当前没有可接受的预研结论；由人决定是否继续补查。
+{% else %}
 {{ decision }}。这是原预研记录的判断，由人决定是否继续。
+{% endif %}
 
 {{ text }}
 
