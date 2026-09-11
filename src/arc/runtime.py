@@ -231,7 +231,11 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             try:
                 response = json.loads(store.read_artifact(raw_path))
             except FileNotFoundError:
-                response = await hub.call(name, arguments)
+                sent_arguments = dict(arguments)
+                if name == 'search_literature' and 'request_id' in cap.parameters.get('properties', {}):
+                    sent_arguments.setdefault('request_id', 'arc:' + raw_path.rsplit('/', 1)[-1])
+                response = await hub.call(name, sent_arguments)
+                response['_arc_sent_arguments'] = sent_arguments
                 # Persist the remote result before any JSON decoding or registry
                 # work. A local processing failure must not repeat this call.
                 store.save_artifact(raw_path, encoded(response))
@@ -252,22 +256,31 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             if response['is_error'] or not isinstance(body, dict) or body.get('error') or body.get('status') in {'failed', 'error'}:
                 return {'is_error': True, 'error': 'MCP_OPERATION_FAILED', 'data': body, **cost_fields}
             source_ids, registered, unregistered = [], [], []
+            from .mcp_content import decoded_page, extend_cached_page, paper_title
             if name == 'read_paper':
                 paper = dict(body.get('paper') or {})
                 text = body.get('markdown')
                 identity = paper.get('versioned_id') or paper.get('arxiv_id')
-                if not (paper.get('title') or '').strip():
-                    if (isinstance(text, str) and text.strip() and isinstance(identity, str)
-                            and re.fullmatch(r'(?:\d{4}\.\d{4,5}|[a-zA-Z][a-zA-Z.\-]*/\d{7})v[1-9]\d*', identity)):
-                        paper['title'] = 'arXiv ' + identity
-                    else:
-                        return {'is_error': True, 'error': 'MCP_SOURCE_METADATA_INCOMPLETE',
-                                'missing': ['title_or_versioned_arxiv_identity_with_body'],
-                                'raw_artifact_path': raw_path}
-                items = [{**paper, 'content': text, 'origin': cap.origin,
-                          'representation_id': f'{cap.service}:{cap.method}:markdown'}]
+                provenance = body.get('source') or {}
+                url = (paper.get('url') or provenance.get('final_url') or provenance.get('original_url')
+                       or ('https://arxiv.org/abs/' + identity if identity else None))
+                title = paper_title(paper, text, identity, url)
+                if not title:
+                    return {'is_error': True, 'error': 'MCP_SOURCE_METADATA_INCOMPLETE',
+                            'missing': ['title_or_versioned_arxiv_identity_with_body'],
+                            'raw_artifact_path': raw_path, **cost_fields}
+                page = (decoded_page(body, arguments, 'paper') if body.get('document_id') else
+                        {'content': text, 'representation_id': f'{cap.service}:{cap.method}:markdown'})
+                items = [{**paper, 'url': url, 'title': title, **page, 'origin': cap.origin}]
             elif name == 'read_web':
-                items = [{**body, **web_text_representation(body, arguments), 'origin': cap.origin}]
+                if body.get('document_type') == 'pdf' and body.get('retrieval_status') == 'requires_pdf_reader':
+                    return {'is_error': False, 'source_ids': [], 'sources': [], 'document_type': 'pdf',
+                            'retrieval_status': 'requires_pdf_reader', 'pdf_url': body.get('pdf_url'),
+                            'next_tool': 'read_paper', 'raw_artifact_path': raw_path, **cost_fields}
+                page = (decoded_page(body, arguments, 'web') if body.get('resource_id') and 'total_chars' in body
+                        else web_text_representation(body, arguments))
+                items = [{**body, **page, 'url': body.get('final_url') or body.get('url') or arguments.get('url'),
+                          'title': body.get('title') or (body.get('final_url') if body.get('resource_id') else None), 'origin': cap.origin}]
             else:
                 raw_items = body.get('papers', body.get('results', []))
                 if not isinstance(raw_items, list) or any(not isinstance(item, dict) for item in raw_items):
@@ -290,6 +303,8 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                             'citation_eligible': False})
                     continue
                 origin = item['origin']
+                page_start = item.get('content_start_char', 0)
+                item = extend_cached_page(store, item) if item.get('content') else item
                 text = item.get('content')
                 source = store.register_source(SourceRecord(title=item['title'], url=url, arxiv_id=arxiv_id,
                     doi=item.get('doi'), version=None,
@@ -297,7 +312,8 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     access_status='retrieved' if text else 'metadata_only', content_origin=origin,
                     content_complete=item.get('content_complete', bool(text)),
                     content_total_chars=item.get('content_total_chars', len(text) if text else None),
-                    representation_id=item.get('representation_id')), content=text)
+                    representation_id=item.get('representation_id'),
+                    content_start_char=item.get('content_start_char', 0)), content=text)
                 source_ids.append(source.source_id)
                 registered.append({'source_id': source.source_id, 'title': source.title, 'url': source.url,
                     'canonical_id': source.canonical_id, 'version': source.version,
@@ -307,12 +323,18 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     'content_complete': item.get('content_complete', bool(text)),
                     'content_total_chars': item.get('content_total_chars', len(text) if text else None),
                     'registered_content_complete': source.content_complete,
+                    'content_start_char': source.content_start_char, 'requested_page_start': page_start,
+                    'locator_coordinates': 'relative_to_cached_content',
                     'content': text if text and len(text) <= 12000 else None,
                     'content_requires_read_record': bool(text and len(text) > 12000)})
             result = {'is_error': False, 'source_ids': source_ids, 'sources': registered,
                     'service': cap.service, 'method': cap.method, 'origin': cap.origin,
                     'raw_artifact_path': raw_path, 'errors': body.get('errors', []),
                     'status': body.get('status'), **cost_fields}
+            if name in {'read_paper', 'read_web'}:
+                for key in ('document_id', 'document_revision', 'resource_id', 'version', 'range', 'offset',
+                            'total_chars', 'next_offset', 'eof', 'coverage', 'line_range', 'sections', 'matches'):
+                    if key in body: result[key] = body[key]
             if unregistered:
                 result['unregistered_candidates'] = unregistered
                 result['candidate_limit'] = 'Provider IDs are search handles, not registered source IDs. Locate a DOI, arXiv ID, or original URL before citing or reading.'

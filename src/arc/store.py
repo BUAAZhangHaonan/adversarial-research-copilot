@@ -482,7 +482,8 @@ class Store:
             if source.content_sha256 and hashlib.sha256(raw.encode("utf-8")).hexdigest()!=source.content_sha256:
                 raise StateError("source_artifact_hash_mismatch")
             if source.content_total_chars is not None:
-                if len(raw)>source.content_total_chars or (source.content_complete and len(raw)!=source.content_total_chars):
+                if (source.content_start_char + len(raw)>source.content_total_chars
+                        or (source.content_complete and (source.content_start_char != 0 or len(raw)!=source.content_total_chars))):
                     raise StateError("source_content_completeness_mismatch")
         with self._transaction() as db:
             old=db.execute("SELECT data FROM sources WHERE canonical_id=? AND version=? AND origin=? AND COALESCE(json_extract(data,'$.representation_id'),'')=?",(canonical,version,source.content_origin,source.representation_id or "")).fetchone()
@@ -512,6 +513,13 @@ class Store:
                 return previous
             db.execute("INSERT INTO sources VALUES (?,?,?,?,?)",(source.source_id,canonical,version,source.content_origin,_dump(source)))
         return source
+
+    def source_by_representation(self, representation_id):
+        with self._connect() as db:
+            rows = db.execute("SELECT data FROM sources WHERE json_extract(data,'$.representation_id')=?", (representation_id,)).fetchall()
+        if len(rows) > 1:
+            raise StateError("ambiguous_source_representation")
+        return SourceRecord.model_validate_json(rows[0][0]) if rows else None
 
     def get_source(self,source_id):
         with self._connect() as db:

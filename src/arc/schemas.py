@@ -292,6 +292,7 @@ class SourceRecord(StrictModel):
     content_sha256: str | None = None
     content_complete: bool = True
     content_total_chars: int | None = Field(default=None, ge=0)
+    content_start_char: int = Field(default=0, ge=0)
     representation_id: str | None = None
     retrieved_at: str = Field(default_factory=utc_now)
 
