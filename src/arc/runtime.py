@@ -165,6 +165,21 @@ def compact_search_diagnostics(body: dict, arguments: dict) -> dict:
             compact[str(engine)[:48]] = re.sub(r'https?://\S+', '[url omitted]', first)[:192]
         result.update(engine_errors=compact, degraded=bool(errors))
         if len(errors) > 8: result['engine_errors_omitted'] = len(errors) - 8
+    source_status = body.get('source_status')
+    if isinstance(source_status, dict):
+        result['source_status'] = {str(key)[:80]: {k: value[k] for k in
+            ('status', 'returned_count', 'error_code', 'retryable') if k in value}
+            for key, value in list(source_status.items())[:16] if isinstance(value, dict)}
+    diagnostics = body.get('diagnostics')
+    if isinstance(diagnostics, list):
+        result['coverage'] = [{key: entry[key] for key in
+            ('stage', 'source', 'status', 'error_code', 'returned_count', 'batch') if key in entry}
+            for entry in diagnostics[:16] if isinstance(entry, dict)]
+        result['coverage_entries'] = len(diagnostics)
+        result['degraded'] = result.get('degraded', False) or any(
+            isinstance(entry, dict) and entry.get('status') == 'error' for entry in diagnostics)
+    if body.get('selection_origin') is not None:
+        result['selection_origin'] = body['selection_origin']
     for key in ('count', 'spam_filtered'):
         if type(body.get(key)) is int and body[key] >= 0: result[key] = body[key]
     return result
@@ -253,7 +268,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             cost = service_cost(reported_cost)
             cost_fields = ({'cost': cost} if cost is not None else
                            {'cost_error': 'MCP_COST_INVALID'} if reported_cost is not None else {})
-            if response['is_error'] or not isinstance(body, dict) or body.get('error') or body.get('status') in {'failed', 'error'}:
+            if response['is_error'] or not isinstance(body, dict) or body.get('error') or body.get('status') in {'failed', 'error', 'interrupted', 'retrieval_failed'}:
                 return {'is_error': True, 'error': 'MCP_OPERATION_FAILED', 'data': body, **cost_fields}
             source_ids, registered, unregistered = [], [], []
             from .mcp_content import decoded_page, extend_cached_page, paper_title
@@ -284,7 +299,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             else:
                 raw_items = body.get('papers', body.get('results', []))
                 if not isinstance(raw_items, list) or any(not isinstance(item, dict) for item in raw_items):
-                    return {'is_error': True, 'error': 'MCP_RESULT_ITEMS_INVALID', 'raw_artifact_path': raw_path}
+                    return {'is_error': True, 'error': 'MCP_RESULT_ITEMS_INVALID', 'raw_artifact_path': raw_path, **cost_fields}
                 items = [{**item, 'origin': 'metadata'} for item in raw_items]
             for item in items:
                 arxiv_id = item.get('versioned_id') or item.get('arxiv_id')
@@ -294,7 +309,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
                     if name == 'read_paper':
                         return {'is_error': True, 'error': 'MCP_SOURCE_METADATA_INCOMPLETE',
                                 'missing': ['source_identity' if not url else 'title'],
-                                'raw_artifact_path': raw_path}
+                                'raw_artifact_path': raw_path, **cost_fields}
                     if name == 'search_literature' and item.get('title'):
                         unregistered.append({**{key: item[key] for key in
                             ('paper_id', 'title', 'authors', 'year', 'venue', 'abstract', 'rationale', 'fulltext_status') if key in item},
@@ -338,7 +353,7 @@ def build_tools(store, hub=None) -> dict[str, BoundTool]:
             if unregistered:
                 result['unregistered_candidates'] = unregistered
                 result['candidate_limit'] = 'Provider IDs are search handles, not registered source IDs. Locate a DOI, arXiv ID, or original URL before citing or reading.'
-            if name == 'search_web':
+            if name in {'search_web', 'search_literature'}:
                 diagnostics = compact_search_diagnostics(body, arguments)
                 if diagnostics: result['search_diagnostics'] = diagnostics
             return result
