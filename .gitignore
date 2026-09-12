@@ -16,6 +16,7 @@ htmlcov/
 *.sqlite-*
 .arc/
 .arc-validation/
+/.arc-validation-*/
 work/
 dist/
 build/
