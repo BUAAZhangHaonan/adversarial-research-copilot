@@ -11,3 +11,5 @@ previous_directions是本轮的最新短认识，不只是标题去重：用curr
 只交一个IdeaSeed，通常约300–500中文字，必要信息优先，不硬截断。说清问题、核心直觉、意义、与已知工作的差异、启发来源、最大未知。不要完整推导、结果分支、功效分析或预注册。
 
 action=submit交seed给编辑；skip表示本轮没有值得提交的候选；stop表示本次材料与剩余机会不足以继续。skip/stop时seed=null，两者也占一次机会。不必凑满配额，也不据此宣布领域没有机会。只缺一项能改变切入点的具体资料时填写next_search，不藏多个候选或要求无限补查。
+
+提交短灵感时，complete只表示候选已写完，不表示新颖性或可行性已证实。把这些未知留在key_unknown、next_search或evidence_requests，交给初筛与预研；不要仅因还需查新就拒绝交出seed。

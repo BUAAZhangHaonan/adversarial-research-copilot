@@ -147,7 +147,8 @@ async def discover(engine, run_id):
             triage = await call_with_evidence_limits(engine, run_id, key + ".triage", "editor", "TRIAGE", payload={
                 **context(engine, run_id, task="TRIAGE", seed=seed, exclude_draw_id=key),
                 "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_candidate_relation": True,
-                "local_archive": archive, "previous_ideas": previous})
+                "local_archive": archive, "previous_ideas": previous,
+                "candidate_evidence_requests": run.state.get(key + ".sketch_evidence_requests", [])})
             if triage is None:
                 engine.store.save_discovery_idea(run_id, key, status="evidence_limited")
                 engine.checkpoint(run_id, **{key + "_done": True})
@@ -161,6 +162,9 @@ async def discover(engine, run_id):
                     **context(engine, run_id, task="CHECK", exclude_draw_id=key),
                     "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_current_understanding": True,
                     "triage": triage.model_dump(mode="json"),
+                    "candidate_evidence_requests": [
+                        *engine.store.get_run(run_id).state.get(key + ".sketch_evidence_requests", []),
+                        *engine.store.get_run(run_id).state.get(key + ".triage_evidence_requests", [])],
                     **({"shared_followup_question": sketch.next_search} if sketch.next_search else {})})
                 if checked is None:
                     engine.store.save_discovery_idea(run_id, key, status="evidence_limited", note=None,

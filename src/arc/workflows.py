@@ -154,7 +154,20 @@ class WorkflowEngine:
         for index, request in enumerate(envelope.capability_requests):
             self.store.save_capability_request(run_id, data(request), task_id=task_id,
                                               request_key=f'{task_id}.envelope.{index}')
-        if envelope.result_status != 'complete':
+        from .discovery_models import SketchResult, TriageResult
+        provisional = (run.state.get('discover_first') and envelope.result_status == 'needs_evidence'
+            and not envelope.capability_requests and (
+                (role == 'ideator' and task == 'SKETCH' and isinstance(envelope.result, SketchResult)
+                 and envelope.result.action == 'submit' and envelope.result.seed is not None)
+                or (role == 'editor' and task == 'TRIAGE' and isinstance(envelope.result, TriageResult)
+                    and envelope.result.action == 'investigate' and not payload.get('evidence_limit_handoff'))))
+        if provisional:
+            # A proposed idea / request to investigate is not a scientific verdict.
+            # Keep the provider's unresolved envelope intact; hand its questions on.
+            self.checkpoint(run_id, **{key + '_provisional': {
+                'source_task_id': task_id, 'result_status': envelope.result_status,
+                'research_verified': False, 'handoff': 'candidate_prestudy'}})
+        if envelope.result_status != 'complete' and not provisional:
             self.checkpoint(run_id, pending_task=key,
                             pending_evidence_requests=data(envelope.evidence_requests),
                             pending_capability_requests=data(envelope.capability_requests),

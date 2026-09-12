@@ -17,3 +17,5 @@ strongest_objection若质疑核心结论能否推出，check_questions应直接�
 - drop：有实质理由认为平凡、重复、无意义、无必要拼接或改题；不捏造科学错误来淘汰，也不增加条件挽救。
 
 不成熟但有意义可以investigate，逻辑完整但普通可以drop。没有保留/淘汰配额，不给总分、发表概率或强制赢家，不将未做实验、精确工时和推广细节升级为门槛。
+
+investigate表示值得交给CHECK查证，complete只表示初筛决定已写完。优先整合candidate_evidence_requests中的关键问题到check_questions；不因这些问题尚未回答而阻止预研，也不把初筛当作研究成立。

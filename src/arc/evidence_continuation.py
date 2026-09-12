@@ -168,7 +168,12 @@ async def call_with_evidence_limits(engine, run_id, key, role, task, payload=Non
     entry = {**entry, "status": "limited"}
     _save(engine, run_id, key, entry)
     traces = list(dict.fromkeys([entry["source_task_id"], *engine.trace_tasks(run_id, entry["closure_key"])]))
-    engine.checkpoint(run_id, **{key: result.model_dump(mode="json"), key + "_trace_tasks": traces})
+    questions = list(entry.get('unresolved_evidence_requests', []))
+    for question in engine.store.get_run(run_id).state.get(entry['closure_key'] + '_evidence_requests', []):
+        if question not in questions:
+            questions.append(question)
+    engine.checkpoint(run_id, **{key: result.model_dump(mode="json"), key + "_trace_tasks": traces,
+                               key + '_evidence_requests': questions})
     return result
 
 
