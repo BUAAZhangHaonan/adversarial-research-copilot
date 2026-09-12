@@ -357,3 +357,68 @@ async def test_blocked_capability_request_can_decline_without_running_overlimit_
     assert store.get_task('task_fixture').status == 'PAUSED_EXTERNAL'
     assert json.loads(saved(store)['response']['message']['content'])['result_status'] == 'blocked'
     await runtime.close()
+
+
+READ_CHARS_PARAMETERS = {
+    'type': 'object',
+    'properties': {
+        'record_id': {'type': 'string'},
+        'offset': {'type': 'integer', 'minimum': 0},
+        'limit_chars': {'type': 'integer', 'minimum': 1, 'maximum': 64000},
+        'format': {'type': 'string'},
+    },
+    'required': ['record_id', 'offset'],
+    'additionalProperties': False,
+}
+RENAMED_READ = {'record_id': 'source_original', 'offset': 68000, 'limit_chars': 52265}
+
+
+@pytest.mark.asyncio
+async def test_optional_read_limit_rename_preserves_source_position_and_length(tmp_path):
+    runtime, store, ledger, requests, executed = fixture(tmp_path, [
+        tool_response(native('bad', INVALID)),
+        tool_response(native('corrected', RENAMED_READ)),
+        sse(json.dumps(answer())),
+    ], parameters=READ_CHARS_PARAMETERS)
+    assert (await invoke(runtime, tool_profile=['read_record'])).result.value == 'valid'
+    assert [args for args, _ in executed] == [RENAMED_READ]
+    assert len(requests) == 3 and saved(store)['repair_counts']['tool_arguments'] == 1
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('change', [
+    {'record_id': 'another_source'}, {'offset': 0}, {'limit_chars': 60000},
+    {'format': 'different'}, {'limit_chars': 64001},
+])
+async def test_read_limit_rename_does_not_allow_other_changes(tmp_path, change):
+    runtime, store, ledger, requests, executed = fixture(tmp_path, [
+        tool_response(native('bad', INVALID)),
+        tool_response(native('changed', {**RENAMED_READ, **change})),
+    ], parameters=READ_CHARS_PARAMETERS)
+    with pytest.raises(RuntimePaused):
+        await invoke(runtime, tool_profile=['read_record'])
+    assert not executed and len(requests) == 2
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_saved_read_limit_rename_recovers_without_new_correction_request(tmp_path, monkeypatch):
+    runtime, store, ledger, requests, executed = fixture(tmp_path, [
+        tool_response(native('bad', INVALID)),
+        tool_response(native('corrected', RENAMED_READ)),
+        sse(json.dumps(answer())),
+    ], parameters=READ_CHARS_PARAMETERS)
+    monkeypatch.setattr('arc.runtime.read_limit_rename_paths', lambda *args: [])
+    with pytest.raises(RuntimePaused, match='TOOL_CORRECTION_TARGET_CHANGED'):
+        await invoke(runtime, tool_profile=['read_record'])
+    old_path = store.get_task('task_fixture').response_artifact_path
+    old_text = store.read_artifact(old_path)
+    assert not executed and len(requests) == 2
+    monkeypatch.undo()
+    assert (await invoke(restart(runtime), tool_profile=['read_record'])).result.value == 'valid'
+    assert len(requests) == 3 and [args for args, _ in executed] == [RENAMED_READ]
+    assert store.read_artifact(old_path) == old_text
+    assert saved(store)['repair_counts']['tool_arguments'] == 1
+    assert saved(store)['tool_correction_revalidations'][0]['correction_allowance_reset'] is False
+    await runtime.close()

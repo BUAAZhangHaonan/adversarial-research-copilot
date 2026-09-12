@@ -32,6 +32,28 @@ def digest(value) -> str:
     return hashlib.sha256(encoded(value).encode()).hexdigest()
 
 
+
+def read_limit_rename_paths(name, before, after, errors, parameters):
+    """A same-value read-length rename changes syntax, not the requested window."""
+    if name not in {'read_record', 'read_paper', 'read_web'}:
+        return []
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return []
+    aliases = {'limit', 'limit_chars', 'max_chars'}
+    properties = parameters.get('properties', {})
+    removed = [e['path'][0] for e in errors
+               if e.get('validator') == 'additionalProperties' and len(e.get('path', [])) == 1
+               and e['path'][0] in aliases and e['path'][0] in before
+               and e['path'][0] not in after and e['path'][0] not in properties]
+    added = [k for k in aliases if k in after and k not in before and k in properties]
+    if len(removed) != 1 or len(added) != 1:
+        return []
+    value = before[removed[0]]
+    if type(value) is not int or type(after[added[0]]) is not int or value != after[added[0]]:
+        return []
+    return [(added[0],)]
+
+
 def correction_counts(state):
     """Read old checkpoints without granting another use of an exhausted category."""
     if 'repair_counts' in state:
@@ -821,7 +843,23 @@ class Runtime:
             self._checkpoint(record, state)
         while True:
             if state.get('tool_correction_failure'):
-                raise RuntimePaused('PAUSED_PROTOCOL', state['tool_correction_failure'])
+                reason = state['tool_correction_failure']
+                response = state.get('response') or {}
+                correction = state.get('tool_correction') or {}
+                calls = (response.get('message') or {}).get('tool_calls')
+                if (reason != 'TOOL_CORRECTION_TARGET_CHANGED' or not calls
+                        or response.get('finish_reason') != 'tool_calls'
+                        or correction.get('phase') not in {'awaiting', 'executing'}):
+                    raise RuntimePaused('PAUSED_PROTOCOL', reason)
+                # Revalidate the already paid correction against the current rule.
+                # A real target change still raises before anything is executed.
+                self._prepare_tool_batch(record, state, calls, profile, response['call_id'])
+                state.setdefault('tool_correction_revalidations', []).append({
+                    'previous_failure': reason, 'response_id': response['call_id'],
+                    'correction_allowance_reset': False})
+                state.pop('tool_correction_failure')
+                record.error = None
+                self._checkpoint(record, state, 'RESPONSE_SAVED')
             for trace in state['tool_trace']:
                 ledger_call = self.ledger.get_call(trace['call_id'])
                 if ledger_call['state'] != 'SETTLED':
@@ -977,6 +1015,9 @@ class Runtime:
                 editable = [tuple(path) for error in original['errors']
                             for path in error.get('editable_paths', [error['path']])]
                 if isinstance(before, dict):
+                    editable.extend(read_limit_rename_paths(
+                        original['name'], before, arguments, original['errors'],
+                        model_schema(self.tools[original['name']].parameters)))
                     def differences(left, right, path=()):
                         if isinstance(left, dict) and isinstance(right, dict):
                             for key in left.keys() | right.keys():
