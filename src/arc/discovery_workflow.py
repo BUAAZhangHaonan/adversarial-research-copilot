@@ -18,8 +18,16 @@ async def finish_stage(engine, run_id, reason):
     """One cached editorial task after research; historical bundles stay historical."""
     if 'writer.POLISH' in engine.runtime.loader.manifest['prompts']:
         from .polishing import build_polish_payload
-        await engine.call(run_id, 'polish', 'writer', 'POLISH',
-                          payload=build_polish_payload(engine.store, run_id), tool_profile=[])
+        from .runtime import RuntimePaused
+        from .workflows import WorkflowPause
+        try:
+            await engine.call(run_id, 'polish', 'writer', 'POLISH',
+                              payload=build_polish_payload(engine.store, run_id), tool_profile=[])
+        except (RuntimePaused, WorkflowPause) as exc:
+            if exc.reason not in {'INVALID_OUTPUT_AFTER_REPAIR', 'critical_source_unavailable'}:
+                raise
+            engine.checkpoint(run_id, polish_failure={'reason': exc.reason,
+                'message': '表达整理未通过校验，交付已保存的研究报告；未采用失败润色稿。'})
     if engine.store.get_run(run_id).state.get("evidence_limits"):
         reason = "finished_with_evidence_limits_human_decision"
     engine.complete(run_id, reason)
