@@ -871,7 +871,11 @@ class Runtime:
                 # Rendered original system is authoritative on resume. Only the
                 # registered repair task supplies additional behavior.
                 snapshot = self._load_prompt_snapshot(record)
-                repaired = self.loader.render_repair(snapshot, data, schema=envelope_type.model_json_schema(),
+                from .discovery_validation import repair_source_catalog
+                repair_data = {**data, 'payload': {**payload,
+                    'retrieved_source_catalog': repair_source_catalog(
+                        self.store, payload, state.get('tool_trace', []))}}
+                repaired = self.loader.render_repair(snapshot, repair_data, schema=envelope_type.model_json_schema(),
                     previous_response=message.get('content'), validation_errors=errors)
                 state['messages'] = repaired.messages
                 spend_correction(state, 'output_json')

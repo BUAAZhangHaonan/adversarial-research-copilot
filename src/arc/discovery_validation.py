@@ -6,25 +6,60 @@ def validate_source_access(store, result):
     if isinstance(result, FieldBrief): notes = result.source_notes
     elif isinstance(result, CandidateCheck): notes = result.note.source_notes + result.field_updates
     else: return
+    errors = []
+    from .store import StateError
     for note in notes:
-        source = store.get_source(note.source_id)
-        if note.access in {"passage", "full_text", "code"}:
-            if source.access_status != "retrieved" or not source.content_path or source.content_origin != "original":
-                raise ValueError(f"source_access_exceeds_retrieved_material:{note.source_id}; use metadata/secondary and state limits")
-            try:
-                content = store.read_artifact(source.content_path)
-            except FileNotFoundError:
-                content = ""
-            if not content.strip():
-                raise ValueError(f"source_retrieved_content_empty:{note.source_id}; use metadata and state limits")
-            if note.access == "full_text" and not source.content_complete:
-                raise ValueError(f"source_full_text_not_available:{note.source_id}; use passage and state truncation limits")
-            # The web reader registers original repository pages as web_unclassified.
-            # That transport label does not certify or disprove authorship/code semantics.
-            if note.access == "code" and source.source_type not in {"author_code", "web_unclassified", "official_documentation"}:
-                raise ValueError(f"source_is_not_original_code:{note.source_id}")
-        if note.access == "abstract" and source.content_origin == "secondary_analysis":
-            raise ValueError(f"secondary_analysis_is_not_original_abstract:{note.source_id}")
+        try:
+            _validate_note_access(store, note)
+        except (ValueError, StateError) as exc:
+            errors.append(str(exc))
+    if errors:
+        raise ValueError('\n'.join(dict.fromkeys(errors)))
+
+
+def _validate_note_access(store, note):
+    source = store.get_source(note.source_id)
+    if note.access in {"passage", "full_text", "code"}:
+        if source.access_status != "retrieved" or not source.content_path or source.content_origin != "original":
+            raise ValueError(f"source_access_exceeds_retrieved_material:{note.source_id}; use metadata/secondary and state limits")
+        try:
+            content = store.read_artifact(source.content_path)
+        except FileNotFoundError:
+            content = ""
+        if not content.strip():
+            raise ValueError(f"source_retrieved_content_empty:{note.source_id}; use metadata and state limits")
+        if note.access == "full_text" and not source.content_complete:
+            raise ValueError(f"source_full_text_not_available:{note.source_id}; use passage and state truncation limits")
+        # The web reader registers original repository pages as web_unclassified.
+        # That transport label does not certify or disprove authorship/code semantics.
+        if note.access == "code" and source.source_type not in {"author_code", "web_unclassified", "official_documentation"}:
+            raise ValueError(f"source_is_not_original_code:{note.source_id}")
+    if note.access == "abstract" and source.content_origin == "secondary_analysis":
+        raise ValueError(f"secondary_analysis_is_not_original_abstract:{note.source_id}")
+
+
+def repair_source_catalog(store, payload, trace):
+    """Compact provenance available to this task, including sources read after its prompt.
+
+    This is an address/availability directory, never semantic proof or an automatic
+    title-based citation replacement. Original pages take precedence over search hits.
+    """
+    from .runtime import reference_ids, SOURCE_REF_KEYS
+    visible = reference_ids([payload, trace], SOURCE_REF_KEYS)
+    sources = store.list_sources(ids=sorted(visible)) if visible else []
+    sources.sort(key=lambda s: (s.content_origin != 'original', s.access_status != 'retrieved', s.source_id))
+    directory = []
+    for source in sources[:64]:
+        directory.append({
+            'source_id': source.source_id, 'title': source.title[:240],
+            'url': (source.url or '')[:600], 'doi': source.doi, 'arxiv_id': source.arxiv_id,
+            'version': source.version, 'access_status': source.access_status,
+            'content_origin': source.content_origin, 'content_complete': source.content_complete,
+            'content_total_chars': source.content_total_chars,
+        })
+    return {'scope': 'current_task_visible_sources', 'sources': directory,
+            'omitted_sources': max(0, len(sources) - len(directory)),
+            'automatic_replacement': False}
 
 
 def source_read_progress(trace):

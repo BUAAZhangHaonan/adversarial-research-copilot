@@ -325,12 +325,27 @@ def prepare_task_retry(store, ledger, run_id, task_key, reason, *, defer_evidenc
                  'previous_task_id': source.task_id, 'previous_error': source.error or run.stop_reason,
                  'validation_errors': errors, 'unaccepted_response': raw,
                  'previous_successful_tools': successful_tools}}
+    from .discovery_validation import repair_source_catalog
+    audit['protocol_retry']['retrieved_source_catalog'] = repair_source_catalog(
+        store, original_input['payload'], successful_tools)
     if deferral:
         audit['protocol_retry']['deferred_evidence'] = deferral
         audit['retry_kind'] = 'defer_evidence'
     refreshed = _refreshed_reference_errors(store, errors, original_input['payload'], successful_tools)
     if refreshed is not None:
         audit['protocol_retry']['refreshed_validation_errors'] = refreshed
+    # Historical runs may have stopped at the first access error. Diagnose every
+    # note under the current validator without altering the saved model response.
+    from .discovery_validation import validate_source_access
+    try:
+        retry_envelope = envelope_type.model_validate_json(raw)
+    except (ValueError, ValidationError):
+        pass
+    else:
+        try:
+            validate_source_access(store, retry_envelope.result)
+        except (ValueError, StateError) as exc:
+            audit['protocol_retry']['refreshed_validation_errors'] = [*(refreshed or errors), str(exc)]
     if rejected_calls:
         audit['confirmed_rejected_calls'] = rejected_calls
     if recovered_draft:
