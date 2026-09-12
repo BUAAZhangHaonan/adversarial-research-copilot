@@ -45,3 +45,24 @@ async def test_final_check_still_cannot_promote_unverified_discuss(tmp_path, mon
     idea=store.list_discovery_ideas(run.run_id)[0]
     assert idea['note'] is None and idea['status']=='evidence_limited'
     assert 'idea1.check_provisional' not in final.state
+
+
+@pytest.mark.asyncio
+async def test_saved_unverified_seed_reenters_validation_without_closure(tmp_path, monkeypatch):
+    import json
+    from arc.schemas import TaskRecord
+    settings,run,store,ledger,brief,seed,_=fixture(tmp_path,monkeypatch)
+    store.update_run(run.run_id,state={**run.state,'field_brief':brief})
+    path=f'runs/{run.run_id}/saved-seed.json'
+    store.save_artifact(path,json.dumps({'response':{'message':{'content':json.dumps({
+        'result_status':'needs_evidence','result':sketch(seed)})}}}))
+    store.put_task(TaskRecord(task_id=run.run_id+'.idea1.sketch',run_id=run.run_id,
+        status='PAUSED_EXTERNAL',input_hash='fixture',prompt_hash='fixture',model_config_hash='fixture',
+        response_artifact_path=path))
+    runtime=QuestionRuntime({'idea1.sketch':sketch(seed),'idea1.triage':triage('park')})
+    runtime.blocked={'idea1.sketch'}
+    final=await WorkflowEngine(store,runtime,settings).execute(run.run_id)
+    assert final.status=='COMPLETED'
+    assert [k for k,_,_ in runtime.calls]==['idea1.sketch','idea1.triage']
+    assert store.get_task(run.run_id+'.idea1.sketch').accepted_result is None
+    assert store.list_discovery_ideas(run.run_id)[0]['seed']==seed

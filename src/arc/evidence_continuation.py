@@ -111,7 +111,7 @@ def _handoff(engine, run_id, key, reason, payload):
     return entry, frozen
 
 
-def _previous_evidence_pause(engine, run_id, key):
+def _previous_evidence_pause(engine, run_id, key, role=None, task=None):
     """An already received blocked result needs no replay under a changed tool profile."""
     run = engine.store.get_run(run_id)
     source_key = _source_key(run, key)
@@ -126,6 +126,13 @@ def _previous_evidence_pause(engine, run_id, key):
             raw = ((saved.get("response") or {}).get("message") or {}).get("content")
             value = json.loads(raw) if raw else {}
             if value.get("result_status") == "needs_evidence":
+                result = value.get('result') or {}
+                if ((role, task) == ('ideator', 'SKETCH') and result.get('action') == 'submit'
+                        and isinstance(result.get('seed'), dict)) or (
+                        (role, task) == ('editor', 'TRIAGE') and result.get('action') == 'investigate'):
+                    # Re-enter normal validation of the saved response. The early
+                    # stage may hand a provisional idea to CHECK without buying closure.
+                    return None
                 return "critical_source_unavailable"
         except (ValueError, FileNotFoundError, TypeError):
             pass
@@ -139,7 +146,7 @@ async def call_with_evidence_limits(engine, run_id, key, role, task, payload=Non
     if entry and entry["status"] == "parked":
         return None
     if not entry:
-        reason = _previous_evidence_pause(engine, run_id, key)
+        reason = _previous_evidence_pause(engine, run_id, key, role, task)
         if reason is None:
             try:
                 return await engine.call(run_id, key, role, task, payload=payload, **kwargs)
