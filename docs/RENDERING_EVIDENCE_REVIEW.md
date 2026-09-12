@@ -10,7 +10,7 @@
 - Task：该 run 的 `.shared_investigation`
 - Task 状态：`PAUSED_PROTOCOL`，错误 `unknown_source_id`，`accepted_result=null`。
 - 主线程提供的停止费用：1.303072–1.303085 CNY，66 次账本调用；本次未重算费用。
-- Artifact 根：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`
+- Artifact 根：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`
 - Task artifact 目录：`runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/tasks/805c7f22e9760ba8422b8da3052a3b42eac47ed7eb5f3d32959f12ed60a99292/`
 - 最终冻结状态：上述目录下 `states/f646be8120474ba0b3e8d90afd7a22fc.json`，SHA256 `b948a0b6f2cba11bc33c124cb5123ac301a9f79078cc6066889c74e326f9aa98`。
 

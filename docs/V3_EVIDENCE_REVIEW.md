@@ -82,7 +82,7 @@ F0 把“没有合并/拆分扰动”限定在 §3 的实验清单，已经避�
 
 ## 任务、来源、claim 与定位
 
-下表由只读 registry 对照补充。所有 claim_version 均为 1。来源路径均相对于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。
+下表由只读 registry 对照补充。所有 claim_version 均为 1。来源路径均相对于 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。
 
 | Finding | Source | claim_id | evidence_id | 原文摘录定位 |
 |---|---|---|---|---|

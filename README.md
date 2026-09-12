@@ -20,6 +20,8 @@ arc --env-file /path/to/existing/.env --data-dir /path/to/private/arc-data disco
 
 每完成一项调查或候选记录就更新本地 Markdown。输出位于 `DATA_DIR/reports/RUN_ID/`；预算暂停时，已经保存但未完成预研的灵感仍可查看。
 
+g203 的已有研究档案已归并到本仓库 `.arc-validation/`，访问这些记录时使用 `--data-dir .arc-validation`。历史目录 `arc-vnext-20260907` 已删除，迁移位置与验证见 [档案归并记录](docs/ARCHIVE_CONSOLIDATION_20260912.md)。私有数据不提交到 Git。
+
 ## 人选择之后再进入后续阶段
 
 从报告取得稳定的 `IDEA_ID`，显式选择后续任务：

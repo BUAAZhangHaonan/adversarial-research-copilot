@@ -8,7 +8,7 @@
 
 ```bash
 .venv/bin/python scripts/start_natural_validation.py \
-  --data-dir /home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation \
+  --data-dir /home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation \
   --prefix functional-20260908-natural discover --draws 5
 ```
 
@@ -16,7 +16,7 @@ discover 完成后先读对应 `reports/<run-id>/`。由开发主线程审阅候
 
 ```bash
 .venv/bin/python scripts/start_natural_validation.py \
-  --data-dir /home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation \
+  --data-dir /home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation \
   --prefix functional-20260908-natural develop \
   --card CARD_ID --version VERSION --selection-reason '填写该版本值得继续检查的具体理由'
 ```
@@ -27,7 +27,7 @@ develop 完成后再次审阅，使用同样参数形式将子命令改成 `run`
 
 ```bash
 .venv/bin/python scripts/start_natural_validation.py \
-  --data-dir /home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation \
+  --data-dir /home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation \
   --prefix functional-20260908-natural resume --stage discover
 ```
 

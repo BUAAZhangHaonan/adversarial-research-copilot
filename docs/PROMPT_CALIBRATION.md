@@ -5,7 +5,7 @@
 ## 失败对象与原件
 
 - task：`arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V2.discover.shared_investigation`。
-- 读取位置：g203 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/arc.sqlite` 的 `tasks.data.accepted_result.result`。当时 TaskRecord 状态为 `ACCEPTED`，但后续证据登记失败；角色输出已保存不代表科研证据合格。
+- 读取位置：g203 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/arc.sqlite` 的 `tasks.data.accepted_result.result`。当时 TaskRecord 状态为 `ACCEPTED`，但后续证据登记失败；角色输出已保存不代表科研证据合格。
 - 原 rendered prompt hash：`8adc9a1bece0b8d33d2e9e73ff850a5a2fda48e6ca9a8733cb46a57839b57be7`。
 - 原 role 文本 SHA256：`7b412a9eb3aea6f245fa5fd9e8971689fb2835e74cf27b0d29292641e5b6811f`。
 

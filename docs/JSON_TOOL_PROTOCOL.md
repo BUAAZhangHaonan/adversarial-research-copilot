@@ -19,7 +19,7 @@ V3的共享调查、COMPOSE及novelty在原生工具循环后多次返回非JSON
 | Flash | `arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-flash` | `call_f3ec7073a49f4a2f893a757ce75e6970`、`call_b451917bcc184e628a38e11f97a1e215` | `tool_0e29f9f6184e479d85e52e53a5b82a88` | 0.019979–0.019981 |
 | Pro | `arc-vnext-validation-20260907.protocol_json_tools.deepseek-v4-pro` | `call_eb58225ad1cc48d19b283702da5d840d`、`call_34ce28d3585e46e2be1cebc8e2f221ad` | `tool_9c602b05670c49f1bed582498f77f99f` | 0.077400–0.077402 |
 
-原件保存在隔离目录 `/home/g203/zhanghaonan/arc-vnext-20260907` 的 `.arc-validation/artifacts/runs/<run_id>/joint-protocol-audit.json`；汇总日志为 `work/live-joint-probe.log`。本次只读核对了日志及两份审计文件路径，未为文档重新发请求。两个子账各有三条调用记录，其中两条模型请求、一条本地工具调用；费用区间不是正式发票或父账本总费用。
+原件现保存在主仓库目录 `/home/g203/zhanghaonan/adversarial-research-copilot` 的 `.arc-validation/artifacts/runs/<run_id>/joint-protocol-audit.json`；汇总日志为 `work/live-joint-probe.log`。本次只读核对了日志及两份审计文件路径，未为文档重新发请求。两个子账各有三条调用记录，其中两条模型请求、一条本地工具调用；费用区间不是正式发票或父账本总费用。
 
 相邻提交 `2b8b79a` 另冻结comparison.boundaries与shuffle_seed，并追加公共EvidenceRequest归属说明；这不等于执行了L4。V3卡虽已保存，旧novelty仍因一次修复后三个request目标全null而 `INVALID_OUTPUT_AFTER_REPAIR`，子账4.529248–4.539975元，没有accepted novelty或科学裁决。上述联合probe时，L2明确输入仍在验证，L3未完成、L4未执行；后续状态以 [E2E_REPORT](E2E_REPORT.md) 为准。联合协议成功只关闭这里的参数组合验证，后续科研判断仍须完整schema、原文与目标归属检查。
 

@@ -67,7 +67,7 @@ Python json.loads: Extra data: line 1 column 15678 (char 15677)
 
 ## 原件与 SHA256
 
-根目录：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。
+根目录：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。
 公共任务目录：
 
 `runs/arc-vnext-validation-20260907.explicit_input_schema_v2.run/tasks/76ae92933d517bcfef8ef5d97bcb6ad652a5e3a5b06b8d69bbc9f081695f75f9/`

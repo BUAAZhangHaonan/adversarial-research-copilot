@@ -48,7 +48,7 @@ Run：`arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover`。
 
 ## 原状态文件与账户证据
 
-根目录：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。各任务完整原件路径由 SQLite `tasks.data.response_artifact_path` 给出，位于 `runs/<上述run>/tasks/<任务摘要>/states/`。本次读取的文件及 SHA256：
+根目录：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。各任务完整原件路径由 SQLite `tasks.data.response_artifact_path` 给出，位于 `runs/<上述run>/tasks/<任务摘要>/states/`。本次读取的文件及 SHA256：
 
 | task | state 文件 | SHA256 |
 |---|---|---|

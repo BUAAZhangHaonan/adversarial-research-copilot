@@ -10,7 +10,7 @@
 - ARC 同材料分支未形成可比较的完成候选，因此不能据这次审查排列 ARC/direct-Pro 的质量优劣，也不能把 accepted schema 当作科学通过。
 - 全程只读 SQLite `mode=ro` 与已保存原件，没有网络检索、模型/MCP 调用，没有读取或输出私有 reasoning。只新增本地此文档，不向研究模型注入结论。
 
-远端 artifact 根为 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。
+远端 artifact 根为 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。
 
 冻结材料文件 `evaluations/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover/evidence.json`：文件 SHA256 `7b61b97a97cc3ddef45c9bb1ec05ed232654cbac931238fe24fc5f2112847802`；内部 material SHA256 `706a5492a913d4f11357f73c6d45fbef22cf4b7290ec86f4e3cdcc9343e799bd`，重新计算一致。下面三份冻结正文也与其原文 artifact 逐字一致。
 

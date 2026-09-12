@@ -42,7 +42,7 @@ run.prompt_version为 `bundle-sha256:dd0ddf4c247756f233e52742119796a4bd604f1a391
 
 ## 固定原件
 
-共同根目录为g203 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`，任务目录为：
+共同根目录为g203 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`，任务目录为：
 
 `runs/arc-vnext-validation-20260907.explicit_input_schema_v3.run/tasks/a80812dd6db9530388f520ad7d271d042e0c4d648e75e54b24ad7af526f3d0e0/`
 

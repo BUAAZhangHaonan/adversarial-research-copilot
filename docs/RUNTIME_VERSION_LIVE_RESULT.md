@@ -1,6 +1,6 @@
 # 同卡版本恢复与任务重试的真实验证
 
-最终阶段状态与费用见 [MASTER_STATUS.md](MASTER_STATUS.md) 和 [COST_REPORT.md](COST_REPORT.md)。原件位于 g203 私有研究档案 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation`，收尾证据导出为正式源码目录下 `work/runtime-closeout-evidence.json`。
+最终阶段状态与费用见 [MASTER_STATUS.md](MASTER_STATUS.md) 和 [COST_REPORT.md](COST_REPORT.md)。原件位于 g203 私有研究档案 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation`，收尾证据导出为正式源码目录下 `work/runtime-closeout-evidence.json`。
 
 ## 已核实的过程
 

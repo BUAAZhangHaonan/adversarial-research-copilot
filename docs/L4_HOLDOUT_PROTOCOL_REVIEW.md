@@ -56,7 +56,7 @@ claim_f7b5aa3b92dae70e3de54c48
 
 调用 `call_17820b127b1d4bf2a2824cbbfbe0a9e6` 已 SETTLED：08:58:13.069641 开始，09:01:37.493999 UTC 结算；费用 **0.234507–0.234508 CNY**，直接引用原账本。
 
-下面路径相对于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。公共目录：
+下面路径相对于 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。公共目录：
 
 `runs/arc-vnext-validation-20260907.materials.conflict_holdout.comparison.ARC/tasks/ab9bd003598c121ca34c1dc554983b6996e3e9b6616938d8b70215501402aeb6/`
 

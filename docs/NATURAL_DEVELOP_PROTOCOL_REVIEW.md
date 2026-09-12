@@ -52,7 +52,7 @@ Run 已为 `PAUSED_PROTOCOL / TOOL_ARGUMENTS_INVALID`。Task 保留最后模型�
 
 ## 原件与哈希
 
-以下路径相对于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。公共任务目录：
+以下路径相对于 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。公共任务目录：
 
 `runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.develop/tasks/33b4e9b38e1c0023c718decfa9b15fdf31383c149d94aef03107ab26d67f2ee3/`
 

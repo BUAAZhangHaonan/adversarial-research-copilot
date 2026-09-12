@@ -1,7 +1,7 @@
 {
   "at": "2026-09-07T18:57:22.498690+00:00",
   "code": "06de446",
-  "data_archive": "/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation",
+  "data_archive": "/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation",
   "parent": {
     "account_id": "arc-vnext-validation-20260907",
     "parent_id": null,

@@ -41,7 +41,7 @@ fresh_verification原响应含7条候选findings，前两条已将Boundary IoU�
 
 ## 固定原件与SHA256
 
-以下路径均相对于g203 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。文件hash是对实际保存字节计算，正文slice另逐字核对；本审计不改写原件。
+以下路径均相对于g203 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。文件hash是对实际保存字节计算，正文slice另逐字核对；本审计不改写原件。
 
 | 对象 | 原件路径 | SHA256 |
 |---|---|---|

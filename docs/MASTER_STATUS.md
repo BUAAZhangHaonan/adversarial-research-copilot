@@ -80,4 +80,4 @@ r2原B.selection应用暂停与显式retry费用保留；retry重评资源前提
 
 本次没有额外文件哈希或SHA256校验。既有运行时检查点身份与来源定位机制保留。
 
-研究原件保留于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation`。逐条实现映射见[IMPLEMENTATION_AUDIT](IMPLEMENTATION_AUDIT.md)，真实任务指针见[当前快照](CURRENT_VALIDATION_SNAPSHOT.json)。
+研究原件保留于 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation`。逐条实现映射见[IMPLEMENTATION_AUDIT](IMPLEMENTATION_AUDIT.md)，真实任务指针见[当前快照](CURRENT_VALIDATION_SNAPSHOT.json)。

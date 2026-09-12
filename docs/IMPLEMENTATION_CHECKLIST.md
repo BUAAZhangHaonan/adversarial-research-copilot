@@ -1,5 +1,8 @@
 # ARC execution checklist
 
+> 目录更新：文中隔离 worktree 是历史开发位置。其代码早已合入 master，历史数据现已归并并删除旧目录，见 [档案归并记录](ARCHIVE_CONSOLIDATION_20260912.md)。
+
+
 当前主链、后续协议修复与最终验收以 [MASTER_STATUS.md](MASTER_STATUS.md) 和 [RUNTIME_VERSION_LIVE_RESULT.md](RUNTIME_VERSION_LIVE_RESULT.md) 为准。以下历史记录保持原样以便定位开发问题。
 
 记录边界：本页工程证据及运行状态保留为 `d0d7459` 文档时点的历史记录，截止三笔预算追加之前；“暂停”“运行中”和未勾选项均指该时点，不代表最终续跑结果。最新执行状态与费用以 `docs/VALIDATION_SNAPSHOT.json`、`docs/COST_REPORT.md`、`docs/L4_REPORT.md` 及最终续跑记录为准；相应最终材料未落地前不预填结果。三笔追加授权见 [BUDGET_EXTENSION_AUTHORIZATION.md](BUDGET_EXTENSION_AUTHORIZATION.md)。

@@ -1,5 +1,8 @@
 # ARC 模型与 MCP 接口核查
 
+> 历史记录：旧 worktree 已移除；当时的 `work/mcp_tools_audit.json` 现位于主仓库 `work/legacy-20260907/mcp_tools_audit.json`。见 [档案归并记录](ARCHIVE_CONSOLIDATION_20260912.md)。
+
+
 核查：2026-09-07；只改 ARC 隔离目录。没有修改或重启服务，没有调用收费研究方法。
 
 ## 接口快照

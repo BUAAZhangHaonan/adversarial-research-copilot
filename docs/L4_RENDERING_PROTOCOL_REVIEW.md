@@ -29,7 +29,7 @@ ARC 首次结构错误为 `json_invalid`（`EOF while parsing a value at line 1 
 
 ## 可复核原件与哈希
 
-以下路径相对于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。
+以下路径相对于 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。
 
 ARC 任务目录 A：
 `runs/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover.comparison.ARC/tasks/7b8b076376cfa3cb52947c8636fdac762d9e5a8205e516810354af4e31d86f62/`

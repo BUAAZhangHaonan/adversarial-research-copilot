@@ -89,9 +89,9 @@
 
 保留历史失败任务 3 个；原 TaskRecord 与响应路径收录于私有 `work/l4-closeout-export.json`，失败记录未改成成功。
 
-原始结果：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/comparison.json`。
+原始结果：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/comparison.json`。
 
-收尾前结果已保留：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/comparison.before-20260908-closeout.json`。
+收尾前结果已保留：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_RENDERING_VALIDATION.discover/comparison.before-20260908-closeout.json`。
 
 ## 拥挤小目标实例分割：区分边界与实例合并错误
 
@@ -152,9 +152,9 @@
 
 保留历史失败任务 2 个；原 TaskRecord 与响应路径收录于私有 `work/l4-closeout-export.json`，失败记录未改成成功。
 
-原始结果：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover/comparison.json`。
+原始结果：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover/comparison.json`。
 
-收尾前结果已保留：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover/comparison.before-20260908-closeout.json`。
+收尾前结果已保留：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.ARC_VNEXT_VALIDATION_V3.discover/comparison.before-20260908-closeout.json`。
 
 ## 多模态冲突理解：区分模态可靠性与标签歧义（留出）
 
@@ -209,6 +209,6 @@
 
 保留历史失败任务 1 个；原 TaskRecord 与响应路径收录于私有 `work/l4-closeout-export.json`，失败记录未改成成功。
 
-原始结果：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.materials.conflict_holdout/comparison.json`。
+原始结果：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.materials.conflict_holdout/comparison.json`。
 
-收尾前结果已保留：`/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.materials.conflict_holdout/comparison.before-20260908-closeout.json`。
+收尾前结果已保留：`/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/evaluations/arc-vnext-validation-20260907.materials.conflict_holdout/comparison.before-20260908-closeout.json`。

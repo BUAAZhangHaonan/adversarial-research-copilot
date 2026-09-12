@@ -30,6 +30,6 @@ CodeX已把本次具体失败登记为来源于development任务的改进需求�
 
 本轮28次模型请求、32次工具调用，共60条账目；费用1.679891–1.679914元。原100元父账本累计46.833939–46.983457元，剩余53.016543元，预留0、未知调用0。没有清空旧费用或重新授权100元，也没有继续重试已耗尽纠正额度的任务。
 
-私有原件根目录为 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation`。汇总审计为 `artifacts/evaluations/tool-correction-20260907-result.json`；原始响应、纠正请求与状态均在 `artifacts/runs/<run_id>/tasks/`，未改写或发布private reasoning。
+私有原件根目录为 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation`。汇总审计为 `artifacts/evaluations/tool-correction-20260907-result.json`；原始响应、纠正请求与状态均在 `artifacts/runs/<run_id>/tasks/`，未改写或发布private reasoning。
 
 本轮启动脚本、日志、结果位于g203主仓库 `work/live_tool_correction_validation.py`、`work/tool-correction-live.log`、`work/tool-correction-validation-result.json`。已重建本轮REPORT及MCP_REQUIREMENTS，包含两项已评估需求。真实L3仍未贯穿，原L4三组比较仍未完成，最终总验收尚未通过。

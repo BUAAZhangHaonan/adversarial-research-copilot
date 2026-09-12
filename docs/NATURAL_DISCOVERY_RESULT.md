@@ -57,7 +57,7 @@ Novelty 已找到更近的 DIMO（arXiv:2211.16066，姿态×光照设置和真�
 
 ## 可复核路径与 SHA256
 
-远端根目录：`/home/g203/zhanghaonan/arc-vnext-20260907/`。数据库：`.arc-validation/arc.sqlite`。以下数据库 hash 对相应行的 `data` 原始字符串按 UTF-8 计算；文件 hash 对原始文件字节计算。
+远端根目录：`/home/g203/zhanghaonan/adversarial-research-copilot/`。数据库：`.arc-validation/arc.sqlite`。以下数据库 hash 对相应行的 `data` 原始字符串按 UTF-8 计算；文件 hash 对原始文件字节计算。
 
 | 数据库对象 | SHA256 |
 | --- | --- |

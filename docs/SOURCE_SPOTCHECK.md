@@ -6,7 +6,7 @@
 
 ## 实际读取了什么
 
-所有路径相对于 `/home/g203/zhanghaonan/arc-vnext-20260907/.arc-validation/artifacts/`。下面的 `chars:start:end` 使用 Python 字符索引，零起点、右端不包含；`L` 为已存文本的一起点行号，不是论文页码。
+所有路径相对于 `/home/g203/zhanghaonan/adversarial-research-copilot/.arc-validation/artifacts/`。下面的 `chars:start:end` 使用 Python 字符索引，零起点、右端不包含；`L` 为已存文本的一起点行号，不是论文页码。
 
 | 论文/表示 | source_id | 实际内容 |
 |---|---|---|
