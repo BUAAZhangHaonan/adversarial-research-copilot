@@ -20,9 +20,13 @@ async def finish_stage(engine, run_id, reason):
         from .polishing import build_polish_payload
         from .runtime import RuntimePaused
         from .workflows import WorkflowPause
+        polish_key = engine.store.get_run(run_id).state.get('polish_task_key', 'polish')
         try:
-            await engine.call(run_id, 'polish', 'writer', 'POLISH',
+            polished = await engine.call(run_id, polish_key, 'writer', 'POLISH',
                               payload=build_polish_payload(engine.store, run_id), tool_profile=[])
+            if polish_key != 'polish':
+                engine.checkpoint(run_id, polish=polished.model_dump(mode='json'),
+                                  polish_trace_tasks=engine.trace_tasks(run_id, polish_key))
         except (RuntimePaused, WorkflowPause) as exc:
             if exc.reason not in {'INVALID_OUTPUT_AFTER_REPAIR', 'critical_source_unavailable'}:
                 raise

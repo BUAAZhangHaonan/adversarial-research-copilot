@@ -23,3 +23,20 @@ async def test_writer_failure_does_not_discard_completed_research(tmp_path, monk
     final = store.get_run(run.run_id)
     assert final.status == 'COMPLETED' and final.state['polish_failure']['reason'] == 'INVALID_OUTPUT_AFTER_REPAIR'
     assert 'polish' not in final.state
+
+
+@pytest.mark.asyncio
+async def test_explicit_new_writing_task_publishes_current_report(tmp_path, monkeypatch):
+    from arc.discovery_workflow import finish_stage
+    settings, run, store, ledger, field, seed, _ = fixture(tmp_path, monkeypatch)
+    key='polish.after_candidate_recovery1'
+    store.update_run(run.run_id, state={**run.state, 'field_brief':field, 'polish_task_key':key})
+    text={'stage_summary':'Current stage is ready for human reading.', 'overview':'Uncertainty remains.',
+          'candidates':[], 'cited_source_ids':[]}
+    runtime=AccessRuntime({key:text})
+    runtime.loader.manifest['prompts']['writer.POLISH']={'tools':[]}
+    await finish_stage(WorkflowEngine(store,runtime,settings),run.run_id,'finished')
+    final=store.get_run(run.run_id)
+    assert final.state['polish']==text
+    assert [k for k,_,_ in runtime.calls]==[key]
+    assert final.state['task_inputs'][key]['payload']['candidates']==[]
