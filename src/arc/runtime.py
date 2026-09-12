@@ -466,6 +466,28 @@ class Runtime:
             self._checkpoint(record, state, 'PAUSED_EXTERNAL')
             raise RuntimePaused('PAUSED_EXTERNAL', record.error)
 
+    def _normalize_retry_identity(self, envelope, task_id, subject, payload, state):
+        """Repair only a copied, explicitly recorded predecessor ID on the same subject.
+
+        The provider response stays immutable. A deterministic accepted view owns
+        task routing metadata; this never rewrites scientific content or subjects.
+        """
+        predecessors = {(payload.get('protocol_retry') or {}).get('previous_task_id'),
+                        (payload.get('evidence_limit_handoff') or {}).get('source_task_id')}
+        prior = envelope.task_id
+        if (prior == task_id or prior not in predecessors
+                or envelope.subject.model_dump(mode='json') != subject):
+            return envelope
+        predecessor = self.store.get_task(prior)
+        if predecessor is None or predecessor.run_id != subject['run_id']:
+            return envelope
+        audit = {'kind': 'copied_explicit_predecessor_task_id', 'from_task_id': prior,
+                 'to_task_id': task_id, 'subject_unchanged': True}
+        corrections = state.setdefault('task_identity_corrections', [])
+        if audit not in corrections:
+            corrections.append(audit)
+        return envelope.model_copy(update={'task_id': task_id})
+
     def _validate_output_contracts(self, envelope, payload, state):
         """Collect independent read-only errors before spending JSON correction."""
         from .retrying import validate_deferred_evidence
@@ -859,6 +881,7 @@ class Runtime:
                 raise RuntimePaused('PAUSED_PROTOCOL', 'STOP_WITH_TOOL_CALLS')
             try:
                 envelope = envelope_type.model_validate_json(message.get('content') or '')
+                envelope = self._normalize_retry_identity(envelope, task_id, subject_data, payload, state)
                 self._validate_output_contracts(envelope, payload, state)
             except (ValueError, ValidationError) as exc:
                 errors = (output_validation_errors(message.get('content') or '', envelope_type, exc)
@@ -908,8 +931,8 @@ class Runtime:
                 self._checkpoint(record, state, 'PAUSED_PROTOCOL')
                 raise RuntimePaused('PAUSED_PROTOCOL', record.error) from exc
             record.accepted_result = envelope.model_dump(mode='json') if envelope.result_status == 'complete' else None
-            if envelope.result_status == 'complete':
-                record.error = None
+            # Valid unresolved research is not a lingering protocol failure.
+            record.error = None
             self._checkpoint(record, state, 'ACCEPTED' if envelope.result_status == 'complete' else 'PAUSED_EXTERNAL')
             return envelope
 

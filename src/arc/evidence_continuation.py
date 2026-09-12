@@ -100,7 +100,7 @@ def _handoff(engine, run_id, key, reason, payload):
         if len(material) >= 6 or remaining <= 0:
             break
     frozen["evidence_limit_handoff"] = {
-        "reason": limit_message, "pause_reason": reason,
+        "reason": limit_message, "pause_reason": reason, "source_task_id": task_id,
         "unresolved_evidence_requests": entry["unresolved_evidence_requests"],
         "unaccepted_draft": draft, "recent_material_excerpts": list(reversed(material)),
         "instruction": "本次只利用已取得的材料收尾，不再检索。返回complete表示有限结论已写完，不表示证据已齐全。"
