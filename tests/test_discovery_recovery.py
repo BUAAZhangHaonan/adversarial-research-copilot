@@ -12,10 +12,13 @@ from tests.test_discovery_workflow import fixture, sketch, triage, checked
 from tests.test_evidence_continuation import AccessRuntime
 
 @pytest.mark.asyncio
-async def test_bad_output_closes_once_then_remaining_draw_continues(tmp_path, monkeypatch):
+@pytest.mark.parametrize('failure', ['INVALID_OUTPUT_AFTER_REPAIR',
+    'TOOL_ARGUMENTS_INVALID_AFTER_CORRECTION', 'TOOL_CORRECTION_CALLS_MISMATCH',
+    'TOOL_CORRECTION_REQUIRED'])
+async def test_bad_output_closes_once_then_remaining_draw_continues(tmp_path, monkeypatch, failure):
     settings, run, store, ledger, field, seed, _ = fixture(tmp_path, monkeypatch, draws=2)
     runtime = AccessRuntime({'survey':field, 'idea1.sketch':sketch(seed), 'idea1.triage':triage('investigate'),
-        'idea1.check':RuntimePaused('PAUSED_PROTOCOL','INVALID_OUTPUT_AFTER_REPAIR'),
+        'idea1.check':RuntimePaused('PAUSED_PROTOCOL',failure),
         'idea1.check.with_available_evidence':RuntimePaused('PAUSED_PROTOCOL','INVALID_OUTPUT_AFTER_REPAIR'),
         'idea2.sketch':sketch(seed), 'idea2.triage':triage('park')})
     final = await WorkflowEngine(store, runtime, settings).execute(run.run_id)
