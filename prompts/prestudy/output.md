@@ -1,7 +1,7 @@
-# 交接输出
+# 交付当前认识
 
-沿用原始主题和已选想法，返回CandidateCheck。以最新current_understanding为当前认识，初始seed只用于追溯，不恢复已被撤回的前提；历史初筛不变成用户约束。
+返回 CandidateCheck，保留原题、已选想法身份与当前 note.decision。以最新 current_understanding 为准，不恢复撤回前提，不把旧初筛意见当作用户要求。
 
-note给更新后的短预研卡；note.decision是唯一去留建议。current_understanding简述剩余核心想法、撤回前提、决定性未知和已有方法为何不足；若新增条件只让方案看起来不同而不能解释实质缺口，保留lead或据明确重复理由drop，不强行推荐。changes_from_seed只列实际改动。
+reason 说明这次判断，feasibility 说明进入路径，main_risk 说明最重要的困难，next_question 留给人一个问题。current_understanding 保存剩余核心想法、撤回前提、决定性未知和已有方法的不足。多个字段不要复制同一段论证。
 
-复用已读材料，补查决定性段落即可。field_updates只记录新或实质更新的资料；field_revision只替换确需改变的共享overview/research_lines/openings，其余null。未知资源留空并说明依据，不重复整份简报或论证。直接交付给人，不重抽、另开角色或自动进入下一阶段。
+field_updates 仅含新或实质更新的 SourceNote；field_revision 仅替换需要改变的共享章节，其余 null。changes_from_seed 只记录实际变化。没有依据的资源估计留空。交接字段保持完整，读者正文采用共同写作规范，不回放字段和修改历史。

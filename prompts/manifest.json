@@ -405,6 +405,7 @@
       "task": "SURVEY",
       "system": [
         "discover/policy.md",
+        "common/plain_research_writing.md",
         "discover/researcher.md"
       ],
       "task_template": "discover/invoke.md",
@@ -424,6 +425,7 @@
       "task": "CHECK",
       "system": [
         "discover/policy.md",
+        "common/plain_research_writing.md",
         "discover/researcher.md"
       ],
       "task_template": "discover/invoke.md",
@@ -443,6 +445,7 @@
       "task": "SKETCH",
       "system": [
         "discover/policy.md",
+        "common/plain_research_writing.md",
         "discover/ideator.md",
         "discover/calibration.md"
       ],
@@ -456,6 +459,7 @@
       "task": "TRIAGE",
       "system": [
         "discover/policy.md",
+        "common/plain_research_writing.md",
         "discover/editor.md",
         "discover/calibration.md"
       ],
@@ -469,6 +473,7 @@
       "task": "DEVELOP",
       "system": [
         "discover/policy.md",
+        "common/plain_research_writing.md",
         "prestudy/develop_scope.md",
         "prestudy/output.md"
       ],
@@ -489,6 +494,7 @@
       "task": "PRESSURE",
       "system": [
         "discover/policy.md",
+        "common/plain_research_writing.md",
         "prestudy/pressure_scope.md",
         "prestudy/output.md"
       ],
@@ -508,6 +514,7 @@
       "role": "writer",
       "task": "POLISH",
       "system": [
+        "common/plain_research_writing.md",
         "discover/writer.md"
       ],
       "task_template": "discover/writer_invoke.md",
