@@ -88,3 +88,42 @@ def test_writer_replay_has_no_research_tools_or_new_budget_authorization(tmp_pat
     with original._connect() as db:
         assert db.execute('SELECT COUNT(*) FROM budget_accounts').fetchone()[0] == 1
         assert db.execute('SELECT COUNT(*) FROM budget_authorizations').fetchone()[0] == 1
+
+def test_one_protocol_failure_does_not_repeat_or_abort_independent_writing(tmp_path, monkeypatch):
+    import argparse
+    import asyncio
+    from types import SimpleNamespace
+    from arc.budget import BudgetLedger
+    from arc.polishing import StagePolish
+    from arc.runtime import RuntimePaused
+    original, reports = source(tmp_path)
+    original.create_run('discover', run_id='r2', state={'discover_first': True})
+    (reports / 'r2').mkdir()
+    (reports / 'r2/REPORT.md').write_text('Second saved report.')
+    BudgetLedger(original.db_path).create_account('existing', '20')
+    attempted = []
+
+    class OneFailureRuntime:
+        def __init__(self, **kwargs):
+            pass
+        async def invoke(self, role, task, payload, schema, subject, task_id, tool_profile):
+            attempted.append(subject.run_id)
+            if subject.run_id == 'revision.r1':
+                raise RuntimePaused('PAUSED_PROTOCOL', 'SUBJECT_OR_TASK_MISMATCH')
+            return SimpleNamespace(result=StagePolish(stage_summary='Saved conclusion.', overview='Context.',
+                candidates=[], cited_source_ids=[]), evidence_requests=[])
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(replay, 'Runtime', OneFailureRuntime)
+    args = argparse.Namespace(source_db=original.db_path, source_artifacts=original.artifact_root,
+        source_reports=reports, output_dir=tmp_path / 'rewrite', ledger_db=original.db_path,
+        account_id='existing', revision_id='revision', run_ids=['r1', 'r2'], prepare_only=False)
+    asyncio.run(replay.replay(args))
+    assert attempted == ['revision.r1', 'revision.r2']
+    receipt = json.loads((args.output_dir / 'WRITER_USAGE.json').read_text())
+    assert receipt['runs']['r1']['status'] == 'PAUSED_PROTOCOL'
+    assert receipt['runs']['r1']['reason'] == 'SUBJECT_OR_TASK_MISMATCH'
+    assert (args.output_dir / 'r2/after/REPORT.md').exists()
+    assert Store(args.output_dir / 'snapshot.sqlite').get_run('revision.r1').status == 'PAUSED_PROTOCOL'
+    assert original.get_run('r1').status == original.get_run('r2').status == 'RUNNING'

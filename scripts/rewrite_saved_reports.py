@@ -18,7 +18,7 @@ from arc.polishing import StagePolish, build_polish_payload, validate_polish
 from arc.pricing import PriceBook
 from arc.prompting import PromptLoader
 from arc.reports import render_discovery_run
-from arc.runtime import Runtime
+from arc.runtime import Runtime, RuntimePaused
 from arc.schemas import Subject
 from arc.store import Store
 
@@ -100,8 +100,21 @@ async def replay(args):
                     state={'source_run_id': run_id, 'research_repeated': False})
             task_id = task_run_id + '.polish'
             print(json.dumps({'event': 'writer_started', 'run_id': run_id}), flush=True)
-            envelope = await runtime.invoke('writer', 'POLISH', payload, StagePolish,
-                Subject(run_id=task_run_id, campaign_id=None, card_id=None, card_version=None), task_id, tool_profile=[])
+            try:
+                saved_task = writer_store.get_task(task_id)
+                if saved_task and saved_task.status == 'PAUSED_PROTOCOL':
+                    raise RuntimePaused('PAUSED_PROTOCOL', saved_task.error)
+                envelope = await runtime.invoke('writer', 'POLISH', payload, StagePolish,
+                    Subject(run_id=task_run_id, campaign_id=None, card_id=None, card_version=None), task_id, tool_profile=[])
+            except RuntimePaused as exc:
+                if exc.status != 'PAUSED_PROTOCOL':
+                    raise
+                writer_store.update_run(task_run_id, status=exc.status, stop_reason=exc.reason)
+                receipt['runs'][run_id] = {'task_id': task_id, 'status': exc.status, 'reason': exc.reason,
+                    'calls': [c for c in ledger.list_calls(args.account_id) if c['run_id'] == task_run_id]}
+                dump(receipt_path, receipt)
+                print(json.dumps({'event': 'writer_protocol_failure', 'run_id': run_id, 'reason': exc.reason}), flush=True)
+                continue
             if envelope.result is None or envelope.evidence_requests:
                 raise ValueError('WRITER_MUST_RETURN_PROSE_WITHOUT_RESEARCH_REQUESTS')
             result = validate_polish(envelope.result, payload)
