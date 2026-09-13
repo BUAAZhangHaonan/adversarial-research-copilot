@@ -68,7 +68,9 @@ def test_pending_survives_budget_pause_without_becoming_recommendation(tmp_path)
     detail = paths['idea:i1'].read_text()
     assert '0 个值得讨论' in text and '1 个待预研' in text
     assert 'PAUSED_BUDGET' in text and 'arc resume r1' in text
-    assert '不是已推荐结果' in detail and '覆盖是不是已被解决' in detail
+    assert detail.splitlines()[2] == '待预研。'
+    assert '覆盖是不是已被解决' in detail
+    assert '值得讨论' not in detail and store.ideas[0]['note'] is None
     assert '无关检索命中' not in text + detail
     assert '无关检索命中' in paths['search_sources'].read_text()
     usage = json.loads(paths['usage'].read_text())
@@ -85,13 +87,16 @@ def test_note_direct_render_has_only_relevant_refs_and_keeps_unknowns(tmp_path):
     assert '摘要；全文未取得' in text and '去掉没有依据的效果承诺' in text
     assert '缺少工作量依据' in text and 'GPU：未记录' in text
     assert '无关检索命中' not in text
-    assert text.index('本次实质调整') < text.index('初始灵感（预研前') < text.index('文献已经做到哪里')
+    assert text.index(seed()['insight']) < text.index('文献与进入路径') < text.index('修改与材料记录')
+    assert text.index('修改与材料记录') < text.index(note()['changes_from_seed'][0])
+    assert note()['main_risk'] in text and note()['next_question'] in text
+    assert note()['limits'][0] in text
     overview = paths['overview'].read_text()
-    assert overview.index('有值得讨论的具体差异') < overview.index('共享调研概览')
+    assert overview.index('有值得讨论的具体差异') < overview.index('领域认识')
     assert note()['seed']['insight'] not in overview
 
 
-@pytest.mark.parametrize('status,label', [('drop', '本次没有继续的方向'), ('park', '还值得留意的线索')])
+@pytest.mark.parametrize('status,label', [('drop', '本次放下的方向'), ('park', '保留的线索')])
 def test_early_editor_decisions_are_not_checked_notes(tmp_path, status, label):
     store = Store(tmp_path)
     store.ideas[0].update(status=status)
@@ -115,7 +120,8 @@ def test_light_prompts_and_saved_json_correction_remain_markdown_only(prompt_id)
     data = {'task_id': 'r1.task', 'subject': {'run_id': 'r1'}, 'payload': {'original_task': '真实原题'}}
     schema = {'type': 'object', 'properties': {'result': {'type': 'object'}}}
     prompt = loader.render(prompt_id, data, schema=schema)
-    assert not any(name.startswith('common/') or name.startswith('roles/') for name in prompt.dependencies)
+    assert {name for name in prompt.dependencies if name.startswith('common/')} == {'common/plain_research_writing.md'}
+    assert not any(name.startswith('roles/') for name in prompt.dependencies)
     assert '真实原题' in prompt.messages[1]['content']
     assert not any(model.lower() in prompt.messages[0]['content'].lower() for model in ['deepseek', 'flash', 'claude', 'v4-pro'])
     repair = render_repair(prompt, data, schema=schema, previous_response={}, validation_errors=['missing'])
@@ -185,10 +191,13 @@ def test_checked_current_understanding_leads_report_without_reviving_old_seed(tm
     detail = paths['idea:i1'].read_text()
     assert updated['current_understanding']['core_insight'] in overview
     assert seed()['insight'] not in overview
-    assert detail.index('当前核心想法') < detail.index('初始灵感（预研前')
+    assert detail.index(updated['current_understanding']['core_insight']) < detail.index('修改与材料记录')
     assert updated['current_understanding']['why_existing_insufficient'] in detail
     assert '旧版本并非天然可见' in detail
-    assert seed()['insight'] in detail.split('初始灵感（预研前', 1)[1]
+    current_text, history_text = detail.split('修改与材料记录', 1)
+    assert seed()['insight'] not in current_text
+    assert seed()['insight'] in history_text
+    assert '已撤回的前提：' in history_text
     assert detail.count(updated['next_question']) == 1
     assert store.__dict__ == before
 
@@ -199,6 +208,7 @@ def test_recorded_candidate_relation_is_visible_without_inventing_a_relation(tmp
     if checked:
         store.ideas[0].update(note=note(), status='checked')
     paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    assert '与其他想法的关系：' not in paths['overview'].read_text() + paths['idea:i1'].read_text()
     assert '候选关系：' not in paths['overview'].read_text() + paths['idea:i1'].read_text()
     store.ideas[0]['triage']['candidate_relation'] = {
         'kind': 'evaluation_support', 'related_draw_ids': ['r1.idea0'],
@@ -232,7 +242,8 @@ def test_unchanged_current_insight_and_unknown_are_not_reprinted_in_multiple_fie
     detail = paths['idea:i1'].read_text()
     assert detail.count(seed()['insight']) == 1
     assert detail.count('同一个决定性未知') == 1
-    assert '初始灵感（预研前' in detail and '核心认识未变' in detail
+    assert '修改与材料记录' in detail and '预研前后的核心认识相同' in detail
+    assert seed()['why_it_matters'] in detail.split('修改与材料记录', 1)[1]
     assert paths['overview'].read_text().count(seed()['insight']) == 1
 
 
@@ -247,8 +258,8 @@ def test_overview_distinguishes_updated_shared_brief_from_original_survey(tmp_pa
     before = copy.deepcopy(store.__dict__)
     paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
     text = paths['overview'].read_text()
-    assert ('已纳入后续资料更新的当前共享概览' in text) is is_updated
-    assert ('以下概览形成于调研阶段' in text) is not is_updated
+    assert '## 领域认识' in text
+    assert ('以下是前期调查概览，候选预研中的更新见相应记录' in text) is not is_updated
     assert store.run['state']['field_brief']['overview'] in text
     assert store.__dict__ == before
 
@@ -259,6 +270,8 @@ def test_pending_reason_is_separate_from_status_without_doubled_punctuation(tmp_
     store.ideas[0]['triage']['reason'] = reason
     paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
     text = paths['overview'].read_text()
-    assert reason + '\n\n尚未完成预研' in text
+    pending_section = text.split('## 尚未完成预研', 1)[1].split('## 领域认识', 1)[0]
+    assert reason + '\n\n' in pending_section
+    assert pending_section.count(reason) == 1
     assert '。。' not in text
     assert store.ideas[0]['triage']['reason'] == reason

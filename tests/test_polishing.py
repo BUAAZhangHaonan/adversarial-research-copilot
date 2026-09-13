@@ -90,9 +90,10 @@ def test_final_polished_report_preserves_technical_draft_and_authoritative_decis
     assert '有条件线索' in report and '有条件线索' in detail
     assert 'https://example.org/s2' in report and 'https://example.org/s1' in detail
     assert 'noise' not in report + detail
-    assert '本次实质调整' in paths['technical_idea:i1'].read_text()
+    assert '修改与材料记录' in paths['technical_idea:i1'].read_text()
+    assert note()['changes_from_seed'][0] in paths['technical_idea:i1'].read_text()
     assert 'ideas/i1.technical.md' in technical
-    assert '查看原始技术报告' in report and 'i1.technical.md' in detail
+    assert '[预研记录](TECHNICAL_REPORT.md)' in report and 'i1.technical.md' in detail
     assert 'COMPLETED' not in report and 'human_selection' not in report
     assert '（s2）' not in report
     assert '本阶段已完成，是否继续由人决定' in report
@@ -106,7 +107,8 @@ def test_unpolished_history_remains_explicitly_technical(tmp_path):
     store = prepared_store(tmp_path)
     paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
     assert '当前为技术稿，尚无已接受的最终润色' in paths['overview'].read_text()
-    assert '本次实质调整' in paths['technical_idea:i1'].read_text()
+    assert '修改与材料记录' in paths['technical_idea:i1'].read_text()
+    assert note()['changes_from_seed'][0] in paths['technical_idea:i1'].read_text()
     assert 'polish' not in store.run['state']
 
 
@@ -146,12 +148,18 @@ def test_writer_and_json_correction_are_registered_no_tool_markdown():
     data = {'task_id': 'r1.polish', 'subject': {'run_id': 'r1'}, 'payload': {'original_question': '原始范围'}}
     prompt = loader.render('writer.POLISH', data, schema=StagePolish.model_json_schema())
     assert loader.manifest['prompts']['writer.POLISH']['tools'] == []
-    assert not any(path.startswith('common/') or path.startswith('roles/') for path in prompt.dependencies)
-    assert '首次出现时给出简短中文解释' in prompt.messages[0]['content']
-    assert '200–350' in prompt.messages[0]['content'] and '500–800' in prompt.messages[0]['content']
-    assert '80–160' in prompt.messages[0]['content'] and '3–5篇' in prompt.messages[0]['content']
+    assert {path for path in prompt.dependencies if path.startswith('common/')} == {'common/plain_research_writing.md'}
+    assert not any(path.startswith('roles/') for path in prompt.dependencies)
+    system = prompt.messages[0]['content']
+    assert '必要术语在第一次使用时顺带解释' in system
+    assert '没有字数、段数或引用数的最低配额' in system
+    assert '在 writing_limits 上限内留余量' in system
+    assert '定理前提、已测范围、未测范围和决定性未知不能因润色消失' in system
+    assert '每个候选还受其 source_ids 限制' in system
     repaired = render_repair(prompt, data, schema=StagePolish.model_json_schema(), previous_response={}, validation_errors=['missing'])
-    assert '原始范围' in repaired.messages[1]['content'] and '不开展检索或科学复审' in repaired.messages[1]['content']
+    assert '原始范围' in repaired.messages[1]['content'] and '不新增研究或事实' in repaired.messages[1]['content']
+    assert '删去决定性条件或改动研究判断' in repaired.messages[1]['content']
+    assert repaired.messages[0] == prompt.messages[0]
     assert 'json' in repaired.messages[1]['content'].lower()
 
 
@@ -190,7 +198,9 @@ def test_revision_render_changes_display_title_without_mutating_source_run_or_re
                        polish_override=revision, polish_payload=build_polish_payload(store, 'r1'))
     detail = paths['idea:i1'].read_text()
     assert detail.startswith('# 信息何时影响决策')
-    assert '原研究标题（历史）：时机改变信息作用' in detail
+    assert '时机改变信息作用' not in detail
+    assert paths['technical_idea:i1'].read_text().startswith('# 时机改变信息作用')
+    assert '[详细预研记录](i1.technical.md)' in detail
     assert '信息何时影响决策' in paths['overview'].read_text()
     assert revision['candidates'][0]['text'] in detail
     assert paths['technical_idea:i1'].read_bytes() == original_files['technical_idea:i1']
@@ -257,10 +267,10 @@ def test_workflow_publish_passes_its_runtime_loader(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('field,value,diagnostic', [
     ('stage_summary', '甲' * 451, 'stage_summary: 451 characters; maximum 450'),
-    ('overview', ('甲' * 220 + '\n\n') * 5, 'overview:'),
-    ('candidate', ('甲' * 220 + '\n\n') * 6, 'candidates[i1].text:'),
+    ('overview', ('甲' * 220 + '\n\n') * 5, 'overview: 1108 characters; maximum 1100'),
+    ('candidate', ('甲' * 220 + '\n\n') * 6, 'candidates[i1].text: 1330 characters; maximum 1300'),
     ('candidate', '甲' * 261, 'candidates[i1].text.paragraph[1]: 261 characters; maximum 260'),
-])
+], ids=['summary_over_limit', 'overview_over_limit', 'candidate_over_limit', 'paragraph_over_limit'])
 def test_marked_writing_payload_rejects_oversize_with_actionable_diagnostics(tmp_path, field, value, diagnostic):
     payload = build_polish_payload(prepared_store(tmp_path), 'r1')
     assert payload['writing_limits'] == WRITING_LIMITS
@@ -272,7 +282,15 @@ def test_marked_writing_payload_rejects_oversize_with_actionable_diagnostics(tmp
     with pytest.raises(ValueError, match='POLISH_WRITING_LIMITS_EXCEEDED') as error:
         validate_polish(result, payload)
     assert diagnostic in str(error.value)
-    assert '保留决定性适用条件' in str(error.value)
+    assert all(line == 'POLISH_WRITING_LIMITS_EXCEEDED' or '; maximum ' in line
+               for line in str(error.value).splitlines())
+    data = {'task_id': 'r1.polish', 'subject': {'run_id': 'r1'}, 'payload': payload}
+    repair = PromptLoader(ASSETS).render('writer.POLISH', data, schema=StagePolish.model_json_schema(),
+        repair={'previous_response': result, 'validation_errors': [str(error.value)]})
+    instruction = repair.messages[1]['content']
+    assert diagnostic in instruction
+    assert '删去决定性条件或改动研究判断' in instruction
+    assert '不把缺失材料写成已取得' in instruction
     # A frozen historical payload does not acquire today's writing constraints.
     payload.pop('writing_limits')
     assert validate_polish(result, payload)
@@ -350,9 +368,11 @@ def test_limited_check_writer_and_report_keep_missing_material_not_prior_recomme
                        polish_override=result, polish_payload=payload)
     technical = paths['technical_idea:i1'].read_text()
     assert '文献受限，保留待查' in paths['overview'].read_text() + technical
-    assert '已经尝试文献核查' in technical and '关键近邻是否已经覆盖这个操作' in technical
+    assert '已尝试核查' in technical and '关键近邻是否已经覆盖这个操作' in technical
+    assert '当前没有可接受的预研结论' in technical
     assert '未做定向预研' not in technical and '值得讨论' not in paths['idea:i1'].read_text()
-    assert '没有可接受的预研结论' in paths['idea:i1'].read_text()
+    assert paths['idea:i1'].read_text().splitlines()[2] == '文献受限，保留待查。'
+    assert '已尝试核查关键近邻，但相关材料仍无法取得' in paths['idea:i1'].read_text()
     assert '0 个值得讨论' in paths['technical_overview'].read_text()
     assert store.__dict__ == before
 

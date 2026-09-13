@@ -168,5 +168,4 @@ def validate_writing_limits(result, limits):
         if len(citations) > limits['max_cited_sources']:
             violations.append(f'{path}: {len(citations)} references; maximum {limits["max_cited_sources"]}')
     if violations:
-        raise ValueError('POLISH_WRITING_LIMITS_EXCEEDED\n' + '\n'.join(violations)
-                         + '\n请精简重复内容、选择关键引用并用空行分段；保留决定性适用条件，不截断句子或改写科学判断。')
+        raise ValueError('POLISH_WRITING_LIMITS_EXCEEDED\n' + '\n'.join(violations))

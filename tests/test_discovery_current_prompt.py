@@ -28,7 +28,8 @@ def test_current_understanding_and_partial_field_revision_reach_effective_task(t
     assert '已撤回的背景前提' in user
     assert 'why_existing_insufficient' in user and 'invalidated_premises' in user
     assert user.count('"$defs"') == 1  # No duplicate complete schema/example payload.
-    assert not any(path.startswith('common/') or path.startswith('roles/') for path in prompt.dependencies)
+    assert [path for path in prompt.dependencies if path.startswith('common/')] == ['common/plain_research_writing.md']
+    assert not any(path.startswith('roles/') for path in prompt.dependencies)
     parsed = CandidateCheck.model_json_schema()
     assert 'field_revision' not in parsed.get('required', [])
     assert 'current_understanding' not in parsed['$defs']['IdeaNote'].get('required', [])

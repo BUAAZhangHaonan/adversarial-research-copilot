@@ -1,32 +1,27 @@
 # {{ title }}
 
-## 阶段摘要
-
 {{ stage_summary }}
 
-## 研究总览
-
+{% if overview %}
 {{ overview }}
+{% endif %}
 
-## 候选与原始判断
-
+{% if candidates %}
+## {% if candidates | length == 1 %}想法详情{% else %}本次想法{% endif %}
 {% for candidate in candidates %}
 - [{{ candidate.title }}]({{ candidate.path }})：{{ candidate.decision }}。
 {% endfor %}
-{% if not candidates %}
+{% else %}
 本阶段没有已保存的候选灵感。
 {% endif %}
 
+{% if sources %}
 ## 关键来源
-
 {% for source in sources %}
-- {% if source.url %}[{{ source.title }}]({{ source.url }}){% else %}{{ source.title }}{% endif %}。
+- {% if source.url %}[{{ source.title }}]({{ source.url }}){% else %}{{ source.title }}{% endif %}
 {% endfor %}
-
-## 后续与原稿
+{% endif %}
 
 {{ execution_status }}
 
-正文经过最终语言整理，研究对象与判断仍以保存记录为准；润色不构成新的研究验证。
-
-[查看原始技术报告](TECHNICAL_REPORT.md) · [费用](COST_REPORT.md) · [任务记录](PROMPT_TRACE_INDEX.md) · [共享调查](FIELD_BRIEF.md)
+[预研记录](TECHNICAL_REPORT.md) · [文献调查](FIELD_BRIEF.md) · [费用](COST_REPORT.md) · [运行记录](PROMPT_TRACE_INDEX.md)

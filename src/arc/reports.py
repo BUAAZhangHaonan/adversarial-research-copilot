@@ -558,7 +558,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
         for item in stage_limits) if stage_limits else ''
     paths['overview'].write_text(loader.render_report('discovery_overview', {
         'report_title': {'develop': '已选想法的预研展开', 'run': '已选想法的压力讨论'}.get(run['mode'], '本次发现'),
-        'conclusion': f"已保存 {sum(idea.get('seed') is not None for idea in ideas)} 个想法：{len(discuss)} 个值得讨论，{len(leads)} 条线索，{len(pending)} 个待预研。建议由人选择，不代表科学认证。",
+        'conclusion': f"已保存 {sum(idea.get('seed') is not None for idea in ideas)} 个想法：{len(discuss)} 个值得讨论，{len(leads)} 条线索，{len(pending)} 个待预研。建议由人选择。",
         'landscape_summary': (brief.get('overview') or '领域调查尚未形成可接受结论；已有材料与待查限制如下。'),
         'landscape_updated': bool(state.get('field_brief_history')) or state.get('brief_version', 1) > 1,
         'brief_version': state.get('brief_version', 1), 'discuss': discuss, 'leads': leads,
@@ -650,6 +650,7 @@ def render_discovery_polish(store, run, paths, loader, *, polish_override=None, 
         path.write_text(loader.render_report('polished_idea', {
             'title': _heading(title), 'decision': decision, 'text': item.text,
             'evidence_limited': original['decision'] == 'evidence_limited',
+            # Frozen historical templates still consume these presentation fields.
             'original_title': _heading(original['title']) if title != original['title'] else None,
             'technical_path': paths['technical_idea:' + item.idea_id].name,
             'sources': _discovery_sources(item.cited_source_ids, notes, directory, path.parent, store),

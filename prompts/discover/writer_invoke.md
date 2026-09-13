@@ -1,13 +1,12 @@
-# 最终中文报告润色
+# 整理当前预研报告
 
-任务：{{ task_type }}；任务标识：{{ task_id }}。
+任务类型：{{ task_type }}
+任务标识：{{ task_id }}
 
-以下是已保存的技术内容、原判断与唯一可用来源目录。只整理这些内容的表达：
+依据以下已保存材料，写给研究同事阅读。使用当前认识与给定来源，不开展新调查。
 
 {{ payload_json }}
 
-完成表达整理后，Envelope.result_status使用"complete"、evidence_requests使用[]。这不改变候选的原判断，也不表示证据缺口已解决；未知与限制保留在正文中。
-
-仅返回符合以下结构的JSON：
+返回下列 schema 的 JSON。自然语言字段只写正文；候选状态由原记录控制。表达整理完成时 result_status="complete"、evidence_requests=[]，研究中尚未知的内容如实保留。
 
 {{ output_schema_json }}

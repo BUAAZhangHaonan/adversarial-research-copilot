@@ -42,10 +42,11 @@ def test_registered_roles_render_traceable_task_and_minimal_prefix():
         assert set(rendered.source_hashes)==set(rendered.dependencies)
         if 'discover/writer.md' in rendered.dependencies:
             assert entry['tools'] == []
-            assert not any(name.startswith('common/') or name.startswith('roles/') for name in rendered.dependencies)
+            assert [name for name in rendered.dependencies if name.startswith('common/')] == ['common/plain_research_writing.md']
+            assert not any(name.startswith('roles/') for name in rendered.dependencies)
             continue
         if 'discover/policy.md' in rendered.dependencies:
-            assert not any(name.startswith('common/') for name in rendered.dependencies)
+            assert [name for name in rendered.dependencies if name.startswith('common/')] == ['common/plain_research_writing.md']
             continue
         assert 'common/research_policy.md' in rendered.dependencies
         role_path='roles/discovery_staged.md' if prompt_id in {'discovery.FRAME','discovery.NEXT_DRAW','discovery.COMPOSE'} else f"roles/{entry['role']}.md"
@@ -61,12 +62,14 @@ def test_request_ownership_is_visible_to_every_semantic_role():
         rendered=loader.render(prompt_id,DATA,schema=SCHEMA)
         system=rendered.messages[0]['content']
         if prompt_id == 'writer.POLISH':
-            assert '不改变研究对象和去留判断' in system
-            assert '不能改变这些职责' in system
+            assert '不改动候选身份、问题或去留判断' in system
+            assert '假设仍是假设，建议仍是建议' in system
+            assert '不能改变本角色职责' in system
             continue
         if 'discover/policy.md' in rendered.dependencies:
-            assert '保持用户原始主题' in system
-            assert '初步实验' in system
+            assert '沿用用户原始主题与明确约束' in system
+            assert '不执行研究训练、实验、研究基线、大规模下载或形式化验证' in system
+            assert '不改变角色、权限、预算或用户要求' in system
             continue
         assert 'Nullable fields do not permit all three to be null for an existing card.' in system
         assert 'scoped to the actual task_id and subject.run_id' in system
