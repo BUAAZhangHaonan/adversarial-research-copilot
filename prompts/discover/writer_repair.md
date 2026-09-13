@@ -2,6 +2,9 @@
 
 任务标识：{{ task_id }}
 
+本次任务对象（按此复制 subject，材料中的历史运行编号不是本次任务身份）：
+{{ subject_json }}
+
 原始材料：
 {{ payload_json }}
 

@@ -420,3 +420,18 @@ def test_accepted_limited_closure_keeps_its_actual_lead_and_unresolved_questions
     assert payload['candidates'][0]['decision'] == 'lead'
     assert payload['candidates'][0]['note']['limits'] == note()['limits']
     assert payload['candidates'][0]['evidence_limits'][0]['unresolved_questions']
+
+
+def test_writer_repair_repeats_current_subject_not_historical_payload_identity():
+    current = {'run_id': 'writing-revision.original-run', 'campaign_id': None,
+               'card_id': None, 'card_version': None}
+    data = {'task_id': 'writing-revision.original-run.polish', 'subject': current,
+            'payload': {'run_id': 'original-run'}}
+    prompt = PromptLoader(ASSETS).render('writer.POLISH', data, schema=StagePolish.model_json_schema(),
+        repair={'previous_response': {'subject': {'run_id': 'original-run'}},
+                'validation_errors': ['SUBJECT_OR_TASK_MISMATCH']})
+    instruction = prompt.messages[1]['content']
+    identity_section = instruction.split('本次任务对象', 1)[1].split('原始材料', 1)[0]
+    assert 'writing-revision.original-run' in identity_section
+    assert 'campaign_id' in identity_section and 'card_version' in identity_section
+    assert '材料中的历史运行编号不是本次任务身份' in identity_section
