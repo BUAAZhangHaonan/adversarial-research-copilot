@@ -64,13 +64,13 @@
 
 ## 模型配置边界
 
-现有配置默认 `research_model: deepseek-v4-pro`；scout/ideator/editor均采用该别名，用户可在 roles 明确覆盖。型号、供应商参数、token上限与计费留在配置/适配层。
+现有配置默认 `research_model: deepseek-flash`；scout/ideator/editor/writer均采用该别名，用户可在 roles 明确覆盖。型号、供应商参数、token上限与计费留在配置/适配层。
 
 新增别名需要提供实际 provider/model、端点、凭据环境变量、操作能力和匹配的价格/上限快照。`openai_compatible` 要求显式 base_url 与 api_key_env；不继承 DeepSeek 的 thinking 或私有 reasoning_content。支持范围是已实现的 Chat Completions JSON、工具、streaming usage 协议；其他协议或计费方式需要单独适配。
 
 `pricing_path` 指向经过核对的价格配置。不能只写一个新型号名字便假定其价格、工具或输出能力与已有型号相同。兼容性以模拟配置检查，不购买或比较新模型。未知别名、缺少凭据、未支持操作和价格上限不一致均明确报错。
 
-当前默认别名 `deepseek-v4.1-flash` 对应官方 API `deepseek-flash`，见[型号与计价](MODEL_MIGRATION_20260910.md)。DeepSeek 保留 max 与384000完整输出上限。科研提示词不包含型号绑定，默认不会自动降低核心步骤模型。单次预算不足时暂停下一请求，不截断已开始回复。
+当前默认别名与官方 API 名均为 `deepseek-flash`，见[型号与计价](MODEL_MIGRATION_20260910.md)。DeepSeek 保留 max 与384000完整输出上限。科研提示词不包含型号绑定，默认不会自动降低核心步骤模型。单次预算不足时暂停下一请求，不截断已开始回复。
 
 ## 验证记录
 
