@@ -20,8 +20,6 @@
 
 {{ feasibility_paragraph }}
 
-{{ resource_paragraph }}
-
 {% if main_risk %}{{ main_risk }}
 
 {% endif %}{{ limits_paragraph }}
@@ -38,6 +36,10 @@
 {% endfor %}
 
 ## 修改与材料记录
+
+{% if decision_reason is defined and decision_reason %}判断依据：{{ decision_reason }}
+
+{% endif %}{{ resource_paragraph }}
 
 {% if material_basis %}{{ material_basis }}
 

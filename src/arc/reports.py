@@ -509,15 +509,17 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
                 'current': current, 'relation': relation_text, 'material_basis': basis_text, 'path': relative}
         if note:
             decision = note['decision']
+            source_titles = {source['source_id']: _heading(source['title']) for source in sources}
             nearest = '\n\n'.join(
-                f"- {work['source_id']}：已做到 {work['already_established']}；剩余差异：{work['remaining_difference']}。"
+                f"- {source_titles.get(work['source_id'], work['source_id'])}：已做到 {work['already_established']}；剩余差异：{work['remaining_difference']}。"
                 + (f" 待查：{work['uncertainty']}" if work.get('uncertainty') else '')
                 for work in note.get('nearest_work', []))
             resources = note.get('resources') or {}
             resource_fields = {'GPU': resources.get('gpu_type'), '数量': resources.get('gpu_count'),
                                '训练时长粗估': resources.get('training_hours_estimate'),
                                '推理时长粗估': resources.get('inference_hours_estimate'), '依据与未知': resources.get('basis')}
-            context.update(status_text=DISCOVERY_DECISIONS[decision] + ('：' + reason if reason != current.get('core_insight') else ''),
+            context.update(status_text=DISCOVERY_DECISIONS[decision],
+                           decision_reason='' if reason == current.get('core_insight') else reason,
                            literature_paragraph=nearest or '尚未形成足够的近邻比较，不能据此宣称不存在重复。',
                            feasibility_paragraph=note['feasibility'], resource_paragraph=_text(resource_fields),
                            main_risk='' if current.get('decisive_unknown') == note['main_risk'] else note['main_risk'], limits_paragraph=_text(note.get('limits', [])),
@@ -647,6 +649,10 @@ def render_discovery_polish(store, run, paths, loader, *, polish_override=None, 
         path = paths['idea:' + item.idea_id]
         decision = decision_names.get(original['decision'], original['decision'])
         title = item.presentation_title or original['title']
+        if item.technical_analysis:
+            technical_path = paths['technical_idea:' + item.idea_id]
+            technical_path.write_text(technical_path.read_text(encoding='utf-8') +
+                                      '\n## 风险与验证\n\n' + item.technical_analysis + '\n', encoding='utf-8')
         path.write_text(loader.render_report('polished_idea', {
             'title': _heading(title), 'decision': decision, 'text': item.text,
             'evidence_limited': original['decision'] == 'evidence_limited',

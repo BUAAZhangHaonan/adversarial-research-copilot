@@ -275,3 +275,19 @@ def test_pending_reason_is_separate_from_status_without_doubled_punctuation(tmp_
     assert pending_section.count(reason) == 1
     assert '。。' not in text
     assert store.ideas[0]['triage']['reason'] == reason
+
+
+def test_checked_reason_is_preserved_after_core_and_nearest_uses_source_title(tmp_path):
+    store = Store(tmp_path)
+    checked = note()
+    checked['reason'] = '只在这个条件下值得投入，仍需核对最强近邻。'
+    store.ideas[0].update(note=checked, status='checked')
+    before = copy.deepcopy(store.__dict__)
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    text = paths['idea:i1'].read_text()
+    assert text.splitlines()[2] == '值得讨论。'
+    assert text.count(checked['reason']) == 1
+    assert text.index('修改与材料记录') < text.index(checked['reason'])
+    assert '- 最近工作：已做到' in text
+    assert '- s2：已做到' not in text
+    assert store.__dict__ == before

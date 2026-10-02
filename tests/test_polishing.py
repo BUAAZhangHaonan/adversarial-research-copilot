@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from arc.polishing import WRITING_LIMITS, StagePolish, build_polish_payload, compact_polish_payload, validate_polish
+from arc.polishing import MAX_CITED_SOURCES, StagePolish, build_polish_payload, compact_polish_payload, validate_polish
 from arc.prompting import PromptLoader, render_repair
 from arc.reports import render_run
 from .test_discovery_reports import Store, note, ASSETS
@@ -17,6 +17,10 @@ def prepared_store(tmp_path):
     store = Store(tmp_path)
     store.run.update(status='COMPLETED', stop_reason='human_selection')
     store.ideas[0].update(note=note(), status='checked')
+    store.ideas[0]['note']['current_understanding'] = {
+        'core_insight': '信息进入决策的时机可能影响选择。', 'invalidated_premises': [],
+        'decisive_unknown': '时机是否提供额外决策价值。',
+        'why_existing_insufficient': '当前材料提供信息覆盖的起点，时机问题仍需比较。'}
     return store
 
 
@@ -36,12 +40,81 @@ def test_payload_uses_current_objects_and_deduplicates_source_notes(tmp_path):
     assert store.__dict__ == before
     assert {source['source_id'] for source in payload['source_directory']} == {'s1', 's2'}
     assert len(next(source for source in payload['source_directory'] if source['source_id'] == 's1')['notes']) == 1
-    assert 'source_notes' not in payload['field_brief']
-    assert 'source_notes' not in payload['candidates'][0]['note']
-    assert payload['candidates'][0]['note']['limits'] == note()['limits']
+    assert 'field_brief' not in payload
+    assert 'note' not in payload['candidates'][0]
+    assert payload['candidates'][0]['technical_context']['limits'] == note()['limits']
+    assert payload['candidates'][0]['technical_context']['risk_analysis'] == note()['main_risk']
     assert payload['candidates'][0]['decision'] == 'discuss'
-    assert 'seed' not in payload['candidates'][0]  # Present once inside the complete technical note.
+    assert 'seed' not in payload['candidates'][0]  # Original remains in the stored technical note.
     assert 'noise' not in json.dumps(payload)
+
+
+def test_writer_view_keeps_proposal_distinct_from_source_result_and_old_endorsement(tmp_path):
+    store = prepared_store(tmp_path)
+    original_note = store.ideas[0]['note']
+    original_note['reason'] = 'UNVERIFIED_ENDORSEMENT_MARKER'
+    original_note['resources']['basis'] = 'RESOURCE_DETAIL_MARKER'
+    work = original_note['nearest_work'][0]
+    work['already_established'] = '来源报道版本通知后可更新。'
+    work['brief_result'] = '来源使用版本通知更新记录。'
+    work['remaining_difference'] = '候选猜想没有版本通知时仍能更新。'
+    before = copy.deepcopy(store.__dict__)
+    payload = build_polish_payload(store, 'r1')
+    view = payload['candidates'][0]['writing_brief']
+    assert view['source_summaries'][0]['reported_result'] == work['brief_result']
+    assert payload['candidates'][0]['technical_context']['comparison_claims'][0]['remaining_difference'] == work['remaining_difference']
+    assert view['source_summaries'][0]['source_id'] == work['source_id']
+    assert 'UNVERIFIED_ENDORSEMENT_MARKER' not in json.dumps(payload)
+    assert 'RESOURCE_DETAIL_MARKER' not in json.dumps(payload)
+    assert store.__dict__ == before
+    assert compact_polish_payload(payload) == payload
+
+
+def test_pending_writer_view_retains_question_and_explicit_material_limits(tmp_path):
+    store = prepared_store(tmp_path)
+    store.ideas[0]['note'] = None
+    store.ideas[0]['status'] = 'pending'
+    before = copy.deepcopy(store.__dict__)
+    payload = build_polish_payload(store, 'r1')
+    view = payload['candidates'][0]['writing_brief']
+    assert view['proposal']['question'] == store.ideas[0]['seed']['question']
+    assert view['decisive_unknown'] == store.ideas[0]['seed']['key_unknown']
+    assert not view['source_summaries']
+    assert payload['candidates'][0]['decision'] != 'discuss'
+    assert store.__dict__ == before
+
+
+def test_historical_writer_input_keeps_audit_identity_without_old_scientific_claims(tmp_path):
+    store = prepared_store(tmp_path)
+    old_note = store.ideas[0]['note']
+    old_note.pop('current_understanding')
+    for key in ['reason', 'main_risk', 'next_question', 'feasibility']:
+        old_note[key] = 'HISTORICAL_FALSE_MARKER_' + key
+    old_note['seed']['insight'] = 'HISTORICAL_FALSE_MARKER_insight'
+    for work in old_note['nearest_work']:
+        work['already_established'] = 'HISTORICAL_FALSE_MARKER_source'
+        work['remaining_difference'] = 'HISTORICAL_FALSE_MARKER_novelty'
+    before = copy.deepcopy(store.__dict__)
+    payload = build_polish_payload(store, 'r1')
+    assert 'HISTORICAL_FALSE_MARKER' not in json.dumps(payload)
+    view = payload['candidates'][0]
+    assert view['writing_brief']['proposal']['review_status'] == 'historical_note_requires_current_review'
+    assert view['technical_context']['audit_reference']['idea_id'] == 'i1'
+    assert store.__dict__ == before
+
+
+def test_writer_uses_current_source_brief_and_keeps_long_source_detail_in_store(tmp_path):
+    store = prepared_store(tmp_path)
+    work = store.ideas[0]['note']['nearest_work'][0]
+    work['already_established'] = 'LONG_TECHNICAL_DETAIL_MARKER' * 1000
+    work['brief_result'] = 'The method predicts need and steers selection.'
+    store.ideas[0]['note']['current_understanding']['illustrative_example'] = 'An explicitly labeled paired-goal example.'
+    before = copy.deepcopy(store.__dict__)
+    payload = build_polish_payload(store, 'r1')
+    assert 'LONG_TECHNICAL_DETAIL_MARKER' not in json.dumps(payload)
+    assert payload['candidates'][0]['writing_brief']['source_summaries'][0]['reported_result'] == work['brief_result']
+    assert payload['candidates'][0]['writing_brief']['example'] == 'An explicitly labeled paired-goal example.'
+    assert store.__dict__ == before
 
 
 @pytest.mark.parametrize('change,problem', [
@@ -67,7 +140,7 @@ def test_candidate_cannot_borrow_another_candidates_reference(tmp_path):
 
 def test_normal_numeric_rephrasing_is_not_a_new_protocol_block(tmp_path):
     payload = build_polish_payload(prepared_store(tmp_path), 'r1')
-    payload['candidates'][0]['note']['feasibility'] = '原稿假设阈值0.95，仍需人检查。'
+    payload['candidates'][0]['technical_context']['proposed_entry'] = '原稿假设阈值0.95，仍需人检查。'
     result = written()
     result['candidates'][0]['text'] = '阈值为95%，仍需人检查。'
     assert validate_polish(result, payload).candidates[0].text == result['candidates'][0]['text']
@@ -133,10 +206,11 @@ def test_prestudy_writer_receives_current_stage_note_not_old_recommendation(tmp_
         'latest_note': note(), 'field_brief': store.run['state']['field_brief']}
     revised = note()
     revised.update(decision='drop', reason='近邻已经覆盖原始想法')
+    revised['current_understanding'] = copy.deepcopy(store.original_idea['note']['current_understanding'])
     store.run['state']['prestudy_note'] = revised
     payload = build_polish_payload(store, 'r1')
     assert payload['candidates'][0]['decision'] == 'drop'
-    assert payload['candidates'][0]['note']['reason'] == '近邻已经覆盖原始想法'
+    assert payload['candidates'][0]['writing_brief']['decision_context'] == '近邻已经覆盖原始想法'
     store.run['state']['polish'] = written()
     paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
     assert '本次放下' in paths['idea:i1'].read_text()
@@ -151,14 +225,14 @@ def test_writer_and_json_correction_are_registered_no_tool_markdown():
     assert {path for path in prompt.dependencies if path.startswith('common/')} == {'common/plain_research_writing.md'}
     assert not any(path.startswith('roles/') for path in prompt.dependencies)
     system = prompt.messages[0]['content']
-    assert '必要术语在第一次使用时顺带解释' in system
-    assert '没有字数、段数或引用数的最低配额' in system
-    assert '在 writing_limits 上限内留余量' in system
-    assert '定理前提、已测范围、未测范围和决定性未知不能因润色消失' in system
-    assert '每个候选还受其 source_ids 限制' in system
+    assert '必要术语首次出现时解释含义' in system
+    assert '段落数量都没有最低配额' in system
+    assert '选择能推进这一个问题的信息' in system
+    assert '研究尚未验证时，预期按假设表述' in system
+    assert '来源引用受候选source_ids、source_directory与citation_limit约束' in system
     repaired = render_repair(prompt, data, schema=StagePolish.model_json_schema(), previous_response={}, validation_errors=['missing'])
     assert '原始范围' in repaired.messages[1]['content'] and '不新增研究或事实' in repaired.messages[1]['content']
-    assert '删去决定性条件或改动研究判断' in repaired.messages[1]['content']
+    assert '保留全文及研究判断' in repaired.messages[1]['content']
     assert repaired.messages[0] == prompt.messages[0]
     assert 'json' in repaired.messages[1]['content'].lower()
 
@@ -171,18 +245,22 @@ def test_compact_prestudy_preserves_current_limits_and_excludes_history_and_fiel
                'invalidated_premises': ['逐样本确定归因已撤回。'],
                'decisive_unknown': '校准是否可迁移仍不清楚。',
                'why_existing_insufficient': '现有结果没有回答迁移条件。'}
-    payload['candidates'][0]['note']['current_understanding'] = current
+    # Rebuild from a current scientific note, before forming the writing view.
+    store.ideas[0]['note']['current_understanding'] = current
+    payload = build_polish_payload(store, 'r1')
+    payload['stage'] = 'develop'
     payload['source_directory'].append({'source_id': 'field-only', 'title': '广泛背景', 'url': None, 'notes': []})
     original = copy.deepcopy(payload)
     compact = compact_polish_payload(payload)
     assert payload == original
     assert 'field_brief' not in compact
     assert len(compact['source_directory']) == 2
-    actual = compact['candidates'][0]['note']
-    assert 'seed' not in actual and 'changes_from_seed' not in actual
-    assert actual['current_understanding'] == current
-    for key in ('reason', 'feasibility', 'main_risk', 'limits', 'resources', 'nearest_work'):
-        assert actual[key] == original['candidates'][0]['note'][key]
+    actual = compact['candidates'][0]['writing_brief']
+    assert actual['proposal']['hypothesis'] == current['core_insight']
+    assert actual['decisive_unknown'] == current['decisive_unknown']
+    assert current['invalidated_premises'][0] not in json.dumps(compact, ensure_ascii=False)
+    assert compact['candidates'][0]['technical_context']['audit_reference']['idea_id'] == 'i1'
+    assert actual == original['candidates'][0]['writing_brief']
 
 
 def test_revision_render_changes_display_title_without_mutating_source_run_or_reports(tmp_path):
@@ -265,35 +343,50 @@ def test_workflow_publish_passes_its_runtime_loader(tmp_path, monkeypatch):
     assert seen[0][3] is loader
 
 
-@pytest.mark.parametrize('field,value,diagnostic', [
-    ('stage_summary', '甲' * 451, 'stage_summary: 451 characters; maximum 450'),
-    ('overview', ('甲' * 220 + '\n\n') * 5, 'overview: 1108 characters; maximum 1100'),
-    ('candidate', ('甲' * 220 + '\n\n') * 6, 'candidates[i1].text: 1330 characters; maximum 1300'),
-    ('candidate', '甲' * 261, 'candidates[i1].text.paragraph[1]: 261 characters; maximum 260'),
-], ids=['summary_over_limit', 'overview_over_limit', 'candidate_over_limit', 'paragraph_over_limit'])
-def test_marked_writing_payload_rejects_oversize_with_actionable_diagnostics(tmp_path, field, value, diagnostic):
-    payload = build_polish_payload(prepared_store(tmp_path), 'r1')
-    assert payload['writing_limits'] == WRITING_LIMITS
+@pytest.mark.parametrize('field,value', [
+    ('stage_summary', '完整摘要。' * 300),
+    ('overview', '完整背景与条件。' * 1600),
+    ('candidate', '核心设想与必要条件。' * 2000),
+    ('candidate', '单个自然段中的完整说明。' * 400),
+])
+def test_complete_long_writing_is_accepted_and_rendered_without_shortening(tmp_path, field, value):
+    store = prepared_store(tmp_path)
+    payload = build_polish_payload(store, 'r1')
+    assert 'writing_limits' not in payload
+    assert payload['citation_limit'] == MAX_CITED_SOURCES
     result = written()
     if field == 'candidate':
         result['candidates'][0]['text'] = value
     else:
         result[field] = value
-    with pytest.raises(ValueError, match='POLISH_WRITING_LIMITS_EXCEEDED') as error:
-        validate_polish(result, payload)
-    assert diagnostic in str(error.value)
-    assert all(line == 'POLISH_WRITING_LIMITS_EXCEEDED' or '; maximum ' in line
-               for line in str(error.value).splitlines())
-    data = {'task_id': 'r1.polish', 'subject': {'run_id': 'r1'}, 'payload': payload}
-    repair = PromptLoader(ASSETS).render('writer.POLISH', data, schema=StagePolish.model_json_schema(),
-        repair={'previous_response': result, 'validation_errors': [str(error.value)]})
-    instruction = repair.messages[1]['content']
-    assert diagnostic in instruction
-    assert '删去决定性条件或改动研究判断' in instruction
-    assert '不把缺失材料写成已取得' in instruction
-    # A frozen historical payload does not acquire today's writing constraints.
-    payload.pop('writing_limits')
-    assert validate_polish(result, payload)
+    accepted = validate_polish(result, payload)
+    assert (accepted.candidates[0].text if field == 'candidate' else getattr(accepted, field)) == value
+    store.run['state']['polish'] = result
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    path = paths['idea:i1'] if field == 'candidate' else paths['overview']
+    assert value in path.read_text(encoding='utf-8')
+    # Older frozen inputs retain their bytes; their former size values have no effect.
+    payload['writing_limits'] = {'stage_summary_max_chars': 1, 'overview_max_chars': 1,
+                                'candidate_text_max_chars': 1, 'paragraph_max_chars': 1,
+                                'max_cited_sources': MAX_CITED_SOURCES}
+    assert validate_polish(result, payload).model_dump(mode='json') == accepted.model_dump(mode='json')
+
+
+def test_risk_analysis_is_complete_in_technical_report_and_main_prose_is_preserved(tmp_path):
+    store = prepared_store(tmp_path)
+    result = written()
+    risk = '风险影响核心命题，比较简单规则和内部信号的选择可以区分定义差异与决策用途。' * 100
+    result['candidates'][0]['technical_analysis'] = risk
+    store.run['state']['polish'] = result
+    before = copy.deepcopy(store.__dict__)
+    paths = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    assert result['candidates'][0]['text'] in paths['idea:i1'].read_text()
+    assert risk not in paths['idea:i1'].read_text()
+    assert risk in paths['technical_idea:i1'].read_text()
+    assert note()['main_risk'] in paths['technical_idea:i1'].read_text()
+    again = render_run(store, 'r1', tmp_path / 'report', PromptLoader(ASSETS))
+    assert again['technical_idea:i1'].read_text().count(risk) == 1
+    assert store.__dict__ == before
 
 
 def test_writing_reference_limit_keeps_short_or_unreferenced_results_valid(tmp_path):
@@ -310,33 +403,26 @@ def test_writing_reference_limit_keeps_short_or_unreferenced_results_valid(tmp_p
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('corrected', [True, False])
-async def test_writer_size_diagnostics_use_existing_single_json_correction(tmp_path, corrected):
+async def test_complete_long_response_makes_one_request_and_preserves_raw_output(tmp_path):
     from .test_runtime import setup_runtime, answer, sse, SUBJECT
-    from arc.runtime import RuntimePaused
-    payload = {'candidates': [], 'source_directory': [], 'writing_limits': dict(WRITING_LIMITS)}
-    oversized = {'stage_summary': '甲' * 451, 'overview': '保留适用条件。', 'candidates': [], 'cited_source_ids': []}
-    fixed = dict(oversized, stage_summary='当前结论只在给定条件下成立，条件是否适用仍待确认。')
-    first = answer()
-    first['result'] = oversized
-    second = answer()
-    second['result'] = fixed if corrected else oversized
-    runtime, store, ledger, requests = setup_runtime(tmp_path, [sse(json.dumps(first)), sse(json.dumps(second))])
+    payload = {'candidates': [], 'source_directory': [], 'citation_limit': MAX_CITED_SOURCES}
+    long_result = {'stage_summary': '完整的阶段认识。' * 500, 'overview': '完整适用条件。' * 1000,
+                   'candidates': [], 'cited_source_ids': []}
+    response = answer()
+    response['result'] = long_result
+    runtime, store, ledger, requests = setup_runtime(tmp_path, [sse(json.dumps(response))])
     runtime.role_models['writer'] = 'deepseek-v4-flash'
     try:
-        if corrected:
-            result = await runtime.invoke('writer', 'POLISH', payload, StagePolish, SUBJECT, 'task_fixture')
-            assert result.result.stage_summary == fixed['stage_summary']
-        else:
-            with pytest.raises(RuntimePaused):
-                await runtime.invoke('writer', 'POLISH', payload, StagePolish, SUBJECT, 'task_fixture')
-        assert len(requests) == 2
+        result = await runtime.invoke('writer', 'POLISH', payload, StagePolish, SUBJECT, 'task_fixture')
+        assert result.result.model_dump(mode='json') == long_result
+        assert len(requests) == 1
         task = store.get_task('task_fixture')
         state = json.loads(store.read_artifact(task.response_artifact_path))
-        assert state['repair_counts'] == {'tool_arguments': 0, 'output_json': 1}
-        assert 'POLISH_WRITING_LIMITS_EXCEEDED' in json.dumps(state['repair_validation_errors'])
-        assert 'stage_summary: 451 characters; maximum 450' in requests[1]['messages'][1]['content']
-        assert (task.accepted_result is not None) == corrected
+        assert state.get('repair_counts', {}).get('output_json', 0) == 0
+        assert task.accepted_result['result'] == long_result
+        receipt = ledger.get_call(task.attempt_ids[0])['metadata']
+        saved_response = json.loads(store.read_artifact(receipt['response_artifact_path']))
+        assert json.loads(saved_response['response']['message']['content'])['result'] == long_result
     finally:
         await runtime.close()
 
@@ -408,7 +494,7 @@ def test_failed_survey_without_conclusions_is_explicit_and_does_not_invent_resea
     assert '尚未形成可接受结论' in paths['field_brief'].read_text()
     assert '未取得关键文献' in paths['field_brief'].read_text()
     payload = build_polish_payload(store, 'r1')
-    assert payload['field_brief']['overview'] == '' and payload['candidates'] == []
+    assert 'field_brief' not in payload and payload['candidates'] == []
     assert payload['evidence_limits'][0]['task'] == 'survey'
 
 
@@ -418,7 +504,7 @@ def test_accepted_limited_closure_keeps_its_actual_lead_and_unresolved_questions
     store.run['state']['evidence_limits'] = {'idea1.check': dict(limited_entry(), status='limited')}
     payload = build_polish_payload(store, 'r1')
     assert payload['candidates'][0]['decision'] == 'lead'
-    assert payload['candidates'][0]['note']['limits'] == note()['limits']
+    assert payload['candidates'][0]['technical_context']['limits'] == note()['limits']
     assert payload['candidates'][0]['evidence_limits'][0]['unresolved_questions']
 
 

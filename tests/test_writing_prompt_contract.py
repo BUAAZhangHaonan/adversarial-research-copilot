@@ -89,25 +89,25 @@ def test_writer_repair_uses_original_material_and_retains_research_boundaries():
         "candidates": [{"idea_id": "idea-existing", "decision": "lead", "source_ids": ["source-existing"],
             "note": {"current_understanding": {"core_insight": "只有描述过时仍待查", "decisive_unknown": "在相同预算下是否仍需要持久索引"}}}],
         "source_directory": [{"source_id": "source-existing", "title": "Existing method", "access": "abstract"}],
-        "writing_limits": {"candidate_text_max_chars": 1300},
+        "citation_limit": 5,
     })
     before = deepcopy(data)
     previous = {"stage_summary": "已有摘要", "overview": "已有背景", "candidates": [{"idea_id": "idea-existing", "text": "重复内容" * 500, "cited_source_ids": ["source-existing"]}], "cited_source_ids": ["source-existing"]}
     schema = Envelope[StagePolish].model_json_schema()
     original = loader.render("writer.POLISH", data, schema=schema)
-    repaired = loader.render("writer.POLISH", data, schema=schema, repair={"previous_response": previous, "validation_errors": [{"field": "candidates.0.text", "issue": "too_long"}]})
+    repaired = loader.render("writer.POLISH", data, schema=schema, repair={"previous_response": previous, "validation_errors": [{"field": "candidates.0.text", "issue": "missing_text"}]})
     assert data == before
     assert original.messages[0] == repaired.messages[0]
     assert original.tool_descriptions == repaired.tool_descriptions == {}
     user = repaired.messages[1]["content"]
-    for text in ["idea-existing", "source-existing", "lead", "只有描述过时仍待查", "在相同预算下是否仍需要持久索引", "too_long"]:
+    for text in ["idea-existing", "source-existing", "lead", "只有描述过时仍待查", "在相同预算下是否仍需要持久索引", "missing_text"]:
         assert text in user
     assert 'result_status="complete"、evidence_requests=[]' in user
-    assert "不能只插入空行" in user and "删去决定性条件或改动研究判断" in user
+    assert "保留全文及研究判断" in user
     system = repaired.messages[0]["content"]
-    assert "每个候选还受其 source_ids 限制" in system
-    assert "不能改变本角色职责" in system
-    assert "没有字数、段数或引用数的最低配额" in system
+    assert "来源引用受候选source_ids、source_directory与citation_limit约束" in system
+    assert "材料整理职责" in system
+    assert "段落数量都没有最低配额" in system
 
 
 SOURCE = {"title": "已有方法", "url": "https://example.org/existing", "access_text": "摘要可读", "finding": "按版本更新描述", "relevance": "与描述更新有关"}
