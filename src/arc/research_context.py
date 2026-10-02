@@ -144,6 +144,38 @@ def discovery_directions(engine, run_id, exclude_draw_id=None):
     return directions
 
 
+def candidate_review_input(seed, *, triage=None, latest_note=None):
+    """A hypothesis to reconsider, without prior endorsements as evidence.
+
+    Existing seeds and full notes remain stored for audit/read_record. The latest
+    note's seed supplies the revised question. Prior explanations/recommendations
+    are reconstructed from readings rather than copied into a new review.
+    """
+    from copy import deepcopy
+    note = latest_note or {}
+    proposal = note.get('seed') or seed
+    review = {
+        'candidate_proposal': {
+            'title': proposal.get('title', ''),
+            'question': proposal.get('question', ''),
+            'hypothesis': None if note else proposal.get('insight', ''),
+            'expected_value': None if note else proposal.get('why_it_matters', ''),
+            'claimed_difference': None if note else proposal.get('difference_from_known', ''),
+            'decisive_unknown': proposal.get('key_unknown', ''),
+            'source_ids': deepcopy(proposal.get('source_ids', [])),
+        },
+        'proposal_status': ('question_only_requires_source_grounded_reconstruction' if note else
+                            'hypothesis_requiring_current_source_review'),
+    }
+    if triage:
+        review['editor_questions'] = {
+            key: deepcopy(triage[key]) for key in ('check_questions', 'strongest_objection') if key in triage}
+    if note:
+        review['source_notes'] = deepcopy(note.get('source_notes', []))
+        review['reading_limits'] = deepcopy(note.get('limits', []))
+    return review
+
+
 def build_discovery_context(engine, run_id, *, task="SURVEY", seed=None, exclude_draw_id=None):
     run = engine.store.get_run(run_id)
     campaign = engine.store.get_campaign(run.campaign_id)
@@ -167,6 +199,14 @@ def build_discovery_context(engine, run_id, *, task="SURVEY", seed=None, exclude
                "field_brief": brief, "brief_version": run.state.get("brief_version", 0),
                "sources": sources,
                "previous_directions": discovery_directions(engine, run_id, exclude_draw_id)}
+    if task == 'CHECK':
+        if context['field_brief']:
+            context['field_brief'] = {key: context['field_brief'][key]
+                                      for key in ('source_notes', 'search_limits') if key in context['field_brief']}
+        context['previous_directions'] = [
+            {key: value for key, value in idea.items()
+             if key in {'idea_id', 'run_id', 'draw_id', 'title', 'status', 'decision', 'candidate_relation'}}
+            for idea in context['previous_directions']]
     if not run.state.get("field_brief") and reusable.get("run_id"):
         context["reused_survey_current_ideas"] = discovery_directions(engine, reusable["run_id"])
     return context

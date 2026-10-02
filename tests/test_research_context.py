@@ -3,6 +3,39 @@ from arc.schemas import SourceRecord, Issue
 from tests.test_selection import research_store, research_draft
 
 
+def test_review_handoff_keeps_questions_without_prior_endorsement_or_history():
+    from copy import deepcopy
+    from arc.research_context import candidate_review_input
+    seed = {'title': 'Old title', 'question': 'Old question', 'insight': 'ORIGINAL_CAUSAL_MARKER',
+            'why_it_matters': 'Original value', 'difference_from_known': 'Original novelty',
+            'key_unknown': 'Original unknown', 'source_ids': ['s1']}
+    latest = {'seed': {**seed, 'question': 'Revised decision question'},
+              'reason': 'ENDORSEMENT_MARKER', 'feasibility': 'FOUR_GRID_CAUSAL_MARKER',
+              'current_understanding': {'core_insight': 'PRIOR_CAUSAL_MARKER'},
+              'source_notes': [{'source_id': 's1', 'finding': 'A source reports a predictor.'}],
+              'limits': ['Only the recorded passages are available.']}
+    triage = {'reason': 'EDITOR_ENDORSEMENT_MARKER', 'check_questions': ['Does the predictor add value?'],
+              'strongest_objection': 'A simple baseline may suffice.'}
+    before = deepcopy([seed, latest, triage])
+    result = candidate_review_input(seed, triage=triage, latest_note=latest)
+    assert result['candidate_proposal']['question'] == 'Revised decision question'
+    assert result['candidate_proposal']['hypothesis'] is None
+    assert result['editor_questions']['check_questions'] == triage['check_questions']
+    assert result['source_notes'] == latest['source_notes']
+    serialized = str(result)
+    for marker in ['ORIGINAL_CAUSAL_MARKER', 'PRIOR_CAUSAL_MARKER', 'ENDORSEMENT_MARKER', 'FOUR_GRID_CAUSAL_MARKER']:
+        assert marker not in serialized
+    assert [seed, latest, triage] == before
+
+
+def test_new_seed_handoff_labels_the_proposal_as_unreviewed():
+    from arc.research_context import candidate_review_input
+    seed = {'question': 'Can a predictor improve actual selection?', 'insight': 'This is a hypothesis.'}
+    result = candidate_review_input(seed)
+    assert result['candidate_proposal']['hypothesis'] == seed['insight']
+    assert result['proposal_status'] == 'hypothesis_requiring_current_source_review'
+
+
 def test_search_hits_stay_out_of_working_materials_and_fulltext_is_on_demand(tmp_path):
     store, source, evidence = research_store(tmp_path)
     hit = store.register_source(SourceRecord(source_id='src_hit', title='A search candidate',

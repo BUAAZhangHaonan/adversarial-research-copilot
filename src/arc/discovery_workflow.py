@@ -5,7 +5,7 @@ from .evidence_continuation import call_with_evidence_limits, unavailable_brief,
 from .schemas import utc_now
 
 
-from .research_context import build_discovery_context as context, compact_idea_view, discovery_directions
+from .research_context import build_discovery_context as context, compact_idea_view, discovery_directions, candidate_review_input
 
 
 def publish(engine, run_id):
@@ -164,8 +164,9 @@ async def discover(engine, run_id):
             if triage.action == "investigate":
                 checked = await call_with_evidence_limits(engine, run_id, key + ".check", "scout", "CHECK", payload={
                     **context(engine, run_id, task="CHECK", exclude_draw_id=key),
-                    "draw_id": key, "idea_id": record["idea_id"], "seed": seed, "require_current_understanding": True,
-                    "triage": triage.model_dump(mode="json"),
+                    "draw_id": key, "idea_id": record["idea_id"], "require_current_understanding": True,
+                    "require_brief_results": True,
+                    **candidate_review_input(seed, triage=triage.model_dump(mode="json")),
                     "candidate_evidence_requests": [
                         *engine.store.get_run(run_id).state.get(key + ".sketch_evidence_requests", []),
                         *engine.store.get_run(run_id).state.get(key + ".triage_evidence_requests", [])],
@@ -213,7 +214,14 @@ async def discover(engine, run_id):
 async def prestudy(engine, run_id):
     run = engine.store.get_run(run_id)
     task = "DEVELOP" if run.mode == "develop" else "PRESSURE"
-    result = await call_with_evidence_limits(engine, run_id, "prestudy", "scout", task, payload={**run.state["idea_input"], "require_current_understanding": True})
+    selected = run.state["idea_input"]
+    payload = {key: value for key, value in selected.items() if key not in {'seed', 'latest_note'}}
+    if payload.get('field_brief'):
+        payload['field_brief'] = {key: payload['field_brief'][key]
+                                  for key in ('source_notes', 'search_limits') if key in payload['field_brief']}
+    payload.update(candidate_review_input(selected['seed'], latest_note=selected.get('latest_note')),
+                   require_current_understanding=True, require_brief_results=True)
+    result = await call_with_evidence_limits(engine, run_id, "prestudy", "scout", task, payload=payload)
     if result is None:
         engine.checkpoint(run_id, prestudy_evidence_limited=True, check_material_basis="unverified")
         await finish_stage(engine, run_id, "prestudy_finished_with_evidence_limits")

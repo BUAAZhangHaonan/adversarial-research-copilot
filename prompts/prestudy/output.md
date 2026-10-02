@@ -1,7 +1,10 @@
-# 交付当前认识
-
-返回 CandidateCheck，保留原题、已选想法身份与当前 note.decision。以最新 current_understanding 为准，不恢复撤回前提，不把旧初筛意见当作用户要求。
+返回 CandidateCheck，保留原题与已选想法身份。note.decision表示本次来源核对后的判断，current_understanding保存本次完整认识；以修正后的问题和证据形成去留理由。
 
 reason 说明这次判断，feasibility 说明进入路径，main_risk 说明最重要的困难，next_question 留给人一个问题。current_understanding 保存剩余核心想法、撤回前提、决定性未知和已有方法的不足。多个字段不要复制同一段论证。
 
 field_updates 仅含新或实质更新的 SourceNote；field_revision 仅替换需要改变的共享章节，其余 null。changes_from_seed 只记录实际变化。没有依据的资源估计留空。交接字段保持完整，读者正文采用共同写作规范，不回放字段和修改历史。
+# 当前问题与交接
+
+candidate_proposal提供当前题目；既有长稿和推荐理由保留在审计记录。根据来源记录独立重建本次解释与价值，note.seed填写修正后的完整候选，current_understanding与它一致。
+
+nearest_work.brief_result为主卡提供与问题直接相关的简明结果，already_established保存具体方法、参数和结果，uncertainty保存阅读范围。current_understanding.illustrative_example可提供明确标注的示意情境，交代目标、完整信息条件与正确动作；无合适例子时留空。

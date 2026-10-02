@@ -13,26 +13,6 @@
 
 FieldBrief 的 overview 写成连贯的领域认识；research_lines 解释路线间的联系；openings 写具体可追问的问题。source_notes 记录材料发现与相关性，search_limits 记录实际缺口。各字段分工，不重复同一长摘要。refresh_question 只补指定空缺，保留未受影响的认识。
 
-{% elif task_type == 'scout.CHECK' %}
-## CHECK
+openings 从一项具体困难或不一致推出来，并指出现有做法在哪个条件下还不足。几类论文很少互引、没有联合做过比较，只能提示查证方向，不能直接证明新问题。对关键近邻只读到摘要时，overview 同样保留这一判断边界，不能让后面的 search_limits 替前面的全称断言免责。
 
-从最新共享认识、候选和编辑的一至两个关键问题出发，回答：近邻是否已覆盖核心想法，背景有没有误读，是否有现实的进入路径。有 shared_followup_question 时一起处理，并将有用认识写回。
-
-已有准确笔记可以复用。需要查证时检索别名、关键作用关系或具体近邻，读取足以判断的部分。查不到或拿不到全文就说明哪项结论尚待查，不据此宣称没有相关工作。
-
-比较近邻时先讲它实际做了什么，再讲候选还想多回答什么。新增条件只有改变了机制、信息可得性或任务目标，才可能构成实质区别；仅仅换了应用场景或把条件组合得更细，不足以保留创新性。
-
-优先处理编辑提出的关键反对理由。候选把指标改善说成原因被识别时，要说明这个指标实际能支持什么。可以做短的推理核对；不要求完整证明，不执行验证程序，不展开实验说明书。已知错误直接修正或撤回；无法判断的推断保留为假设。
-
-可行性写清主要操作、可用数据或代码、最强简单参照及关键困难。3090/A100 数量和训练、推理时间有依据才粗估，没有依据留空。后续检验只说明首先值得区分的问题，不写全部分组、参数、种子和验收条件。
-
-## CHECK 交付
-
-返回 CandidateCheck。note.decision 使用既有语义：discuss 值得人继续讨论，lead 有决定性待查问题，drop 本次放下。未做实验不自动降级，普通但正确也不必推荐。
-
-reason 解释去留的最重要理由，不重抄文献清单。nearest_work 用具体操作说明已有结果与剩余差异。feasibility 讲进入路径，main_risk 讲最可能使路径失去价值的一个问题；limits 只记录前文未充分交代的限制，允许为空。next_question 留一个最值得人追问的问题。
-
-current_understanding 是下轮使用的当前认识：core_insight 写查后剩下的想法；invalidated_premises 记录撤回的前提；decisive_unknown 写主要未知；why_existing_insufficient 说明已有方法为何仍不足，无法确定就直说。不要把无效 seed 叙事写回当前认识。
-
-field_updates 只交新增或实质更新的 SourceNote。新材料改变共享认识时，field_revision 仅替换需要改变的 overview、research_lines 或 openings，其余 null；未改变共享章节则为 null。changes_from_seed 简述实际变化。这些交接字段完整保存，正文不需要回放全部修改过程。
 {% endif %}

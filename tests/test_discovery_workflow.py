@@ -136,7 +136,7 @@ async def test_checked_updates_reach_next_sketch_with_original_task_and_relation
     assert payload['field_brief']['overview'] == review['field_revision']['overview']
     assert payload['field_brief']['research_lines'] == review['field_revision']['research_lines']
     assert final.state['field_brief_history'][0]['field_brief'] == brief
-    assert payload['previous_directions'][0]['current_understanding'] == review['note']['current_understanding']
+    assert {k: v for k, v in payload['previous_directions'][0]['current_understanding'].items() if k != 'illustrative_example'} == review['note']['current_understanding']
     assert 'content_path' not in payload['sources'][0] and 'content_sha256' not in payload['sources'][0]
     assert payload['brief_version'] == 2
     assert payload['original_question'] == store.get_campaign(run.campaign_id).topic
@@ -219,7 +219,11 @@ async def test_explicit_idea_handoff_routes_directly_to_prestudy_without_carddra
     assert runtime.calls == [('prestudy', 'scout', task)]
     assert result.status == 'COMPLETED' and result.card_id is None
     assert runtime.payloads['prestudy']['original_question'] == store.get_campaign(origin.campaign_id).topic
-    assert runtime.payloads['prestudy']['seed'] == seed and runtime.payloads['prestudy']['field_brief'] == brief
+    assert runtime.payloads['prestudy']['candidate_proposal']['question'] == seed['question']
+    assert runtime.payloads['prestudy']['candidate_proposal']['hypothesis'] is None
+    assert 'seed' not in runtime.payloads['prestudy'] and 'latest_note' not in runtime.payloads['prestudy']
+    assert runtime.payloads['prestudy']['field_brief']['source_notes'] == brief['source_notes']
+    assert 'overview' not in runtime.payloads['prestudy']['field_brief']
     assert store.list_cards(run_id=run.run_id) == []
 
 

@@ -14,7 +14,7 @@ ASSETS = ROOT / "prompts"
 PLAIN = "common/plain_research_writing.md"
 SYSTEMS = {
     "scout.SURVEY": ["discover/policy.md", PLAIN, "discover/researcher.md"],
-    "scout.CHECK": ["discover/policy.md", PLAIN, "discover/researcher.md"],
+    "scout.CHECK": ["discover/policy.md", PLAIN, "discover/check_candidate.md"],
     "ideator.SKETCH": ["discover/policy.md", PLAIN, "discover/ideator.md", "discover/calibration.md"],
     "editor.TRIAGE": ["discover/policy.md", PLAIN, "discover/editor.md", "discover/calibration.md"],
     "scout.DEVELOP": ["discover/policy.md", PLAIN, "prestudy/develop_scope.md", "prestudy/output.md"],

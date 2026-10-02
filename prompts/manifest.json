@@ -426,7 +426,7 @@
       "system": [
         "discover/policy.md",
         "common/plain_research_writing.md",
-        "discover/researcher.md"
+        "discover/check_candidate.md"
       ],
       "task_template": "discover/invoke.md",
       "repair_template": "discover/repair.md",

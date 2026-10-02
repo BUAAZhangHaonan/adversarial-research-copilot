@@ -70,6 +70,7 @@ class TriageResult(DiscoveryModel):
 
 class NearestWork(DiscoveryModel):
     source_id: str = Field(min_length=1)
+    brief_result: str | None = Field(default=None, min_length=1)
     already_established: str = Field(min_length=1)
     remaining_difference: str = Field(min_length=1)
     uncertainty: str = ""
@@ -85,6 +86,7 @@ class ResourceHint(DiscoveryModel):
 
 class CurrentUnderstanding(DiscoveryModel):
     core_insight: str = Field(min_length=1)
+    illustrative_example: str | None = Field(default=None, min_length=1)
     invalidated_premises: list[str]
     decisive_unknown: str = Field(min_length=1)
     why_existing_insufficient: str = Field(min_length=1)

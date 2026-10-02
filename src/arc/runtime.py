@@ -525,6 +525,9 @@ class Runtime:
         if (payload.get('require_current_understanding') and isinstance(envelope.result, CandidateCheck)
                 and envelope.result.note.current_understanding is None):
             raise ValueError('CURRENT_UNDERSTANDING_REQUIRED')
+        if (payload.get('require_brief_results') and isinstance(envelope.result, CandidateCheck)
+                and any(work.brief_result is None for work in envelope.result.note.nearest_work)):
+            raise ValueError('NEAREST_WORK_BRIEF_RESULT_REQUIRED')
         if (payload.get('require_candidate_relation') and isinstance(envelope.result, TriageResult)
                 and envelope.result.candidate_relation is None):
             raise ValueError('CANDIDATE_RELATION_REQUIRED')
