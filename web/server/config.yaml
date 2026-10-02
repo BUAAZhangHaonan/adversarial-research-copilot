@@ -1,0 +1,38 @@
+# arc-arena web 服务配置
+host: 0.0.0.0
+port: 8210
+
+# ARC 核心位于当前仓库根目录（相对于此配置文件）
+backend_root: ../..
+
+# 同时运行的 LLM 任务上限（超出返回 429，保护 token 预算）
+max_concurrent_jobs: 2
+
+session_days: 7
+
+# 任务提交后把 job 关联到新 ARC run 的探测窗口（秒）
+job_detect_seconds: 90
+
+# 各模式提交参数的上限（前端档位也按此生成）
+limits:
+  discover:
+    draws_max: 5
+    budget_cny_max: 100
+  develop:
+    budget_cny_max: 200
+    question_max_chars: 4000
+  debate:
+    budget_cny_max: 200
+    proposal_max_chars: 20000
+  resume:
+    budget_cny_max: 200
+
+# 默认值：ARC 0.2 每阶段结束即停，中文报告由上游 prompt 自带
+defaults:
+  discover:
+    draws: 5
+    budget_cny: 20
+  develop:
+    budget_cny: 20
+  debate:
+    budget_cny: 20

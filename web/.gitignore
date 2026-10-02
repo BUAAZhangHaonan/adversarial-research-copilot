@@ -1,0 +1,19 @@
+server/.venv/
+server/data/
+server/__pycache__/
+server/**/__pycache__/
+server/.pytest_cache/
+client/node_modules/
+client/dist/
+*.log
+.DS_Store
+
+# Local credentials, research fixtures and generated UI evidence
+.env
+.env.*
+*.tsbuildinfo
+client/output/
+client/shots*/
+client/scripts/shoot.mjs
+server/tests/fixtures/
+server/tests/test_artifacts.py

@@ -1,0 +1,380 @@
+/* ============ 卡牌体系 v2 ============ */
+
+/* ---------- 卡牌通用 ---------- */
+.card-slot { perspective: 1100px; }
+
+/* 3D 鼠标跟随倾斜层(与翻转动画分离,避免 transform 冲突) */
+.card-tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.12s ease-out;
+  will-change: transform;
+}
+
+.card3d {
+  position: relative;
+  width: var(--card-w, 172px);
+  height: calc(var(--card-w, 172px) * 1.4);
+  transform-style: preserve-3d;
+}
+.card-face, .card-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 13px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: 3px solid #14100a;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.32), 0 12px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.card-back {
+  background:
+    repeating-linear-gradient(45deg, rgba(230, 197, 139, 0.09) 0 10px, transparent 10px 20px),
+    repeating-linear-gradient(-45deg, rgba(230, 197, 139, 0.06) 0 10px, transparent 10px 20px),
+    radial-gradient(circle at 50% 42%, #343951 0 34%, #1f2235 34% 36%, #343951 36% 60%, #1f2235 60% 62%, #343951 62%);
+  background-color: #292d43;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-back .emblem {
+  font-family: var(--font-big);
+  color: var(--gold);
+  font-size: 26px;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+  border: 3px solid rgba(230, 197, 139, 0.65);
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* 开包稀有度卡背辉光:看到光猜稀有度,翻开验证 */
+.card-back.bg-SS { box-shadow: 0 0 22px 5px rgba(255, 111, 222, 0.55), 0 0 40px 10px rgba(230, 197, 139, 0.3), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-back.bg-SS::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 13px;
+  background: conic-gradient(#ff5d5d, #e6c58b, #9bcbb0, #94bfea, #baa3e7, #ff5d5d);
+  filter: blur(5px);
+  opacity: 0.75;
+  animation: spin-slow 5s linear infinite;
+  z-index: -1;
+}
+.card-back.bg-S { box-shadow: 0 0 20px 4px rgba(230, 197, 139, 0.6), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-back.bg-A { box-shadow: 0 0 16px 3px rgba(150, 200, 255, 0.5), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-back.bg-B { box-shadow: 0 0 16px 3px rgba(186, 163, 231, 0.5), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-back.bg-X { box-shadow: 0 0 12px 2px rgba(120, 120, 120, 0.4), 0 6px 0 rgba(0, 0, 0, 0.32); }
+
+.card-face {
+  transform: rotateY(180deg);
+  background: linear-gradient(180deg, #faf5e0 0%, #f4eed8 70%, #ece2c0 100%);
+  color: #1d1a12;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 稀有度外框 */
+.card-face.r-SS { border-color: #14100a; }
+.card-face.r-SS::after {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(#ff5d5d, #e6c58b, #9bcbb0, #94bfea, #baa3e7, #ff5d5d);
+  animation: spin-slow 5s linear infinite;
+  z-index: -1;
+}
+.card-face.r-SS { box-shadow: 0 0 18px 4px rgba(230, 197, 139, 0.55), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-face.r-S { border: 3px solid #a8801f; box-shadow: 0 0 14px 2px rgba(230, 197, 139, 0.35), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-face.r-A { border: 3px solid #6f93b8; box-shadow: 0 0 10px 1px rgba(87, 182, 255, 0.25), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-face.r-B { border: 3px solid #7e63b8; box-shadow: 0 0 10px 1px rgba(186, 163, 231, 0.28), 0 6px 0 rgba(0, 0, 0, 0.32); }
+.card-face.r-X { border: 3px solid #555; filter: saturate(0.35); }
+
+/* 卡面内容 */
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 9px 5px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.65);
+  background: linear-gradient(180deg, #fffbe9, #f0e6c4);
+}
+.card-rarity {
+  font-family: var(--font-big);
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(0, 0, 0, 0.6);
+}
+.card-rarity.r-SS { background: linear-gradient(135deg, #ff5d5d, #e6c58b, #94bfea); }
+.card-rarity.r-S { background: linear-gradient(180deg, #e8b93c, #b07a12); }
+.card-rarity.r-A { background: linear-gradient(180deg, #79a8d8, #40729e); }
+.card-rarity.r-B { background: linear-gradient(180deg, #a985e8, #6d4bb0); }
+.card-rarity.r-X { background: #666; }
+.card-id { font-family: var(--font-pixel); font-size: 11px; color: #6b6349; margin-left: auto; }
+
+.card-art {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 0;
+  margin: 7px 8px 4px;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 120%, rgba(230, 197, 139, 0.25), transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 4px),
+    #fbf5dd;
+  overflow: hidden;
+}
+.card-art .delta-icon { width: 58%; height: 58%; opacity: 0.9; }
+.card-art .art-id {
+  position: absolute;
+  bottom: 3px;
+  right: 7px;
+  font-family: var(--font-big);
+  font-size: 10px;
+  color: rgba(29, 26, 18, 0.25);
+}
+
+.card-name {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #17150e;
+  padding: 0 9px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 34px;
+}
+
+.card-stats {
+  display: flex;
+  gap: 5px;
+  padding: 6px 9px 8px;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  color: #3c372a;
+  align-items: center;
+  border-top: 2px solid rgba(0, 0, 0, 0.12);
+}
+.card-stats .stars { color: #c98d1c; letter-spacing: -1px; }
+.card-stats .risk { margin-left: auto; color: #8a5a5a; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 碎裂卡(drop) */
+.card-shred { position: relative; }
+.card-shred::before,
+.card-shred::after {
+  content: '';
+  position: absolute;
+  top: -6%;
+  width: 46%;
+  height: 115%;
+  background: inherit;
+  z-index: 6;
+}
+.card-shred::before { left: -14%; transform: rotate(-13deg); clip-path: polygon(18% 0, 100% 4%, 74% 100%, 0 96%); }
+.card-shred::after { right: -14%; transform: rotate(11deg); clip-path: polygon(26% 2%, 100% 0, 82% 98%, 8% 100%); }
+
+/* 卡牌 hover 抬升 + 微放大 */
+.card-hover { transition: transform 0.16s var(--ease-bounce, ease), filter 0.16s; }
+.card-hover:hover {
+  transform: translateY(-5px) rotate(-0.4deg) scale(1.025);
+  z-index: 10;
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.45));
+}
+
+/* ---------- 开包场景 ---------- */
+.pack-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 24px;
+  background: radial-gradient(ellipse 90% 70% at 50% 40%, rgba(38, 39, 63, 0.97), rgba(15, 17, 29, 0.99));
+  overflow: hidden;
+}
+.pack-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: white;
+  pointer-events: none;
+}
+
+/* ---------- 数值弹跳 ---------- */
+.pop {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  animation: pop 0.45s cubic-bezier(0.2, 2.2, 0.4, 1.0) both;
+}
+@keyframes pop {
+  0% { transform: scale(0.2); opacity: 0; }
+  70% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 阶段轨道(抽卡轨道) ---------- */
+.ritual-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.ritual-node {
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 3px solid var(--line);
+  background: var(--panel-deep);
+  color: #a7a8bb;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  transition: color 0.3s, border-color 0.3s;
+}
+.track-sm .ritual-node { font-size: 10.5px; padding: 6px 10px; border-width: 2px; }
+.ritual-node.done { color: var(--green-ok); border-color: rgba(155, 203, 176, 0.35); }
+.ritual-node.done::before { content: '✓'; animation: pop 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) both; }
+.ritual-node.active {
+  color: var(--gold);
+  border-color: rgba(230, 197, 139, 0.65);
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+.ritual-node.active::before { content: '◗'; animation: spin-slow 1.2s linear infinite; }
+.ritual-node.failed { color: var(--red); border-color: rgba(255, 93, 93, 0.5); }
+.ritual-node.failed::before { content: '✗'; }
+
+/* ---------- 仪式台(运行页 V2) ---------- */
+.ritual-stage {
+  margin-top: 28px;
+  padding: 30px 28px 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.ritual-title { font-size: 20px; margin: 4px 0 6px; }
+.ritual-title.rt-running { color: var(--gold); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.55); }
+.ritual-title.rt-paused { color: var(--amber); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.55); }
+.ritual-title.rt-failed { color: var(--red); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.55); }
+.ritual-narrative {
+  font-size: 15.5px;
+  color: var(--cream);
+  margin: 0 0 18px;
+  min-height: 24px;
+  letter-spacing: 0.02em;
+}
+.ritual-deck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 5vw, 56px);
+  flex-wrap: wrap;
+  padding: 6px 0 10px;
+}
+.ritual-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 560px;
+  margin: 2px auto 0;
+}
+.ritual-feed { max-width: 470px; margin: 18px auto 0; text-align: left; }
+.ritual-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 仪表盘 ---------- */
+.dial { position: relative; width: 128px; height: 128px; flex-shrink: 0; }
+.dial-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.dial-num { font-size: 26px; font-weight: 700; color: var(--gold); line-height: 1.05; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
+.dial-max { font-size: 11px; color: #e5dfc6; }
+.dial-label { font-size: 11px; color: #d8d2b6; margin-top: 2px; }
+.dial-active .dial-num { animation: dial-glow 2s ease-in-out infinite; }
+@keyframes dial-glow {
+  0%, 100% { text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
+  50% { text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 0 16px rgba(230, 197, 139, 0.65); }
+}
+.budget-dial .dial-cny { font-size: 17px; }
+.dial-hot .dial-num { color: var(--red); }
+
+.elapsed-block { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.elapsed-time {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--cream);
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- 法阵 ---------- */
+.ritual-circle { position: relative; flex-shrink: 0; }
+.rc-spin { animation: spin-slow 22s linear infinite; }
+.rc-spin-rev { animation: spin-slow 30s linear infinite reverse; }
+.rc-breathe { animation: rc-breathe 2.6s ease-in-out infinite; transform-origin: 100px 100px; }
+@keyframes rc-breathe {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.rc-core {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.rc-glyph {
+  font-size: 44px;
+  filter: drop-shadow(0 0 14px rgba(230, 197, 139, 0.5));
+  animation: floaty 3.6s ease-in-out infinite;
+}
+.rc-paused .rc-glyph { filter: drop-shadow(0 0 14px rgba(255, 179, 71, 0.55)); }
+.rc-failed .rc-glyph { filter: drop-shadow(0 0 14px rgba(255, 93, 93, 0.55)); }
+.rc-done .rc-glyph { filter: drop-shadow(0 0 14px rgba(155, 203, 176, 0.55)); }
+.rc-ring {
+  position: absolute;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px dashed rgba(230, 197, 139, 0.35);
+  animation: spin-slow 12s linear infinite;
+}
+
+.card-back.bg-SS,.card-back.bg-S,.card-back.bg-A,.card-back.bg-B,.card-back.bg-X{box-shadow:0 0 12px 1px rgba(174,158,212,.15),0 6px 0 rgba(0,0,0,.25)}
+.card-back.bg-SS::after{opacity:.3;animation-duration:9s}
+.card-face.r-SS{box-shadow:0 0 12px 2px rgba(230,197,139,.2),0 5px 0 rgba(0,0,0,.25)}
+.card-face.r-S,.card-face.r-A,.card-face.r-B{box-shadow:0 5px 0 rgba(0,0,0,.25),0 9px 17px rgba(0,0,0,.2)}
+.reading-card-wall .card-slot,.card-wall .card-slot{animation:deal-in .24s ease-out backwards}
+.reading-card-wall .card-slot:nth-child(2),.card-wall .card-slot:nth-child(2){animation-delay:.035s}
+.reading-card-wall .card-slot:nth-child(3),.card-wall .card-slot:nth-child(3){animation-delay:.07s}
+.reading-card-wall .card-slot:nth-child(n+4),.card-wall .card-slot:nth-child(n+4){animation-delay:.1s}
+@keyframes deal-in{from{opacity:0;transform:translateY(7px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.card-hover:hover,.mode-card:hover{transform:none}*{animation-delay:0ms!important;transition-delay:0ms!important}}
