@@ -135,6 +135,10 @@ async def execute(settings, run_id):
     store, ledger = services(settings)
     run = store.get_run(run_id)
     frozen = Settings.model_validate(run.config)
+    if (run.state.get("idea_input") or {}).get("external_origin"):
+        # Private archives can be recovered into a new root. Keep the recorded
+        # scientific settings, but direct fresh stage artifacts into the selected archive.
+        frozen = frozen.model_copy(update={"data_dir": store.db_path.parent.resolve()})
     runtime = None
     try:
         if run.status not in {'COMPLETED', 'CANCELLED', 'PAUSED_SCOPE_CHANGE'}:
