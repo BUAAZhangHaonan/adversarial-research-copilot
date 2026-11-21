@@ -79,6 +79,8 @@ class Store:
                 CREATE TABLE IF NOT EXISTS external_handoffs(
                     id TEXT PRIMARY KEY, payload_hash TEXT NOT NULL, idea_id TEXT NOT NULL REFERENCES external_ideas(id),
                     run_id TEXT NOT NULL UNIQUE, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS handoff_executions(handoff_id TEXT PRIMARY KEY REFERENCES external_handoffs(id),
+                    started_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS discovery_ideas(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),draw_id TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(run_id,draw_id));
                 CREATE VIRTUAL TABLE IF NOT EXISTS discovery_ideas_fts USING fts5(idea_id UNINDEXED,content);
                 CREATE TABLE IF NOT EXISTS draws(id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL REFERENCES campaigns(id),ordinal INTEGER NOT NULL,started_at TEXT NOT NULL,UNIQUE(campaign_id,ordinal));

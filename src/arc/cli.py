@@ -14,6 +14,8 @@ from .prompting import PromptLoader
 
 app = typer.Typer(help='ARC：发现研究卡、展开方案、压力测试。每个阶段默认结束即停。', no_args_is_help=True)
 requirements = typer.Typer(help='登记改进需求、记录用户评估并导出执行模板；不执行变更。', no_args_is_help=True)
+from .handoff_cli import commands as handoff_commands
+app.add_typer(handoff_commands, name="handoff")
 app.add_typer(requirements, name='requirements')
 
 
