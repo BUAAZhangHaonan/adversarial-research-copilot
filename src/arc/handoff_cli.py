@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 
 import typer
 
@@ -20,6 +20,19 @@ def output(value):
     typer.echo(json.dumps(value, ensure_ascii=False, default=str))
 
 
+@contextmanager
+def contract_failure():
+    from .store import StateError
+    try:
+        yield
+    except StateError as exc:
+        name = str(exc).split(":",1)[0]
+        missing = name == "unknown_external_handoff"
+        output({"schema_version":"radar.arc.prestudy.v1",
+                "execution_status":"not_found" if missing else "rejected", "error": {"code":name}})
+        raise typer.Exit(code=3 if missing else 2) from None
+
+
 @commands.command(name="import")
 def import_idea(ctx: typer.Context):
     """Read a frozen radar.arc.selected-idea.v1 object from standard input."""
@@ -31,7 +44,8 @@ def import_idea(ctx: typer.Context):
         # Report field paths; input text or credentials do not belong in diagnostics.
         failures = [{"field":e["loc"], "type":e["type"]} for e in exc.errors(include_input=False)]
         raise typer.BadParameter(json.dumps(failures,ensure_ascii=False)) from None
-    body = import_selected(ctx.obj, request)
+    with contract_failure():
+        body = import_selected(ctx.obj, request)
     store, ledger = services(ctx.obj)
     output(export_result(store, ledger, body["handoff_id"]))
 
@@ -41,7 +55,8 @@ def result(ctx: typer.Context, handoff_id: str):
     """Return status, current scientific note, original Chinese presentation and sources."""
     from .cli import services
     store, ledger = services(ctx.obj)
-    recover_registration(store, handoff_id)
+    with contract_failure():
+        recover_registration(store, handoff_id)
     output(export_result(store, ledger, handoff_id))
 
 
@@ -50,7 +65,8 @@ def execute_stage(ctx: typer.Context, handoff_id: str):
     """Execute or recover this exact stage. A concurrent invocation only returns status."""
     from .cli import services, execute
     store, ledger = services(ctx.obj)
-    body = recover_registration(store, handoff_id)
+    with contract_failure():
+        body = recover_registration(store, handoff_id)
     try:
         with handoff_lock(store, handoff_id, wait=False):
             run = store.get_run(body["run_id"])

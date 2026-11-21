@@ -142,3 +142,18 @@ def test_status_recovers_interrupted_registration_and_busy_executor(tmp_path):
         assert again.exit_code==0 and json.loads(again.stdout)["run_id"]==body["run_id"]
         assert check.exit_code==0 and json.loads(check.stdout)["execution_status"]=="running"
     assert ledger.summary(body["run_id"])["call_count"]==0
+
+
+def test_unknown_or_conflicting_handoffs_do_not_create_another_account(tmp_path):
+    root=["--data-dir",str(tmp_path),"handoff"]
+    runner=CliRunner()
+    unknown=runner.invoke(app,[*root,"result","unknown"])
+    assert unknown.exit_code==3 and json.loads(unknown.stdout)["execution_status"]=="not_found"
+    raw=payload()
+    first=runner.invoke(app,[*root,"import"],input=json.dumps(raw))
+    assert first.exit_code==0
+    raw["request"]["focus"]="另一个研究问题"
+    conflict=runner.invoke(app,[*root,"import"],input=json.dumps(raw))
+    assert conflict.exit_code==2
+    assert json.loads(conflict.stdout)["error"]["code"]=="handoff_id_reused_for_different_immutable_input"
+    assert "另一个研究问题" not in conflict.stdout
