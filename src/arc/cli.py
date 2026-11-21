@@ -73,7 +73,7 @@ def services(settings):
 
 def new_run(settings, mode, *, topic=None, card_id=None, version=None,
             budget='20', parent=None, run_id=None, campaign_id=None, input_text=None,
-            parent_card_id=None, parent_card_version=None, boundaries=None, idea_id=None):
+            parent_card_id=None, parent_card_version=None, boundaries=None, idea_id=None, frozen_idea_input=None):
     store, ledger = services(settings)
     run_id = run_id or f'run_{uuid4().hex}'
     amount = Decimal(str(budget))
@@ -84,18 +84,12 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
     if idea_id:
         if mode not in ('develop', 'run') or card_id or input_text:
             raise typer.BadParameter('--idea requires develop/run and cannot be combined with another input')
-        idea = store.get_discovery_idea(idea_id)
-        if not idea.get('seed'): raise typer.BadParameter('idea has no submitted seed')
-        origin = store.get_run(idea['run_id'])
-        campaign_id = origin.campaign_id
-        campaign = store.get_campaign(campaign_id)
-        idea_input = {'idea_id': idea_id, 'original_question': campaign.topic, 'user_boundaries': campaign.boundaries,
-            'seed': idea['seed'], 'latest_note': idea['note'], 'field_brief': origin.state.get('field_brief')}
-        latest = store.latest_idea_prestudy(idea_id)
-        if latest:
-            idea_input.update(latest_note=latest['note'], latest_note_origin={'run_id': latest['run_id'], 'mode': latest['mode']})
-            if latest.get('field_brief'):
-                idea_input['field_brief'] = latest['field_brief']
+        if frozen_idea_input is None:
+            campaign_id, idea_input = store.selected_idea_context(idea_id)
+        else:
+            if frozen_idea_input.get("idea_id") != idea_id:
+                raise typer.BadParameter("frozen input belongs to another idea")
+            idea_input = frozen_idea_input
     if mode in ('develop', 'run'):
         if not card_id and not input_text and not idea_id:
             raise typer.BadParameter('--card is required')
@@ -119,7 +113,10 @@ def new_run(settings, mode, *, topic=None, card_id=None, version=None,
         state.update(discover_first=True, idea_ids=[])
         reusable = store.reusable_discovery_brief(topic, boundaries)
         if reusable: state['reusable_survey'] = reusable
-    if idea_input: state.update(idea_input=idea_input, discover_first=True)
+    if idea_input:
+        state.update(idea_input=idea_input, discover_first=True)
+        if idea_input.get("external_origin"):
+            state["source_ids"] = list(idea_input["seed"]["source_ids"])
     if input_text:
         from .schemas import SourceRecord
         source = store.register_source(SourceRecord(title='用户导入的研究问题', url=None,

@@ -75,6 +75,10 @@ class Store:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS campaigns(id TEXT PRIMARY KEY,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,campaign_id TEXT REFERENCES campaigns(id),data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS external_ideas(id TEXT PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS external_handoffs(
+                    id TEXT PRIMARY KEY, payload_hash TEXT NOT NULL, idea_id TEXT NOT NULL REFERENCES external_ideas(id),
+                    run_id TEXT NOT NULL UNIQUE, data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS discovery_ideas(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),draw_id TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(run_id,draw_id));
                 CREATE VIRTUAL TABLE IF NOT EXISTS discovery_ideas_fts USING fts5(idea_id UNINDEXED,content);
                 CREATE TABLE IF NOT EXISTS draws(id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL REFERENCES campaigns(id),ordinal INTEGER NOT NULL,started_at TEXT NOT NULL,UNIQUE(campaign_id,ordinal));
@@ -252,6 +256,37 @@ class Store:
             row = db.execute("SELECT data FROM discovery_ideas WHERE id=?", (idea_id,)).fetchone()
         if row is None: raise StateError("idea_missing")
         return json.loads(row[0])
+
+    def get_lightweight_idea(self, idea_id):
+        """Resolve a selected discovery or external idea in its original namespace."""
+        with self._connect() as db:
+            row = db.execute("SELECT data FROM discovery_ideas WHERE id=? UNION ALL "
+                             "SELECT data FROM external_ideas WHERE id=?", (idea_id, idea_id)).fetchone()
+        if row is None:
+            raise StateError("idea_missing")
+        return json.loads(row[0])
+
+    def selected_idea_context(self, idea_id):
+        idea = self.get_lightweight_idea(idea_id)
+        if not idea.get("seed"):
+            raise StateError("idea_has_no_seed")
+        if idea.get("external_origin"):
+            campaign_id = None
+            selected = dict(idea["initial_context"])
+        else:
+            origin = self.get_run(idea["run_id"])
+            campaign = self.get_campaign(origin.campaign_id)
+            campaign_id = origin.campaign_id
+            selected = {"idea_id": idea_id, "original_question": campaign.topic,
+                        "user_boundaries": campaign.boundaries, "seed": idea["seed"],
+                        "latest_note": idea["note"], "field_brief": origin.state.get("field_brief")}
+        latest = self.latest_idea_prestudy(idea_id)
+        if latest:
+            selected.update(latest_note=latest["note"], latest_note_origin={
+                "run_id": latest["run_id"], "mode": latest["mode"]})
+            if latest.get("field_brief"):
+                selected["field_brief"] = latest["field_brief"]
+        return campaign_id, selected
 
     def list_discovery_ideas(self, run_id=None):
         with self._connect() as db:
@@ -1035,7 +1070,7 @@ class Store:
 
     def get_record(self,id,version=None,run_id=None):
         with self._connect() as db:
-            kind=next((table for table in ("sources","evidence","tasks","capabilities","campaigns","runs","discovery_ideas") if db.execute(f"SELECT 1 FROM {table} WHERE id=?",(id,)).fetchone()),None)
+            kind=next((table for table in ("sources","evidence","tasks","capabilities","campaigns","runs","discovery_ideas","external_ideas") if db.execute(f"SELECT 1 FROM {table} WHERE id=?",(id,)).fetchone()),None)
             if kind=="capabilities":
                 row=db.execute("SELECT * FROM capabilities WHERE id=?",(id,)).fetchone()
                 return {"request_id":row["id"],"run_id":row["run_id"],**json.loads(row["data"])}
@@ -1051,7 +1086,7 @@ class Store:
                 else:
                     card=db.execute("SELECT 1 FROM cards WHERE card_id=? AND version=?",(id,version)).fetchone()
                 if not card: raise StateError("record_missing")
-        if kind=="discovery_ideas": return self.get_discovery_idea(id)
+        if kind in ("discovery_ideas","external_ideas"): return self.get_lightweight_idea(id)
         if kind=="campaigns": return self.get_campaign(id).model_dump(mode="json")
         if kind=="runs":
             run=self.get_run(id)

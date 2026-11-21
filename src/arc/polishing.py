@@ -42,7 +42,7 @@ def build_polish_payload(store, run_id):
     brief = deepcopy(state.get('field_brief') or selected.get('field_brief') or {})
     records = [as_data(record) for record in store.list_discovery_ideas(run_id=run_id)]
     if selected:
-        original = as_data(store.get_discovery_idea(selected['idea_id']))
+        original = as_data(store.get_lightweight_idea(selected['idea_id']))
         records = [{**original, 'seed': selected['seed'], 'triage': None,
                     'note': None if state.get('prestudy_evidence_limited') else state.get('prestudy_note'),
                     'check_material_basis': state.get('check_material_basis'),

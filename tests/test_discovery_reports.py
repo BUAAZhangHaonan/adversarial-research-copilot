@@ -49,7 +49,7 @@ class Store:
                        'note': None, 'status': 'pending'}]
     def get_run(self, run_id): return self.run
     def list_discovery_ideas(self, *, run_id): return self.ideas
-    def get_discovery_idea(self, idea_id): return self.original_idea
+    def get_lightweight_idea(self, idea_id): return self.original_idea
     def list_tasks(self, run_id): return []
     def list_capability_requests(self, run_id): return []
     def list_sources(self, ids=None):

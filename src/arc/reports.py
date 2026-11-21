@@ -436,7 +436,7 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
     brief = state.get('field_brief') or selected.get('field_brief') or {}
     topic = (store.get_campaign(run['campaign_id']).topic if run.get('campaign_id') else selected.get('original_question', ''))
     if selected:
-        original = _obj(store.get_discovery_idea(selected['idea_id']))
+        original = _obj(store.get_lightweight_idea(selected['idea_id']))
         # A prior discovery recommendation is not acceptance of this stage.
         ideas = [{**original, 'seed': selected['seed'],
                   'note': None if state.get('prestudy_evidence_limited') else state.get('prestudy_note'),
