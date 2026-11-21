@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 import typer
 
 from .external_idea import SelectedIdea
-from .handoff import handoff_lock, handoff_record, import_selected
+from .handoff import HandoffBusy, handoff_lock, import_selected, recover_registration
 from .handoff_result import export_result
 from .schemas import utc_now
 
@@ -41,6 +41,7 @@ def result(ctx: typer.Context, handoff_id: str):
     """Return status, current scientific note, original Chinese presentation and sources."""
     from .cli import services
     store, ledger = services(ctx.obj)
+    recover_registration(store, handoff_id)
     output(export_result(store, ledger, handoff_id))
 
 
@@ -49,7 +50,7 @@ def execute_stage(ctx: typer.Context, handoff_id: str):
     """Execute or recover this exact stage. A concurrent invocation only returns status."""
     from .cli import services, execute
     store, ledger = services(ctx.obj)
-    body = handoff_record(store, handoff_id)
+    body = recover_registration(store, handoff_id)
     try:
         with handoff_lock(store, handoff_id, wait=False):
             run = store.get_run(body["run_id"])
@@ -63,6 +64,6 @@ def execute_stage(ctx: typer.Context, handoff_id: str):
                     except Exception:
                         if store.get_run(run.run_id).status != "ERROR":
                             raise
-    except BlockingIOError:
+    except HandoffBusy:
         pass
     output(export_result(store, ledger, handoff_id))

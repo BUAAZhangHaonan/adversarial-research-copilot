@@ -11,12 +11,16 @@ from .schemas import utc_now
 from .store import StateError
 
 
+class HandoffBusy(RuntimeError):
+    """Another process is currently executing this stage."""
+
+
 @contextmanager
-def handoff_lock(store, handoff_id, *, wait=True):
+def handoff_lock(store, handoff_id, *, wait=True, purpose="execute"):
     """One local executor per persisted request; the OS releases it on process exit."""
     root = store.db_path.parent / "handoff-locks"
     root.mkdir(mode=0o700, exist_ok=True)
-    path = root / (fingerprint(handoff_id) + ".lock")
+    path = root / (fingerprint([purpose, handoff_id]) + ".lock")
     with path.open("a+b") as stream:
         if os.name == "nt":
             import msvcrt
@@ -29,10 +33,13 @@ def handoff_lock(store, handoff_id, *, wait=True):
             try:
                 msvcrt.locking(stream.fileno(), mode, 1)
             except OSError as exc:
-                raise BlockingIOError("handoff_running") from exc
+                raise HandoffBusy("handoff_running") from exc
         else:
             import fcntl
-            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
+            try:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
+            except BlockingIOError as exc:
+                raise HandoffBusy("handoff_running") from exc
         yield
 
 
@@ -94,19 +101,33 @@ def _prepare(store, settings, request, signature):
 
 
 def import_selected(settings, request: SelectedIdea):
-    from .cli import services, new_run
+    from .cli import services
 
     store, _ = services(settings)
     signature = fingerprint(request.model_dump(mode="json"))
-    with handoff_lock(store, request.handoff_id):
+    with handoff_lock(store, request.handoff_id, purpose="prepare"):
         row = _existing(store, request.handoff_id)
         if row and row["payload_hash"] != signature:
             raise StateError("handoff_id_reused_for_different_immutable_input")
         body = json.loads(row["data"]) if row else _prepare(store, settings, request, signature)
-        with store._connect() as db:
-            created = db.execute("SELECT 1 FROM runs WHERE id=?", (body["run_id"],)).fetchone()
-        if not created:
-            frozen = Settings.model_validate(body["settings"])
-            new_run(frozen, body["stage"], idea_id=body["idea_id"], budget=frozen.budget_cny,
-                    run_id=body["run_id"], frozen_idea_input=body["stage_input"])
+        materialize_run(store, body)
+    return body
+
+
+def materialize_run(store, body):
+    """The frozen handoff persists before the account and stage. Re-entry finishes preparation."""
+    from .cli import new_run
+
+    with store._connect() as db:
+        created = db.execute("SELECT 1 FROM runs WHERE id=?", (body["run_id"],)).fetchone()
+    if not created:
+        frozen = Settings.model_validate(body["settings"])
+        new_run(frozen, body["stage"], idea_id=body["idea_id"], budget=frozen.budget_cny,
+                run_id=body["run_id"], frozen_idea_input=body["stage_input"])
+
+
+def recover_registration(store, handoff_id):
+    with handoff_lock(store, handoff_id, purpose="prepare"):
+        body = handoff_record(store, handoff_id)
+        materialize_run(store, body)
     return body
