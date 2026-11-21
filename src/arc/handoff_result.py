@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .handoff import handoff_record
 from .research_context import reference_ids, SOURCE_KEYS
+from .stage_sources import trace_readings, public_url
 
 
 def export_result(store, ledger, handoff_id):
@@ -30,15 +31,30 @@ def export_result(store, ledger, handoff_id):
         if n not in group:
             group.append(n)
     ids.update(by_source)
+    traced = trace_readings(store, run.run_id) if run.status != "RUNNING" else {}
+    ids.update(traced)
+    # Include older Radar links only for sources delivered into this continuation.
+    if body["payload"].get("idea_id") and inherited:
+        import json
+        with store._connect() as db:
+            older = db.execute("SELECT json_extract(data,'$.source_mapping') FROM external_handoffs WHERE idea_id=? "
+                               "AND rowid<(SELECT rowid FROM external_handoffs WHERE id=?) ORDER BY rowid",
+                               (body["idea_id"],handoff_id)).fetchall()
+        for row in older:
+            for link in json.loads(row[0]):
+                if link["source_id"] in inherited and link not in mapped:
+                    mapped.append(link)
     directory = []
     for source in store.list_sources(ids=sorted(ids)):
         notes = by_source.get(source.source_id, [])
-        levels = sorted({n["access"] for n in notes if n.get("access")} |
+        levels = sorted(traced.get(source.source_id,set()) | {n["access"] for n in notes if n.get("access")} |
                         {s["access"] for s in mapped if s["source_id"] == source.source_id})
         directory.append({
-            "source_id": source.source_id, "title": source.title, "url": source.url, "doi": source.doi,
+            "source_id": source.source_id, "title": source.title, "url": public_url(source), "doi": source.doi,
             "arxiv_id": source.arxiv_id, "version": source.version, "source_type": source.source_type,
-            "access_status": source.access_status, "content_complete": source.content_complete,
+            "access_status": source.access_status, "content_complete": bool(source.content_path and source.content_complete),
+            "representation_id":source.representation_id, "start_char":source.content_start_char,
+            "total_chars":source.content_total_chars,
             "reading_level": levels[0] if len(levels) == 1 else (
                 "multiple" if levels else "metadata" if source.access_status == "metadata_only" else "not_recorded"),
             "read_levels": levels, "source_notes": notes,

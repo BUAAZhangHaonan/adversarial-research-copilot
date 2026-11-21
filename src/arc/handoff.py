@@ -71,6 +71,8 @@ def _prepare(store, settings, request, signature):
             raise StateError("continuation_belongs_to_another_origin")
         _, previous = store.selected_idea_context(idea_id)
     seed, brief, mapping = request.register_materials(store)
+    if previous:
+        seed.source_ids=list(dict.fromkeys([*seed.source_ids, *previous["seed"]["source_ids"]]))
     field = brief.model_dump(mode="json")
     if previous.get("field_brief"):
         prior = previous["field_brief"]
@@ -87,7 +89,7 @@ def _prepare(store, settings, request, signature):
                 "available_assets": request.assets, "resource_conditions": request.resource_conditions}
     body = {"handoff_id": hid, "idea_id": idea_id, "run_id": run_id, "origin": origin,
             "stage": request.request.stage, "payload": request.model_dump(mode="json"),
-            "stage_input": selected, "source_mapping": mapping, "settings": settings.model_dump(mode="json"),
+            "stage_input": selected, "source_mapping": mapping, "settings": settings.model_copy(update={"data_dir":settings.data_dir.resolve()}).model_dump(mode="json"),
             "imported_at": utc_now()}
     idea = {"idea_id": idea_id, "external_origin": origin, "initial_context": selected,
             "topic": seed.question, "seed": selected["seed"], "note": None, "status": "selected",
@@ -121,7 +123,7 @@ def materialize_run(store, body):
     with store._connect() as db:
         created = db.execute("SELECT 1 FROM runs WHERE id=?", (body["run_id"],)).fetchone()
     if not created:
-        frozen = Settings.model_validate(body["settings"])
+        frozen = Settings.model_validate(body["settings"]).model_copy(update={"data_dir":store.db_path.parent.resolve()})
         new_run(frozen, body["stage"], idea_id=body["idea_id"], budget=frozen.budget_cny,
                 run_id=body["run_id"], frozen_idea_input=body["stage_input"])
 
