@@ -483,6 +483,10 @@ def render_discovery_run(store: Any, run_id: str, output_dir: str | Path,
         references = _discovery_sources(sorted(note_ids), source_notes, sources, target.parent, store)
         provenance = (f"想法 `{idea_id}`；运行 `{_safe_id(run_id)}`；抽卡机会 {idea.get('draw_id', '未记录')}；"
                       f"资料版本 {idea.get('brief_version', '未记录')}。原题：{idea.get('topic', '')}")
+        if original_origin := idea.get("external_origin"):
+            current_origin = selected.get("external_origin") or original_origin
+            provenance = (f"用户选中的研究问题：{idea.get('topic', '')}。"
+                          f"外部快照：{current_origin['snapshot_id']}。本阶段关注：{selected.get('stage_focus', '')}")
         current = note.get('current_understanding') or {}
         relation = triage.get('candidate_relation') or {}
         relation_names = {'independent': '独立认识', 'alternative_route': '替代路线',

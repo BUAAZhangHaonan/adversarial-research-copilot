@@ -102,7 +102,9 @@ async def test_two_real_stage_paths_render_and_export_later_source_and_draft(tmp
     retrieved=next(x for x in out["source_directory"] if x["source_id"]==new.source_id)
     assert (retrieved["url"],retrieved["version"],retrieved["origin"],retrieved["reading_level"])==(
         new.url,"experiment-v1","arc_stage","passage")
-    assert build_polish_payload(store,record["run_id"])["candidates"][0]["idea_id"]==record["idea_id"]
+    writer_input=build_polish_payload(store,record["run_id"])
+    assert writer_input["candidates"][0]["idea_id"]==record["idea_id"]
+    assert writer_input["stage_focus"]==raw["request"]["focus"]
     follow=deepcopy(raw);follow.update(handoff_id="sample-run",idea_id=record["idea_id"])
     follow["request"]={"stage":"run","focus":"这一对照能否排除难度解释？","boundaries":["只预研"]}
     next_stage=import_selected(settings,SelectedIdea.model_validate(follow))

@@ -92,6 +92,7 @@ def build_polish_payload(store, run_id):
     return compact_polish_payload({'run_id': run_id, 'stage': run['mode'],
             'original_question': campaign.get('topic') or selected.get('original_question', ''),
             'user_boundaries': campaign.get('boundaries') or selected.get('user_boundaries', []),
+            **({'stage_focus': selected['stage_focus']} if selected.get('stage_focus') else {}),
             'field_brief': brief, 'candidates': candidates, 'skipped_directions': skipped,
             'source_directory': directory, 'citation_limit': MAX_CITED_SOURCES,
             'evidence_limits': evidence_limit_summaries(state)})
