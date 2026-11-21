@@ -31,7 +31,7 @@ def export_result(store, ledger, handoff_id):
         if n not in group:
             group.append(n)
     ids.update(by_source)
-    traced = trace_readings(store, run.run_id) if run.status != "RUNNING" else {}
+    traced, missing_trace = trace_readings(store, run.run_id) if run.status != "RUNNING" else ({}, False)
     ids.update(traced)
     # Include older Radar links only for sources delivered into this continuation.
     if body["payload"].get("idea_id") and inherited:
@@ -84,6 +84,8 @@ def export_result(store, ledger, handoff_id):
         "presentation_status":("polished" if polish else "draft" if note else "unavailable" if completed else "pending"),
         "presentation":polish, "polish_failure":state.get("polish_failure"),
         "draft":note or None, "draft_text":draft_text, "cited_source_ids":sorted(cited),
-        "source_directory":directory, "source_mapping":mapped, "source_notes":note.get("source_notes", []),
+        "source_directory":directory, "source_mapping":mapped,
+        "source_trace_status":"partial" if missing_trace else "recorded" if run.status!="RUNNING" else "in_progress",
+        "unresolved_cited_source_ids":sorted(cited - {s["source_id"] for s in directory}), "source_notes":note.get("source_notes", []),
         "previous_stage":selected.get("latest_note_origin"), "cost":ledger.summary(run.budget_account_id),
     }

@@ -8,10 +8,15 @@ def trace_readings(store, run_id):
     levels: dict[str, set[str]] = {}
     intervals: dict[str, list[tuple[int, int]]] = {}
     totals: dict[str, int] = {}
+    incomplete = False
     for task in store.list_tasks(run_id):
         if not task.response_artifact_path:
             continue
-        result = json.loads(store.read_artifact(task.response_artifact_path))
+        try:
+            result = json.loads(store.read_artifact(task.response_artifact_path))
+        except (FileNotFoundError,ValueError):
+            incomplete = True
+            continue
         for item in result.get("tool_trace", []):
             response = item.get("result") or {}
             if item.get("status") != "completed" or response.get("is_error"):
@@ -45,7 +50,7 @@ def trace_readings(store, run_id):
             end = max(end, stop)
         if end == total:
             levels[sid].add("full_text")
-    return levels
+    return levels, incomplete
 
 
 def public_url(source):
